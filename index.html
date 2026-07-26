@@ -261,7 +261,6 @@
   <button class="btn btn-warn" id="btn-toggle-db-access"></button>
   <button class="btn btn-warn" id="btn-boundary-mode">📍 Définir le contour du site</button>
   <button class="btn btn-primary" id="btn-boundary-finish" style="display:none;">✅ Terminer le contour</button>
-  <button class="btn btn-warn" id="btn-entry-point-mode">🚪 Définir l'entrée du site</button>
 </div>
 
 <div id="banner"></div>
@@ -570,9 +569,7 @@ let boundaryDraftPoints = [];
 let boundaryDraftMarkers = [];
 let tempAccesses = {}; // { token: {type:'pickup'|'encode', trailer, target, lat, lng, label, expiresAt, createdAt, used} }
 let driverMode = null; // {token, entry} si on est en accès chauffeur restreint
-let siteEntryPoint = null; // {lat,lng} point d'entrée obligatoire du site (évite que le routage passe par la sortie)
-let entryPointMode = false;
-let entryPointMarker = null;
+
 
 
 // ---------- HELPERS ----------
@@ -629,7 +626,6 @@ async function loadAll(preFetched) {
   dbAccessMode = (d.dbAccessMode && d.dbAccessMode.mode) || 'restricted';
   siteBoundary = Array.isArray(d.siteBoundary) ? d.siteBoundary : [];
   tempAccesses = d.tempAccesses || {};
-  siteEntryPoint = (d.siteEntryPoint && d.siteEntryPoint.lat != null) ? d.siteEntryPoint : null;
 }
 
 async function saveSpotsConfig() {
@@ -679,10 +675,7 @@ async function saveTempAccesses() {
   try { await backendSave('saveTempAccesses', 'yard:temp-access', tempAccesses); }
   catch(e) { toast("Erreur sauvegarde des accès chauffeur"); }
 }
-async function saveSiteEntryPoint() {
-  try { await backendSave('saveSiteEntryPoint', 'yard:site-entry', siteEntryPoint); }
-  catch(e) { toast("Erreur sauvegarde du point d'entrée"); }
-}
+
 
 async function saveMapView(viewData) {
   try { await backendSave('saveMapView', STORAGE_KEY_MAP_VIEW, viewData); }
@@ -710,7 +703,6 @@ async function initMap(center, zoom, dataAlreadyLoaded) {
   renderSpots(center);
   renderFreeTrailers();
   renderBoundary();
-  renderEntryPointMarker();
   updateHeader();
   startGpsTracking();
   startLiveSync();
@@ -801,17 +793,6 @@ function startGpsTracking() {
 
 let routeLine = null;
 
-async function fetchRoute(profile, from, to) {
-  const base = profile === 'foot'
-    ? 'https://routing.openstreetmap.de/routed-foot/route/v1/foot/'
-    : 'https://routing.openstreetmap.de/routed-car/route/v1/driving/';
-  const url = `${base}${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  if (!data.routes || !data.routes.length) return null;
-  return data.routes[0];
-}
-
 async function openRouteTo(lat, lng) {
   if (!userPos) {
     toast("Position GPS non disponible, réessaie dans un instant");
@@ -819,61 +800,27 @@ async function openRouteTo(lat, lng) {
   }
   if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
 
-  const target = { lat, lng };
   toast("Calcul de l'itinéraire...");
-
   try {
-    if (siteEntryPoint) {
-      // Étape 1 : de la position actuelle jusqu'à l'entrée réelle du site (routage public)
-      // Étape 2 : de l'entrée jusqu'à la remorque, en ligne directe à l'intérieur du site
-      const [footLeg1, carLeg1] = await Promise.all([
-        fetchRoute('foot', userPos, siteEntryPoint).catch(() => null),
-        fetchRoute('car', userPos, siteEntryPoint).catch(() => null)
-      ]);
-      const leg1 = footLeg1 || carLeg1;
-      const leg1Coords = leg1 ? leg1.geometry.coordinates.map(c => [c[1], c[0]]) : [[userPos.lat, userPos.lng], [siteEntryPoint.lat, siteEntryPoint.lng]];
-      const leg2Coords = [[siteEntryPoint.lat, siteEntryPoint.lng], [target.lat, target.lng]];
-      const fullCoords = [...leg1Coords, ...leg2Coords];
-
-      routeLine = L.polyline(fullCoords, { color: '#2563eb', weight: 5, opacity: 0.85 }).addTo(map);
-      map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
-
-      const leg1Dist = leg1 ? leg1.distance : distanceMeters(userPos, siteEntryPoint);
-      const leg2Dist = distanceMeters(siteEntryPoint, target);
-      const totalDist = leg1Dist + leg2Dist;
-      const distanceLabel = totalDist < 1000 ? `${Math.round(totalDist)} m` : `${(totalDist/1000).toFixed(1)} km`;
-      const parts = [distanceLabel + ' (via entrée du site)'];
-      if (footLeg1) parts.push(`🚶 ${Math.round((footLeg1.duration + leg2Dist/1000/4.5*3600)/60)} min à pied`);
-      if (carLeg1) parts.push(`🚗 ${Math.round((carLeg1.duration + leg2Dist/1000/15*3600)/60)} min en voiture`);
-      toast(parts.join(' · '), 6000);
-      return;
-    }
-
-    const [footRoute, carRoute] = await Promise.all([
-      fetchRoute('foot', userPos, target).catch(() => null),
-      fetchRoute('car', userPos, target).catch(() => null)
-    ]);
-
-    const mainRoute = footRoute || carRoute;
-    if (!mainRoute) {
+    const url = `https://router.project-osrm.org/route/v1/foot/${userPos.lng},${userPos.lat};${lng},${lat}?overview=full&geometries=geojson`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!data.routes || !data.routes.length) {
       toast("Itinéraire introuvable, ligne directe affichée");
-      drawStraightLine(userPos, target);
+      drawStraightLine(userPos, { lat, lng });
       return;
     }
-    const coords = mainRoute.geometry.coordinates.map(c => [c[1], c[0]]);
+    const route = data.routes[0];
+    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
     routeLine = L.polyline(coords, { color: '#2563eb', weight: 5, opacity: 0.85 }).addTo(map);
     map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
-
-    const distanceM = Math.round(mainRoute.distance);
-    const distanceLabel = distanceM < 1000 ? `${distanceM} m` : `${(distanceM/1000).toFixed(1)} km`;
-    const parts = [distanceLabel];
-    if (footRoute) parts.push(`🚶 ${Math.round(footRoute.duration/60)} min à pied`);
-    if (carRoute) parts.push(`🚗 ${Math.round(carRoute.duration/60)} min en voiture`);
-    toast(parts.join(' · '), 6000);
+    const distanceM = Math.round(route.distance);
+    const durationMin = Math.round(route.duration / 60);
+    toast(`${distanceM} m · environ ${durationMin} min à pied`);
   } catch (e) {
     console.error("Erreur itinéraire:", e);
     toast("Itinéraire indisponible, ligne directe affichée");
-    drawStraightLine(userPos, target);
+    drawStraightLine(userPos, { lat, lng });
   }
 }
 
@@ -987,15 +934,6 @@ function finalizeRow() {
 }
 
 function onMapClick(e) {
-  if (entryPointMode) {
-    siteEntryPoint = { lat: e.latlng.lat, lng: e.latlng.lng };
-    saveSiteEntryPoint();
-    renderEntryPointMarker();
-    toast("Point d'entrée défini");
-    entryPointMode = false;
-    document.getElementById('btn-entry-point-mode').style.background = '#d97706';
-    return;
-  }
   if (driverMode) {
     if (driverMode.entry.type !== 'encode') return; // rien d'autre autorisé en mode reprise
     if (driverMode.entry.used) { toast("Accès déjà utilisé"); return; }
@@ -1758,20 +1696,6 @@ document.getElementById('db-btn-delete').onclick = async () => {
   renderDbPanel();
   saveTrailerDB().catch(() => toast("Erreur de synchronisation"));
 };
-
-document.getElementById('btn-entry-point-mode').onclick = () => {
-  entryPointMode = !entryPointMode;
-  document.getElementById('btn-entry-point-mode').style.background = entryPointMode ? '#2563eb' : '#d97706';
-  toast(entryPointMode ? "Touche l'entrée réelle du site sur la carte" : "Annulé");
-};
-
-function renderEntryPointMarker() {
-  if (entryPointMarker) { map.removeLayer(entryPointMarker); entryPointMarker = null; }
-  if (siteEntryPoint) {
-    const icon = L.divIcon({ className: '', html: '<div style="font-size:26px;">🚪</div>', iconSize: [30, 30], iconAnchor: [15, 28] });
-    entryPointMarker = L.marker([siteEntryPoint.lat, siteEntryPoint.lng], { icon }).addTo(map);
-  }
-}
 
 function addBoundaryPoint(latlng) {
   const icon = L.divIcon({ className: '', html: '<div class="anchor-marker"></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
