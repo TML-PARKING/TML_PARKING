@@ -1,0 +1,2114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TML Ghlin">
+<meta name="theme-color" content="#111827">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23111827'/%3E%3Ctext x='50' y='62' font-size='55' text-anchor='middle'%3E%F0%9F%9A%9B%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23111827'/%3E%3Ctext x='50' y='62' font-size='55' text-anchor='middle'%3E%F0%9F%9A%9B%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Plan%20Site%20TML%20Ghlin%22%2C%22short_name%22%3A%22TML%20Ghlin%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%23111827%22%7D">
+<title>Plan Site TML Ghlin - Gestion Remorques</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; overflow: hidden; position: fixed; width: 100%; }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+
+  header {
+    background: #111827; color: #fff; padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #1f2937; z-index: 1000; flex-shrink: 0;
+    flex-wrap: wrap; row-gap: 8px;
+  }
+  header h1 { font-size: 15px; font-weight: 600; }
+  header .sub { font-size: 11px; color: #9ca3af; }
+  header > div:first-child { min-width: 0; }
+  .top-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .btn {
+    border: none; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: opacity .15s; color: #fff; white-space: nowrap;
+  }
+  .btn:active { opacity: .7; }
+  .btn-primary { background: #2563eb; }
+  .btn-ghost { background: #1f2937; color: #d1d5db; }
+  .btn-danger { background: #dc2626; }
+  .btn-success { background: #16a34a; }
+  .btn-warn { background: #d97706; }
+
+  #map { flex: 1; width: 100%; }
+
+  .leaflet-container { background: #0f172a; }
+
+  /* Marqueurs emplacements fixes */
+  .spot-marker {
+    width: 34px; height: 34px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px; color: #fff;
+    border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
+  .spot-free { background: #16a34a; }
+  .spot-occupied { background: #dc2626; }
+  .spot-editing { background: #d97706; }
+
+  .trailer-marker {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #ea580c; border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+
+  /* Panneau bas coulissant */
+  #sheet {
+    position: fixed; left: 50%; right: auto; bottom: 0; width: 100%;
+    background: #111827; color: #fff; border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.4);
+    transform: translate(-50%, 100%); transition: transform .25s ease;
+    z-index: 2000; max-height: 80vh; display: flex; flex-direction: column;
+  }
+  #sheet.open { transform: translate(-50%, 0); }
+
+  .bottom-sheet {
+    position: fixed; left: 50%; right: auto; bottom: 0; width: 100%;
+    background: #111827; color: #fff; border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.4);
+    transform: translate(-50%, 100%); transition: transform .25s ease;
+    display: flex; flex-direction: column;
+  }
+  .bottom-sheet.open { transform: translate(-50%, 0); }
+
+  @media (min-width: 768px) {
+    #sheet, .bottom-sheet {
+      max-width: 460px; bottom: 24px; border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    }
+  }
+  #sheet .handle, .bottom-sheet .handle {
+    width: 40px; height: 4px; background: #4b5563; border-radius: 2px;
+    margin: 10px auto 6px;
+  }
+  .sheet-header { padding: 0 18px 8px; display: flex; justify-content: space-between; align-items: center; }
+  .sheet-header h2 { font-size: 16px; }
+  .sheet-body { padding: 4px 18px 20px; overflow-y: auto; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 11px; color: #9ca3af; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+  .field input, .field select, .field textarea {
+    width: 100%; background: #1a2333; border: 1px solid #374151; color: #fff;
+    border-radius: 10px; padding: 12px 14px; font-size: 15px; transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: #2563eb; background: #1f2937;
+  }
+  .field textarea { resize: vertical; min-height: 50px; }
+
+  .status-options { display: flex; gap: 8px; flex-wrap: wrap; }
+  .status-chip {
+    flex: 1; min-width: 90px; padding: 12px 8px; text-align: center; border-radius: 10px;
+    background: #1a2333; border: 1px solid #374151; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; color: #d1d5db; transition: all .15s;
+  }
+  .status-chip.active { border-color: transparent; }
+  .status-chip[data-status="pleine"].active { background: #16a34a; color: #fff; }
+  .status-chip[data-status="vide"].active { background: #6b7280; color: #fff; }
+  .status-chip[data-status="fleet"].active { background: #7c3aed; color: #fff; }
+  .status-chip[data-status="charge"].active { background: #0891b2; color: #fff; }
+  #db-ct-ok.active { background: #16a34a; color: #fff; border-color: transparent; }
+  #db-ct-nok.active { background: #dc2626; color: #fff; border-color: transparent; }
+
+  .age-warning { color: #f87171; font-size: 11px; margin-top: 4px; }
+
+  .sheet-actions { display: flex; gap: 8px; margin-top: 6px; }
+  .sheet-actions .btn { flex: 1; padding: 13px; font-size: 14px; }
+
+  /* Liste des remorques */
+  #list-panel {
+    position: fixed; top: 52px; right: 0; bottom: 0; width: 280px; max-width: 82vw;
+    background: #111827ee; color: #fff; transform: translateX(100%);
+    transition: transform .2s ease; z-index: 1500; overflow-y: auto;
+    border-left: 1px solid #1f2937;
+  }
+  #list-panel.open { transform: translateX(0); }
+  #list-panel .lp-header { padding: 12px 14px; border-bottom: 1px solid #1f2937; display:flex; justify-content:space-between; align-items:center; }
+  #list-panel .lp-header h3 { font-size: 14px; }
+  .lp-search { padding: 10px 14px; border-bottom: 1px solid #1f2937; }
+  .lp-search input { width: 100%; background: #1f2937; border: 1px solid #374151; color: #fff; border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+  .lp-item {
+    padding: 10px 14px; border-bottom: 1px solid #1f293780; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .lp-item:active { background: #1f2937; }
+  .lp-item .lp-num { font-weight: 700; font-size: 13px; }
+  .lp-item .lp-meta { font-size: 11px; color: #9ca3af; }
+  .lp-badge { font-size: 10px; padding: 3px 7px; border-radius: 6px; font-weight: 600; flex-shrink: 0; }
+  .lp-badge.pleine { background: #16a34a33; color: #4ade80; }
+  .lp-badge.vide { background: #6b728033; color: #d1d5db; }
+  .lp-badge.fleet { background: #7c3aed33; color: #c4b5fd; }
+  .lp-badge.charge { background: #0891b233; color: #67e8f9; }
+  .lp-badge.rouge15 { background: #dc262633; color: #f87171; }
+  .lp-badge.ctsoon { background: #f9731633; color: #fb923c; }
+
+  .detail-row { display:flex; justify-content:space-between; align-items:flex-start; padding:8px 0; border-bottom:1px solid #37415180; gap:12px; }
+  .detail-row:last-child { border-bottom:none; }
+  .detail-label { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; flex-shrink:0; }
+  .detail-value { font-size:14px; font-weight:600; text-align:right; }
+  .detail-pill { padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; }
+  .lp-filter-btn { font-size: 11px; padding: 6px 10px; white-space: nowrap; flex: 0 0 auto; }
+  .lp-filter-btn.active { background: #2563eb; color: #fff; }
+  #list-panel .empty { padding: 20px 14px; color: #6b7280; font-size: 13px; text-align: center; }
+
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1400; display: none; }
+  #overlay.show { display: block; }
+
+  #banner {
+    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+    background: #1f2937; color: #fbbf24; padding: 8px 16px; border-radius: 10px;
+    font-size: 12px; z-index: 1400; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    display: none; max-width: 90vw; text-align: center;
+  }
+  #banner.show { display: block; }
+
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #16a34a; color: #fff; padding: 10px 18px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; z-index: 3000; opacity: 0; transition: opacity .2s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  .legend {
+    position: fixed; left: 10px; bottom: 14px; background: #111827dd; color: #d1d5db;
+    padding: 8px 10px; border-radius: 10px; font-size: 10px; z-index: 1200; line-height: 1.6;
+  }
+  .legend span { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; }
+
+  /* Mode accès chauffeur restreint : masque toute la navigation normale */
+  body.driver-mode #btn-list, body.driver-mode #btn-reframe, body.driver-mode #btn-emails,
+  body.driver-mode #btn-trailerdb, body.driver-mode #btn-setup, body.driver-mode #btn-history,
+  body.driver-mode .legend { display: none !important; }
+
+  #driver-card {
+    position: fixed; left: 50%; bottom: 0; width: 100%; max-width: 460px; transform: translateX(-50%);
+    background: #111827; color: #fff; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.4);
+    z-index: 1800; padding: 18px; display: none;
+  }
+  #driver-card h2 { font-size: 18px; margin-bottom: 10px; }
+  #driver-thankyou {
+    position: fixed; inset: 0; background: #0f172a; color: #fff; z-index: 5000;
+    display: none; align-items: center; justify-content: center; text-align: center; padding: 30px;
+  }
+
+  .anchor-marker {
+    width: 22px; height: 22px; border-radius: 50%; background: #facc15;
+    border: 3px solid #111827; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
+
+  #admin-tools {
+    position: fixed; right: 10px; bottom: 90px; z-index: 1300;
+    display: none; flex-direction: column; gap: 8px; width: 190px;
+  }
+  #admin-tools button {
+    width: 100%; padding: 10px 8px; font-size: 11.5px; line-height: 1.3;
+    border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    white-space: normal; word-break: break-word;
+  }
+
+  /* Position GPS de l'utilisateur */
+  .user-location-marker {
+    width: 18px; height: 18px; border-radius: 50%; background: #3b82f6;
+    border: 3px solid #fff; box-shadow: 0 0 0 4px #3b82f680;
+  }
+
+  .btn-route {
+    display: block; width: 100%; padding: 12px; margin-top: 10px; border-radius: 8px;
+    background: #2563eb; color: #fff; font-weight: 600; font-size: 14px; text-align: center;
+    border: none; cursor: pointer;
+  }
+
+
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1>Site TML Ghlin</h1>
+      <div class="sub" id="header-sub">Chargement...</div>
+    </div>
+    <div class="top-actions">
+      <button class="btn btn-ghost" id="btn-list">📋 Liste</button>
+      <button class="btn btn-primary" id="btn-gen-encode-access">🔑 Accès dépôt</button>
+      <button class="btn btn-ghost" id="btn-history">🕓</button>
+      <button class="btn btn-warn" id="btn-reframe" style="display:none;">📍 Fixer le cadrage</button>
+      <button class="btn btn-ghost" id="btn-emails" style="display:none;">✉️</button>
+      <button class="btn btn-ghost" id="btn-trailerdb">🗄️</button>
+      <button class="btn btn-ghost" id="btn-setup">⚙️</button>
+    </div>
+  </header>
+  <div id="map"></div>
+</div>
+
+<div id="admin-tools">
+  <button class="btn btn-warn" id="btn-row-mode">📐 Créer une rangée alignée</button>
+  <button class="btn btn-warn" id="btn-add-spots">➕ Ajouter des emplacements</button>
+  <button class="btn btn-warn" id="btn-toggle-db-access"></button>
+  <button class="btn btn-warn" id="btn-boundary-mode">📍 Définir le contour du site</button>
+  <button class="btn btn-primary" id="btn-boundary-finish" style="display:none;">✅ Terminer le contour</button>
+</div>
+
+<div id="banner"></div>
+
+<div class="legend">
+  <div><span style="background:#16a34a"></span>Emplacement libre</div>
+  <div><span style="background:#dc2626"></span>Emplacement occupé</div>
+  <div><span style="background:#ea580c;border-radius:50%"></span>Remorque en zone libre</div>
+</div>
+
+<div id="overlay"></div>
+
+<div id="list-panel">
+  <div class="lp-header">
+    <h3>Remorques sur site (<span id="lp-count">0</span>)</h3>
+    <button class="btn btn-ghost" id="btn-list-close" style="padding:4px 8px;">✕</button>
+  </div>
+  <div class="lp-search"><input type="text" id="lp-search-input" placeholder="Rechercher n°, client..."></div>
+  <div id="lp-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px;">
+    <button class="btn btn-ghost lp-filter-btn active" data-filter="all" style="flex-shrink:0;">Tous</button>
+    <button class="btn btn-ghost lp-filter-btn" data-filter="pleine" style="flex-shrink:0;">À vider</button>
+    <button class="btn btn-ghost lp-filter-btn" data-filter="vide" style="flex-shrink:0;">Vide</button>
+    <button class="btn btn-ghost lp-filter-btn" data-filter="fleet" style="flex-shrink:0;">Fleet</button>
+    <button class="btn btn-ghost lp-filter-btn" data-filter="charge" style="flex-shrink:0;">Chargé</button>
+  </div>
+  <div id="lp-items"></div>
+</div>
+
+<div id="history-panel" style="position:fixed; top:52px; right:0; bottom:0; width:300px; max-width:88vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
+  <div class="lp-header">
+    <h3>Historique (<span id="hp-count">0</span>)</h3>
+    <button class="btn btn-ghost" id="btn-history-close" style="padding:4px 8px;">✕</button>
+  </div>
+  <div class="lp-search"><input type="text" id="hp-search-input" placeholder="Rechercher n°, client..."></div>
+  <div id="hp-items"></div>
+</div>
+
+<div id="sheet">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2 id="sheet-title">Emplacement</h2>
+    <button class="btn btn-ghost" id="btn-sheet-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <label>N° Remorque</label>
+      <input type="text" id="f-trailer" placeholder="Ex: TR-4521" autocomplete="off">
+      <div id="ct-indicator" style="margin-top:6px; font-size:13px; font-weight:600; display:none; padding:8px 10px; border-radius:8px;"></div>
+    </div>
+    <div class="field">
+      <label>Client</label>
+      <input type="text" id="f-client" placeholder="Ex: Chaussea, Nike, H&M..." autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Statut</label>
+      <div class="status-options">
+        <div class="status-chip" data-status="pleine">À vider</div>
+        <div class="status-chip" data-status="vide">Vide</div>
+        <div class="status-chip" data-status="fleet">Fleet</div>
+        <div class="status-chip" data-status="charge">Chargé</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="f-notes" placeholder="Optionnel"></textarea>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-danger" id="btn-remove">Retirer</button>
+      <button class="btn btn-success" id="btn-save">Enregistrer</button>
+    </div>
+    <button class="btn-route" id="btn-route">🧭 Itinéraire vers cette remorque</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="driver-card">
+  <h2 id="driver-card-title">Remorque</h2>
+  <div id="driver-card-body" style="margin-bottom:16px; font-size:14px; line-height:1.6;"></div>
+  <button class="btn-route" id="btn-driver-route" style="margin-top:0;">🧭 Tracer l'itinéraire</button>
+  <button class="btn btn-success" id="btn-driver-done" style="width:100%; padding:14px; margin-top:10px; font-size:15px;">✅ Marquer comme récupérée</button>
+</div>
+
+<div id="driver-thankyou">
+  <div>
+    <div style="font-size:48px; margin-bottom:16px;">✅</div>
+    <div id="driver-thankyou-text" style="font-size:18px; font-weight:600;"></div>
+  </div>
+</div>
+
+<div id="email-sheet" class="bottom-sheet" style="z-index:2000; max-height:80vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Destinataires des alertes (>15 jours)</h2>
+    <button class="btn btn-ghost" id="btn-email-sheet-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <label>Seuil d'alerte (jours sur site)</label>
+      <input type="number" id="f-threshold-days" min="1" placeholder="15">
+    </div>
+    <div class="field">
+      <label>Fréquence d'envoi du récapitulatif</label>
+      <select id="f-frequency-days">
+        <option value="1">Tous les jours</option>
+        <option value="2">Tous les 2 jours</option>
+        <option value="3">Tous les 3 jours</option>
+        <option value="7">Une fois par semaine</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" id="btn-save-alert-settings" style="width:100%; padding:12px; margin-bottom:16px;">Enregistrer les réglages</button>
+    <hr style="border-color:#1f2937; margin-bottom:14px;">
+    <div id="email-list" style="margin-bottom: 14px;"></div>
+    <div class="field">
+      <label>Ajouter une adresse</label>
+      <input type="email" id="f-new-email" placeholder="ex: departement@tml.be" autocomplete="off">
+    </div>
+    <button class="btn btn-success" id="btn-add-email" style="width:100%; padding:12px;">Ajouter</button>
+
+    <hr style="border-color:#1f2937; margin:20px 0;">
+    <h3 style="font-size:14px; margin-bottom:10px;">Alertes contrôle technique (dépassé ou &lt; 2 mois)</h3>
+    <div id="ct-email-list" style="margin-bottom: 14px;"></div>
+    <div class="field">
+      <label>Ajouter une adresse (alertes CT)</label>
+      <input type="email" id="f-new-ct-email" placeholder="ex: qualite@tml.be" autocomplete="off">
+    </div>
+    <button class="btn btn-success" id="btn-add-ct-email" style="width:100%; padding:12px;">Ajouter</button>
+  </div>
+</div>
+
+<div id="detail-sheet" class="bottom-sheet" style="z-index:2100; max-height:88vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2 id="detail-title">Remorque</h2>
+    <button class="btn btn-ghost" id="btn-detail-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body" style="padding-top:0;">
+    <div id="detail-badges" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;"></div>
+
+    <div style="background:#1f2937; border-radius:12px; padding:14px; margin-bottom:14px;">
+      <div class="detail-row"><span class="detail-label">Client</span><span id="detail-client" class="detail-value">—</span></div>
+      <div class="detail-row"><span class="detail-label">Emplacement</span><span id="detail-location" class="detail-value">—</span></div>
+      <div class="detail-row"><span class="detail-label">Déposée depuis</span><span id="detail-days" class="detail-value">—</span></div>
+      <div class="detail-row" id="detail-notes-row"><span class="detail-label">Notes</span><span id="detail-notes" class="detail-value">—</span></div>
+    </div>
+
+    <div id="detail-ct-box" style="border-radius:12px; padding:14px; margin-bottom:14px; display:none;">
+      <div style="font-size:12px; text-transform:uppercase; letter-spacing:.03em; opacity:.8; margin-bottom:4px;">Contrôle technique</div>
+      <div id="detail-ct-text" style="font-weight:600; font-size:14px;"></div>
+    </div>
+
+    <div id="detail-compass-box" style="display:flex; align-items:center; gap:16px; background:#1f2937; border-radius:12px; padding:14px; margin-bottom:18px;">
+      <div id="detail-compass-arrow" style="width:46px; height:46px; flex-shrink:0; transition: transform .3s ease;">
+        <svg viewBox="0 0 24 24" width="46" height="46"><path d="M12 2 L19 21 L12 17 L5 21 Z" fill="#2563eb"/></svg>
+      </div>
+      <div>
+        <div style="font-weight:700; font-size:15px;" id="detail-distance">Position GPS indisponible</div>
+        <div style="font-size:12px; color:#9ca3af;">Direction approximative depuis ta position</div>
+      </div>
+    </div>
+
+    <button class="btn-route" id="btn-detail-route" style="margin-top:0;">🧭 Tracer l'itinéraire sur la carte</button>
+    <button class="btn btn-ghost" id="btn-detail-edit" style="width:100%; padding:12px; margin-top:10px;">✏️ Voir / modifier la fiche</button>
+    <button class="btn btn-primary" id="btn-detail-qr" style="width:100%; padding:12px; margin-top:10px;">🔑 Accès chauffeur temporaire (reprise)</button>
+    <button class="btn btn-danger" id="btn-detail-remove" style="width:100%; padding:12px; margin-top:10px;">🗑️ Retirer cette remorque</button>
+  </div>
+</div>
+
+<div id="qr-modal" class="bottom-sheet" style="z-index:2200; max-height:90vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Accès chauffeur temporaire</h2>
+    <button class="btn btn-ghost" id="btn-qr-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body" style="text-align:center;">
+    <div id="qr-code-box" style="background:#fff; padding:16px; border-radius:12px; display:inline-block; margin-bottom:16px;"></div>
+    <div id="qr-expiry-text" style="font-size:13px; color:#9ca3af; margin-bottom:14px;"></div>
+    <div class="field" style="text-align:left;">
+      <label>Lien (si le QR ne peut pas être scanné)</label>
+      <input type="text" id="qr-link-text" readonly style="font-size:12px;">
+    </div>
+    <button class="btn btn-primary" id="btn-qr-copy" style="width:100%; padding:12px;">📋 Copier le lien</button>
+  </div>
+</div>
+
+<div id="db-panel" style="position:fixed; top:52px; right:0; bottom:0; width:300px; max-width:88vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
+  <div class="lp-header">
+    <h3>Base remorques (<span id="db-count">0</span>)</h3>
+    <button class="btn btn-ghost" id="btn-db-panel-close" style="padding:4px 8px;">✕</button>
+  </div>
+  <div class="lp-search"><input type="text" id="db-panel-search" placeholder="Rechercher n° remorque..."></div>
+  <div id="db-panel-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px;">
+    <button class="btn btn-ghost lp-filter-btn active" data-dbfilter="all">Tous</button>
+    <button class="btn btn-ghost lp-filter-btn" data-dbfilter="ok">✅ OK</button>
+    <button class="btn btn-ghost lp-filter-btn" data-dbfilter="soon">🟠 &lt; 2 mois</button>
+    <button class="btn btn-ghost lp-filter-btn" data-dbfilter="nok">⚠️ Non OK</button>
+  </div>
+  <div style="padding:0 14px 10px;">
+    <button class="btn btn-success" id="btn-db-new" style="width:100%; padding:10px;">➕ Ajouter une remorque</button>
+  </div>
+  <div id="db-panel-items"></div>
+</div>
+
+<div id="db-sheet" class="bottom-sheet" style="z-index:2000; max-height:85vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Base de données remorques (contrôle technique)</h2>
+    <button class="btn btn-ghost" id="btn-db-sheet-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <label>N° Remorque</label>
+      <input type="text" id="db-f-trailer" placeholder="Ex: TR-4521" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Date de validité du contrôle technique</label>
+      <input type="date" id="db-f-date">
+    </div>
+    <div id="db-ct-preview" style="margin-bottom:12px; font-size:13px; font-weight:600; display:none; padding:8px 10px; border-radius:8px;"></div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="db-f-notes" placeholder="Optionnel"></textarea>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-danger" id="db-btn-delete">Supprimer</button>
+      <button class="btn btn-success" id="db-btn-save">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- CONFIG ----------
+const SITE_ADDRESS = "Route de Wallonie 138, 7011 Ghlin, Belgique";
+const FALLBACK_COORDS = [50.4700, 3.9280]; // approx Ghlin industrial zone, corrected on geocode
+
+// Renseigne ici l'URL de déploiement Apps Script (Déployer > Nouveau déploiement > Application web)
+// une fois copiée depuis Google. Obligatoire : sans elle, l'app ne peut pas fonctionner.
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbySqX-2TWedMzSHyHpUyOFWDy_vFALhCAIWv9fIUQhvtSMTySY0-JWpLfwdFE8BJQmPUA/exec";
+
+// ---------- COUCHE DE DONNÉES (Google Sheets via Apps Script) ----------
+async function backendGetAll() {
+  if (!APPS_SCRIPT_URL) {
+    showBackendMissingWarning();
+    return {};
+  }
+  const resp = await fetch(APPS_SCRIPT_URL + '?action=getAll');
+  return await resp.json();
+}
+
+async function backendSave(action, storageKey, data) {
+  if (!APPS_SCRIPT_URL) {
+    showBackendMissingWarning();
+    return;
+  }
+  // text/plain évite le preflight CORS que Apps Script ne gère pas
+  await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, data })
+  });
+}
+
+let backendWarningShown = false;
+function showBackendMissingWarning() {
+  if (backendWarningShown) return;
+  backendWarningShown = true;
+  toast("Backend Google Sheets non configuré (APPS_SCRIPT_URL vide)");
+}
+let numFixedSpots = 25;
+const STORAGE_KEY_SPOT_COUNT = "yard:spot-count";
+const ADMIN_PIN = "1506";
+const ADMIN_PIN_DB = "2007";
+const STORAGE_KEY_TRAILER_DB = "yard:trailer-db";
+const STORAGE_KEY_SPOTS_CONFIG = "yard:spots-config";
+const STORAGE_KEY_OCCUPANCY = "yard:occupancy";
+const STORAGE_KEY_FREE_TRAILERS = "yard:free-trailers";
+const STORAGE_KEY_MAP_VIEW = "yard:map-view";
+const STORAGE_KEY_EMAIL_CONFIG = "yard:email-config";
+const STORAGE_KEY_HISTORY = "yard:history";
+let isAdmin = false;
+let isDbAdmin = false;
+let trailerDB = {}; // { "TR-1234": { ctExpiryDate: "YYYY-MM-DD", notes: "" } }
+const STORAGE_KEY_DB_ACCESS_MODE = "yard:db-access-mode";
+let dbAccessMode = 'restricted'; // 'restricted' = PIN 2007 requis, 'open' = accès libre
+let emailRecipients = [];
+let alertThresholdDays = 15;
+let alertFrequencyDays = 1;
+let ctAlertRecipients = [];
+let history = [];
+
+let map;
+let spotsConfig = {};      // { "1": {lat,lng}, ... } fixed spot positions
+let occupancy = {};        // { "1": {trailer, client, status, notes, time} }
+let freeTrailers = {};     // { id: {lat,lng,trailer,client,status,notes,time} }
+let spotMarkers = {};
+let freeMarkers = {};
+let setupMode = false;
+let currentTarget = null;  // {type:'spot', id} or {type:'free', id} or {type:'new-free', lat,lng} or {type:'new-spot', num}
+let userMarker = null;
+let userPos = null;
+const STORAGE_KEY_SITE_BOUNDARY = "yard:site-boundary";
+let siteBoundary = []; // [{lat,lng}, ...] contour du site défini par l'admin
+let boundaryLayer = null;
+let boundaryMode = false;
+let boundaryDraftPoints = [];
+let boundaryDraftMarkers = [];
+let tempAccesses = {}; // { token: {type:'pickup'|'encode', trailer, target, lat, lng, label, expiresAt, createdAt, used} }
+let driverMode = null; // {token, entry} si on est en accès chauffeur restreint
+
+// ---------- HELPERS ----------
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+function banner(msg, show=true) {
+  const b = document.getElementById('banner');
+  b.textContent = msg;
+  b.classList.toggle('show', show);
+}
+function genId() { return 'ft-' + Date.now() + '-' + Math.floor(Math.random()*1000); }
+
+function daysSince(isoTime) {
+  if (!isoTime) return 0;
+  const diff = Date.now() - new Date(isoTime).getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+// Détermine la couleur/état visuel d'une remorque : >15j = rouge (priorité), fleet = bloqué (violet), sinon couleur du statut
+function getVisualState(data) {
+  if (!data) return { color: '#16a34a', label: '' };
+  const days = daysSince(data.time);
+  if (days > alertThresholdDays) return { color: '#dc2626', label: `⚠ ${days}j` };
+  if (data.status === 'fleet') return { color: '#7c3aed', label: 'Bloqué' };
+  if (data.status === 'vide') return { color: '#6b7280', label: '' };
+  if (data.status === 'charge') return { color: '#0891b2', label: '' };
+  return { color: '#16a34a', label: '' };
+}
+
+async function loadAll(preFetched) {
+  let d = preFetched;
+  if (!d) {
+    try { d = await backendGetAll(); } catch(e) { console.warn("Erreur chargement des données:", e); d = {}; }
+  }
+
+  spotsConfig = d.spotsConfig || {};
+  occupancy = d.occupancy || {};
+  freeTrailers = d.freeTrailers || {};
+
+  const cfg = d.emailConfig || {};
+  emailRecipients = cfg.recipients || [];
+  alertThresholdDays = cfg.thresholdDays || 15;
+  alertFrequencyDays = cfg.frequencyDays || 1;
+  ctAlertRecipients = cfg.ctRecipients || [];
+
+  history = Array.isArray(d.history) ? d.history : [];
+  numFixedSpots = (d.spotCount && parseInt(d.spotCount.count)) || 25;
+  trailerDB = d.trailerDB || {};
+  dbAccessMode = (d.dbAccessMode && d.dbAccessMode.mode) || 'restricted';
+  siteBoundary = Array.isArray(d.siteBoundary) ? d.siteBoundary : [];
+  tempAccesses = d.tempAccesses || {};
+}
+
+async function saveSpotsConfig() {
+  try { await backendSave('saveSpotsConfig', STORAGE_KEY_SPOTS_CONFIG, spotsConfig); }
+  catch(e) { toast("Erreur sauvegarde config"); }
+}
+async function saveOccupancy() {
+  try { await backendSave('saveOccupancy', STORAGE_KEY_OCCUPANCY, occupancy); }
+  catch(e) { toast("Erreur sauvegarde"); }
+}
+async function saveFreeTrailers() {
+  try { await backendSave('saveFreeTrailers', STORAGE_KEY_FREE_TRAILERS, freeTrailers); }
+  catch(e) { toast("Erreur sauvegarde"); }
+}
+async function saveEmailConfig() {
+  try {
+    await backendSave('saveEmailConfig', STORAGE_KEY_EMAIL_CONFIG, {
+      recipients: emailRecipients,
+      thresholdDays: alertThresholdDays,
+      frequencyDays: alertFrequencyDays,
+      ctRecipients: ctAlertRecipients
+    });
+  }
+  catch(e) { toast("Erreur sauvegarde des adresses"); }
+}
+async function saveHistory() {
+  try { await backendSave('saveHistory', STORAGE_KEY_HISTORY, history); }
+  catch(e) { toast("Erreur sauvegarde historique"); }
+}
+async function saveSpotCount() {
+  try { await backendSave('saveSpotCount', STORAGE_KEY_SPOT_COUNT, { count: numFixedSpots }); }
+  catch(e) { toast("Erreur sauvegarde du nombre d'emplacements"); }
+}
+async function saveTrailerDB() {
+  try { await backendSave('saveTrailerDB', STORAGE_KEY_TRAILER_DB, trailerDB); }
+  catch(e) { toast("Erreur sauvegarde base de données remorques"); }
+}
+async function saveDbAccessMode() {
+  try { await backendSave('saveDbAccessMode', STORAGE_KEY_DB_ACCESS_MODE, { mode: dbAccessMode }); }
+  catch(e) { toast("Erreur sauvegarde du mode d'accès"); }
+}
+async function saveSiteBoundary() {
+  try { await backendSave('saveSiteBoundary', STORAGE_KEY_SITE_BOUNDARY, siteBoundary); }
+  catch(e) { toast("Erreur sauvegarde du contour"); }
+}
+async function saveTempAccesses() {
+  try { await backendSave('saveTempAccesses', 'yard:temp-access', tempAccesses); }
+  catch(e) { toast("Erreur sauvegarde des accès chauffeur"); }
+}
+async function saveMapView(viewData) {
+  try { await backendSave('saveMapView', STORAGE_KEY_MAP_VIEW, viewData); }
+  catch(e) { toast("Erreur sauvegarde du cadrage"); }
+}
+
+// ---------- MAP INIT ----------
+async function initMap(center, zoom, dataAlreadyLoaded) {
+  map = L.map('map', {
+    zoomControl: false, tap: true,
+    rotate: true, rotateControl: false, touchRotate: true, bearing: 0
+  }).setView(center, zoom || 17);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    attribution: '© Google',
+    maxZoom: 21,
+    maxNativeZoom: 20,
+    subdomains: ['mt0','mt1','mt2','mt3']
+  }).addTo(map);
+
+  map.on('click', onMapClick);
+
+  if (!dataAlreadyLoaded) await loadAll();
+  renderSpots(center);
+  renderFreeTrailers();
+  renderBoundary();
+  updateHeader();
+  startGpsTracking();
+  startLiveSync();
+}
+
+function renderBoundary() {
+  // Le contour n'est plus affiché visuellement une fois défini : il sert uniquement
+  // à restreindre l'encodage en zone libre (isPointInBoundary), sans polluer la carte.
+  if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
+}
+
+// Vérifie si un point est à l'intérieur du contour défini (algorithme ray-casting)
+function isPointInBoundary(lat, lng) {
+  if (siteBoundary.length < 3) return true; // pas de contour défini = pas de restriction
+  let inside = false;
+  for (let i = 0, j = siteBoundary.length - 1; i < siteBoundary.length; j = i++) {
+    const xi = siteBoundary[i].lat, yi = siteBoundary[i].lng;
+    const xj = siteBoundary[j].lat, yj = siteBoundary[j].lng;
+    const intersect = ((yi > lng) !== (yj > lng)) &&
+      (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// ---------- SYNCHRONISATION TEMPS RÉEL ----------
+let lastSyncSnapshot = '';
+
+function snapshotOf(spots, occ, free) {
+  return JSON.stringify({ spots, occ, free });
+}
+
+async function pollForUpdates() {
+  try {
+    const d = await backendGetAll();
+    const newOcc = d.occupancy || {};
+    const newFree = d.freeTrailers || {};
+    const newSpots = d.spotsConfig || {};
+    const newCount = (d.spotCount && parseInt(d.spotCount.count)) || 25;
+    const newBoundary = Array.isArray(d.siteBoundary) ? d.siteBoundary : [];
+    const newTrailerDB = d.trailerDB || {};
+    const snap = snapshotOf(newSpots, newOcc, newFree) + '|' + newCount + '|' + JSON.stringify(newBoundary) + '|' + JSON.stringify(newTrailerDB);
+
+    if (snap !== lastSyncSnapshot) {
+      lastSyncSnapshot = snap;
+      occupancy = newOcc;
+      freeTrailers = newFree;
+      spotsConfig = newSpots;
+      numFixedSpots = newCount;
+      siteBoundary = newBoundary;
+      trailerDB = newTrailerDB;
+      renderSpots();
+      renderFreeTrailers();
+      if (!boundaryMode) renderBoundary();
+      if (listPanel.classList.contains('open')) renderListPanel();
+    }
+  } catch (e) {
+    console.warn("Sync temps réel indisponible:", e);
+  }
+}
+
+function startLiveSync() {
+  lastSyncSnapshot = snapshotOf(spotsConfig, occupancy, freeTrailers) + '|' + numFixedSpots + '|' + JSON.stringify(siteBoundary) + '|' + JSON.stringify(trailerDB);
+  setInterval(pollForUpdates, 3000);
+}
+
+// ---------- GPS UTILISATEUR ----------
+function startGpsTracking() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      if (!userMarker) {
+        const icon = L.divIcon({ className: '', html: '<div class="user-location-marker"></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
+        userMarker = L.marker([userPos.lat, userPos.lng], { icon, zIndexOffset: 1000 }).addTo(map);
+      } else {
+        userMarker.setLatLng([userPos.lat, userPos.lng]);
+      }
+      if (detailTarget) updateDetailCompass();
+    },
+    (err) => { console.warn("GPS indisponible:", err.message); },
+    { enableHighAccuracy: true, maximumAge: 5000 }
+  );
+}
+
+let routeLine = null;
+
+async function openRouteTo(lat, lng) {
+  if (!userPos) {
+    toast("Position GPS non disponible, réessaie dans un instant");
+    return;
+  }
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+
+  toast("Calcul de l'itinéraire...");
+  try {
+    const url = `https://router.project-osrm.org/route/v1/foot/${userPos.lng},${userPos.lat};${lng},${lat}?overview=full&geometries=geojson`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!data.routes || !data.routes.length) {
+      toast("Itinéraire introuvable, ligne directe affichée");
+      drawStraightLine(userPos, { lat, lng });
+      return;
+    }
+    const route = data.routes[0];
+    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    routeLine = L.polyline(coords, { color: '#2563eb', weight: 5, opacity: 0.85 }).addTo(map);
+    map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
+    const distanceM = Math.round(route.distance);
+    const durationMin = Math.round(route.duration / 60);
+    toast(`${distanceM} m · environ ${durationMin} min à pied`);
+  } catch (e) {
+    console.error("Erreur itinéraire:", e);
+    toast("Itinéraire indisponible, ligne directe affichée");
+    drawStraightLine(userPos, { lat, lng });
+  }
+}
+
+function drawStraightLine(from, to) {
+  routeLine = L.polyline([[from.lat, from.lng], [to.lat, to.lng]], { color: '#2563eb', weight: 4, opacity: 0.8, dashArray: '8,8' }).addTo(map);
+  map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
+}
+
+// ---------- OUTIL "RANGÉE ALIGNÉE" ----------
+let rowMode = false;
+let rowAnchors = []; // jusqu'à 2 points {lat,lng}
+let rowAnchorMarkers = [];
+
+function toggleRowModeUI(show) {
+  document.getElementById('admin-tools').style.display = show ? 'flex' : 'none';
+  document.getElementById('btn-emails').style.display = show ? 'inline-block' : 'none';
+  updateDbAccessToggleLabel();
+}
+
+function updateDbAccessToggleLabel() {
+  const btn = document.getElementById('btn-toggle-db-access');
+  btn.textContent = dbAccessMode === 'open'
+    ? '🔓 Base remorques : Accès libre (cliquer pour restreindre)'
+    : '🔒 Base remorques : PIN requis (cliquer pour ouvrir à tous)';
+}
+
+document.getElementById('btn-toggle-db-access').onclick = async () => {
+  dbAccessMode = dbAccessMode === 'open' ? 'restricted' : 'open';
+  await saveDbAccessMode();
+  updateDbAccessToggleLabel();
+  toast(dbAccessMode === 'open' ? "Base remorques accessible à tous sans code" : "Base remorques de nouveau protégée par code");
+};
+
+document.getElementById('btn-add-spots').onclick = async () => {
+  const input = prompt(`Actuellement ${numFixedSpots} emplacements configurés. Combien veux-tu en ajouter ?`, 5);
+  const addCount = parseInt(input);
+  if (!addCount || addCount < 1) { toast("Nombre invalide"); return; }
+  numFixedSpots += addCount;
+  await saveSpotCount();
+  renderSpots();
+  toast(`${addCount} emplacements ajoutés (total ${numFixedSpots})`);
+};
+
+function resetRowAnchors() {
+  rowAnchorMarkers.forEach(m => map.removeLayer(m));
+  rowAnchorMarkers = [];
+  rowAnchors = [];
+}
+
+document.getElementById('btn-row-mode').onclick = () => {
+  rowMode = !rowMode;
+  resetRowAnchors();
+  document.getElementById('btn-row-mode').style.background = rowMode ? '#2563eb' : '#d97706';
+  banner(rowMode ? "Touche le point de DÉPART de la rangée, puis le point de FIN." : '', rowMode);
+};
+
+function placeRowAnchor(latlng) {
+  const icon = L.divIcon({ className: '', html: '<div class="anchor-marker"></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
+  const marker = L.marker(latlng, { icon }).addTo(map);
+  rowAnchorMarkers.push(marker);
+  rowAnchors.push({ lat: latlng.lat, lng: latlng.lng });
+
+  if (rowAnchors.length === 1) {
+    banner("Départ placé. Touche maintenant le point de FIN de la rangée.");
+  } else if (rowAnchors.length === 2) {
+    finalizeRow();
+  }
+}
+
+function finalizeRow() {
+  const remaining = numFixedSpots - Object.keys(spotsConfig).length;
+  if (remaining <= 0) {
+    toast("Les 25 emplacements sont déjà placés");
+    resetRowAnchors();
+    rowMode = false;
+    document.getElementById('btn-row-mode').style.background = '#d97706';
+    return;
+  }
+  const input = prompt(`Combien d'emplacements dans cette rangée (départ et fin inclus) ? Max ${remaining}.`, Math.min(remaining, 5));
+  const count = parseInt(input);
+  if (!count || count < 2) {
+    toast("Nombre invalide, annulé");
+    resetRowAnchors();
+    return;
+  }
+  if (count > remaining) {
+    toast(`Trop grand : il ne reste que ${remaining} emplacements libres`);
+    resetRowAnchors();
+    return;
+  }
+
+  const [a, b] = rowAnchors;
+  const numbers = [];
+  for (let i = 1; i <= numFixedSpots && numbers.length < count; i++) {
+    if (!spotsConfig[i]) numbers.push(i);
+  }
+
+  for (let i = 0; i < count; i++) {
+    const t = i / (count - 1); // 0 -> 1 le long de la ligne
+    const lat = a.lat + (b.lat - a.lat) * t;
+    const lng = a.lng + (b.lng - a.lng) * t;
+    spotsConfig[numbers[i]] = { lat, lng };
+  }
+  saveSpotsConfig();
+  renderSpots();
+  toast(`${count} emplacements alignés et espacés régulièrement`);
+
+  resetRowAnchors();
+  rowMode = false;
+  document.getElementById('btn-row-mode').style.background = '#d97706';
+}
+
+function onMapClick(e) {
+  if (driverMode) {
+    if (driverMode.entry.type !== 'encode') return; // rien d'autre autorisé en mode reprise
+    if (driverMode.entry.used) { toast("Accès déjà utilisé"); return; }
+    if (!isPointInBoundary(e.latlng.lat, e.latlng.lng)) {
+      toast("Hors de la zone autorisée du site — dépose impossible ici");
+      return;
+    }
+    openSheetForNewFree(e.latlng.lat, e.latlng.lng);
+    return;
+  }
+  if (boundaryMode) {
+    addBoundaryPoint(e.latlng);
+    return;
+  }
+  if (rowMode) {
+    placeRowAnchor(e.latlng);
+    return;
+  }
+  if (setupMode) {
+    // en mode setup, un clic ajoute le prochain emplacement fixe non placé
+    const next = getNextUnplacedSpot();
+    if (!next) { toast("Les 25 emplacements sont déjà placés"); return; }
+    spotsConfig[next] = { lat: e.latlng.lat, lng: e.latlng.lng };
+    saveSpotsConfig();
+    renderSpots();
+    toast("Emplacement " + next + " placé");
+    return;
+  }
+  // clic normal en dehors d'un marqueur = nouvelle remorque en zone libre
+  if (!isPointInBoundary(e.latlng.lat, e.latlng.lng)) {
+    toast("Hors de la zone autorisée du site — encodage impossible ici");
+    return;
+  }
+  openSheetForNewFree(e.latlng.lat, e.latlng.lng);
+}
+
+function getNextUnplacedSpot() {
+  for (let i = 1; i <= numFixedSpots; i++) {
+    if (!spotsConfig[i]) return i;
+  }
+  return null;
+}
+
+// ---------- RENDER SPOTS ----------
+function renderSpots(centerFallback) {
+  Object.values(spotMarkers).forEach(m => map.removeLayer(m));
+  spotMarkers = {};
+
+  for (let i = 1; i <= numFixedSpots; i++) {
+    const pos = spotsConfig[i];
+    if (!pos) continue;
+    if (driverMode) {
+      const t = driverMode.entry.target;
+      if (!(t && t.type === 'spot' && String(t.id) === String(i))) continue;
+    }
+    const occ = occupancy[i];
+    let markerColor = '#16a34a'; // libre par défaut
+    let labelText = i;
+    if (setupMode) {
+      markerColor = '#d97706';
+    } else if (occ) {
+      const vs = getVisualState(occ);
+      markerColor = vs.color;
+    }
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="spot-marker" style="background:${markerColor}">${labelText}</div>`,
+      iconSize: [34, 34], iconAnchor: [17, 17]
+    });
+    const marker = L.marker([pos.lat, pos.lng], { icon, draggable: setupMode }).addTo(map);
+    marker.on('click', () => {
+      if (setupMode) return;
+      if (driverMode) { showDriverPickupCard(); return; }
+      openSheetForSpot(i);
+    });
+    if (setupMode) {
+      marker.on('dragend', (ev) => {
+        const p = ev.target.getLatLng();
+        spotsConfig[i] = { lat: p.lat, lng: p.lng };
+        saveSpotsConfig();
+      });
+    }
+    spotMarkers[i] = marker;
+  }
+  updateHeader();
+}
+
+function renderFreeTrailers() {
+  Object.values(freeMarkers).forEach(m => map.removeLayer(m));
+  freeMarkers = {};
+  Object.entries(freeTrailers).forEach(([id, t]) => {
+    if (driverMode) {
+      const dt = driverMode.entry.target;
+      if (!(dt && dt.type === 'free' && dt.id === id)) return;
+    }
+    const vs = getVisualState(t);
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="trailer-marker" style="background:${vs.color}">🚛</div>`,
+      iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+    const marker = L.marker([t.lat, t.lng], { icon, draggable: false }).addTo(map);
+    marker.on('click', () => { if (driverMode) { showDriverPickupCard(); return; } openSheetForFree(id); });
+    marker.on('dragend', (ev) => {
+      const p = ev.target.getLatLng();
+      freeTrailers[id].lat = p.lat;
+      freeTrailers[id].lng = p.lng;
+      saveFreeTrailers();
+    });
+    freeMarkers[id] = marker;
+  });
+  updateHeader();
+}
+
+function updateHeader() {
+  const occupiedSpots = Object.keys(occupancy).length;
+  const freeCount = Object.keys(freeTrailers).length;
+  document.getElementById('header-sub').textContent =
+    `${occupiedSpots}/${numFixedSpots} emplacements occupés · ${freeCount} en zone libre`;
+}
+
+// ---------- SHEET (formulaire) ----------
+const sheet = document.getElementById('sheet');
+const overlay = document.getElementById('overlay');
+
+function openSheet() {
+  sheet.classList.add('open');
+  overlay.classList.add('show');
+}
+function closeSheet() {
+  sheet.classList.remove('open');
+  overlay.classList.remove('show');
+  currentTarget = null;
+}
+
+function fillForm(data) {
+  document.getElementById('f-trailer').value = data?.trailer || '';
+  document.getElementById('f-client').value = data?.client || '';
+  document.getElementById('f-notes').value = data?.notes || '';
+  document.querySelectorAll('.status-chip').forEach(c => c.classList.remove('active'));
+  const status = data?.status || 'pleine';
+  const chip = document.querySelector(`.status-chip[data-status="${status}"]`);
+  if (chip) chip.classList.add('active');
+
+  let warnEl = document.getElementById('f-age-warning');
+  if (!warnEl) {
+    warnEl = document.createElement('div');
+    warnEl.id = 'f-age-warning';
+    warnEl.className = 'age-warning';
+    document.querySelector('.status-options').insertAdjacentElement('afterend', warnEl);
+  }
+  if (data && data.time) {
+    const days = daysSince(data.time);
+    const parts = [];
+    if (days > alertThresholdDays) parts.push(`⚠ Sur site depuis ${days} jours`);
+    if (data.status === 'fleet') parts.push('🔒 Bloqué (fleet)');
+    warnEl.textContent = parts.join(' · ');
+  } else {
+    warnEl.textContent = '';
+  }
+  updateCtIndicator();
+}
+
+function setSheetReadOnly(readOnly) {
+  document.getElementById('f-trailer').disabled = readOnly;
+  document.getElementById('f-client').disabled = readOnly;
+  document.getElementById('f-notes').disabled = readOnly;
+  document.querySelectorAll('.status-chip').forEach(c => {
+    c.style.pointerEvents = readOnly ? 'none' : 'auto';
+    c.style.opacity = readOnly ? '0.6' : '1';
+  });
+  document.getElementById('btn-save').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('btn-remove').style.width = readOnly ? '100%' : '';
+}
+
+function openEditSheetForSpot(num) {
+  currentTarget = { type: 'spot', id: num };
+  const occ = occupancy[num];
+  document.getElementById('sheet-title').textContent = 'Emplacement ' + num;
+  document.getElementById('btn-remove').style.display = occ ? 'block' : 'none';
+  fillForm(occ);
+  setSheetReadOnly(!!occ && occ.status !== 'fleet');
+  openSheet();
+}
+
+function openEditSheetForFree(id) {
+  currentTarget = { type: 'free', id };
+  const data = freeTrailers[id];
+  document.getElementById('sheet-title').textContent = 'Remorque (zone libre)';
+  document.getElementById('btn-remove').style.display = 'block';
+  fillForm(data);
+  setSheetReadOnly(!data || data.status !== 'fleet');
+  openSheet();
+}
+
+// Points d'entrée publics (clic sur un marqueur carte) : si la remorque est déjà
+// encodée, on affiche la fiche détail propre ; sinon (emplacement vide) le formulaire d'encodage.
+function openSheetForSpot(num) {
+  const occ = occupancy[num];
+  if (occ) {
+    const pos = spotsConfig[num] || {};
+    openDetailView({ label: 'Emplacement ' + num, lat: pos.lat, lng: pos.lng, ...occ, _target: { type: 'spot', id: num }, open: () => openEditSheetForSpot(num) });
+  } else {
+    openEditSheetForSpot(num);
+  }
+}
+
+function openSheetForFree(id) {
+  const data = freeTrailers[id];
+  if (data) {
+    openDetailView({ label: 'Zone libre', ...data, _target: { type: 'free', id }, open: () => openEditSheetForFree(id) });
+  } else {
+    openEditSheetForFree(id);
+  }
+}
+
+function openSheetForNewFree(lat, lng) {
+  currentTarget = { type: 'new-free', lat, lng };
+  document.getElementById('sheet-title').textContent = 'Nouvelle remorque (zone libre)';
+  document.getElementById('btn-remove').style.display = 'none';
+  fillForm(null);
+  setSheetReadOnly(false);
+  openSheet();
+}
+
+['f-trailer', 'f-client', 'f-notes'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    const pos = el.selectionStart;
+    el.value = el.value.toUpperCase();
+    el.setSelectionRange(pos, pos);
+  });
+});
+
+document.getElementById('f-trailer').addEventListener('input', updateCtIndicator);
+
+// Calcule le statut du contrôle technique à partir de la date de validité :
+// vert = OK (plus de 2 mois restants), orange = OK mais échéance proche (<=2 mois), rouge = dépassé
+function getCtStatus(expiryDate) {
+  if (!expiryDate) return null;
+  const now = new Date();
+  const expiry = new Date(expiryDate);
+  const daysLeft = Math.floor((expiry - now) / (1000 * 60 * 60 * 24));
+  if (daysLeft < 0) {
+    return { level: 'nok', color: '#dc2626', bg: '#dc262633', label: `⚠️ CT NON CONFORME (expiré depuis ${Math.abs(daysLeft)}j)` };
+  } else if (daysLeft <= 60) {
+    return { level: 'soon', color: '#f97316', bg: '#f9731633', label: `🟠 CT OK — à renouveler bientôt (expire dans ${daysLeft}j, le ${expiryDate})` };
+  } else {
+    return { level: 'ok', color: '#4ade80', bg: '#16a34a33', label: `✅ CT OK (valide jusqu'au ${expiryDate})` };
+  }
+}
+
+function updateCtIndicator() {
+  const trailerNum = document.getElementById('f-trailer').value.trim();
+  const indicator = document.getElementById('ct-indicator');
+  if (!trailerNum || !trailerDB[trailerNum]) {
+    indicator.style.display = 'none';
+    return;
+  }
+  const status = getCtStatus(trailerDB[trailerNum].ctExpiryDate);
+  if (!status) {
+    indicator.style.display = 'none';
+    return;
+  }
+  indicator.style.display = 'block';
+  indicator.style.background = status.bg;
+  indicator.style.color = status.color;
+  indicator.textContent = status.label;
+}
+
+document.getElementById('btn-sheet-close').onclick = closeSheet;
+overlay.onclick = () => { closeSheet(); closeListPanel(); closeEmailSheet(); closeHistoryPanel(); closeDbSheet(); closeDbPanel(); closeDetailView(); qrModal.classList.remove('open'); };
+
+document.getElementById('btn-route').onclick = () => {
+  if (!currentTarget) return;
+  let lat, lng;
+  if (currentTarget.type === 'spot') {
+    const pos = spotsConfig[currentTarget.id];
+    if (!pos) { toast("Position inconnue pour cet emplacement"); return; }
+    lat = pos.lat; lng = pos.lng;
+  } else if (currentTarget.type === 'free') {
+    const t = freeTrailers[currentTarget.id];
+    lat = t.lat; lng = t.lng;
+  } else if (currentTarget.type === 'new-free') {
+    lat = currentTarget.lat; lng = currentTarget.lng;
+  }
+  if (lat == null) { toast("Position introuvable"); return; }
+  closeSheet();
+  openRouteTo(lat, lng);
+};
+
+document.querySelectorAll('.status-chip').forEach(chip => {
+  chip.onclick = () => {
+    document.querySelectorAll('.status-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+  };
+});
+
+function isTrailerAlreadyOnSite(trailerNum, excludeTarget) {
+  for (const [num, d] of Object.entries(occupancy)) {
+    if (excludeTarget && excludeTarget.type === 'spot' && String(excludeTarget.id) === String(num)) continue;
+    if (d.trailer === trailerNum) return true;
+  }
+  for (const [id, d] of Object.entries(freeTrailers)) {
+    if (excludeTarget && excludeTarget.type === 'free' && excludeTarget.id === id) continue;
+    if (d.trailer === trailerNum) return true;
+  }
+  return false;
+}
+
+document.getElementById('btn-save').onclick = async () => {
+  const trailer = document.getElementById('f-trailer').value.trim().toUpperCase();
+  if (!trailer) { toast("Indique un n° de remorque"); return; }
+  if (isTrailerAlreadyOnSite(trailer, currentTarget)) {
+    toast("Cette remorque est déjà encodée sur le site");
+    return;
+  }
+  const client = document.getElementById('f-client').value.trim().toUpperCase();
+  const notes = document.getElementById('f-notes').value.trim().toUpperCase();
+  const activeChip = document.querySelector('.status-chip.active');
+  const status = activeChip ? activeChip.dataset.status : 'pleine';
+
+  let existingTime = null;
+  if (currentTarget.type === 'spot') existingTime = occupancy[currentTarget.id]?.time;
+  else if (currentTarget.type === 'free') existingTime = freeTrailers[currentTarget.id]?.time;
+  const data = { trailer, client, status, notes, time: existingTime || new Date().toISOString() };
+
+  if (currentTarget.type === 'spot') {
+    occupancy[currentTarget.id] = data;
+    renderSpots();
+    saveOccupancy().catch(() => toast("Erreur de synchronisation"));
+  } else if (currentTarget.type === 'free') {
+    freeTrailers[currentTarget.id] = { ...freeTrailers[currentTarget.id], ...data };
+    renderFreeTrailers();
+    saveFreeTrailers().catch(() => toast("Erreur de synchronisation"));
+  } else if (currentTarget.type === 'new-free') {
+    const id = genId();
+    freeTrailers[id] = { lat: currentTarget.lat, lng: currentTarget.lng, ...data };
+    renderFreeTrailers();
+    saveFreeTrailers().catch(() => toast("Erreur de synchronisation"));
+    if (driverMode && driverMode.entry.type === 'encode') {
+      markAccessUsed().catch(() => {});
+      closeSheet();
+      showDriverThankYou("Remorque déposée avec succès. Merci !");
+      return;
+    }
+  }
+  toast("Enregistré");
+  closeSheet();
+  renderListPanel();
+};
+
+async function performRemove(target) {
+  if (!target) return;
+  let removedData = null;
+  let label = '';
+  if (target.type === 'spot') {
+    removedData = occupancy[target.id];
+    label = 'Emplacement ' + target.id;
+    delete occupancy[target.id];
+    renderSpots();
+    saveOccupancy().catch(() => toast("Erreur de synchronisation (retrait)"));
+  } else if (target.type === 'free') {
+    removedData = freeTrailers[target.id];
+    label = 'Zone libre';
+    delete freeTrailers[target.id];
+    renderFreeTrailers();
+    saveFreeTrailers().catch(() => toast("Erreur de synchronisation (retrait)"));
+  }
+  if (removedData) {
+    history.unshift({
+      trailer: removedData.trailer,
+      client: removedData.client,
+      status: removedData.status,
+      label,
+      dropTime: removedData.time,
+      removeTime: new Date().toISOString()
+    });
+    if (history.length > 500) history = history.slice(0, 500);
+    saveHistory().catch(() => toast("Erreur de synchronisation (historique)"));
+  }
+  toast("Retiré");
+  renderListPanel();
+}
+
+document.getElementById('btn-remove').onclick = async () => {
+  await performRemove(currentTarget);
+  closeSheet();
+};
+
+// ---------- LISTE ----------
+const listPanel = document.getElementById('list-panel');
+function openListPanel() { listPanel.classList.add('open'); overlay.classList.add('show'); renderListPanel(); }
+function closeListPanel() { listPanel.classList.remove('open'); overlay.classList.remove('show'); }
+document.getElementById('btn-list').onclick = openListPanel;
+document.getElementById('btn-list-close').onclick = closeListPanel;
+document.getElementById('lp-search-input').oninput = renderListPanel;
+
+let lpActiveFilter = 'all';
+document.querySelectorAll('.lp-filter-btn').forEach(btn => {
+  btn.onclick = () => {
+    lpActiveFilter = btn.dataset.filter;
+    document.querySelectorAll('.lp-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderListPanel();
+  };
+});
+
+function renderListPanel() {
+  const q = document.getElementById('lp-search-input').value.trim().toLowerCase();
+  const items = [];
+  Object.entries(occupancy).forEach(([num, d]) => {
+    const pos = spotsConfig[num] || {};
+    items.push({ label: 'Emplacement ' + num, sub: d.client || '', lat: pos.lat, lng: pos.lng, ...d, _target: { type: 'spot', id: num }, open: () => openEditSheetForSpot(parseInt(num)) });
+  });
+  Object.entries(freeTrailers).forEach(([id, d]) => {
+    items.push({ label: 'Zone libre', sub: d.client || '', ...d, _target: { type: 'free', id }, open: () => openEditSheetForFree(id) });
+  });
+  let filtered = lpActiveFilter === 'all' ? items : items.filter(it => it.status === lpActiveFilter);
+  filtered = q ? filtered.filter(it =>
+    (it.trailer||'').toLowerCase().includes(q) || (it.client||'').toLowerCase().includes(q) || (it.label||'').toLowerCase().includes(q)
+  ) : filtered;
+
+  document.getElementById('lp-count').textContent = items.length;
+  const container = document.getElementById('lp-items');
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty">Aucune remorque sur site</div>';
+    return;
+  }
+  container.innerHTML = '';
+  filtered.forEach(it => {
+    const vs = getVisualState(it);
+    const days = daysSince(it.time);
+    const badgeClass = days > alertThresholdDays ? 'rouge15' : it.status;
+    const badgeText = days > alertThresholdDays ? `${days}j` : (it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : it.status))));
+
+    const ctEntry = it.trailer ? trailerDB[it.trailer] : null;
+    const ctStatus = ctEntry ? getCtStatus(ctEntry.ctExpiryDate) : null;
+    const ctBadgeHtml = ctStatus
+      ? `<span style="font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; background:${ctStatus.bg}; color:${ctStatus.color};">CT ${ctStatus.level === 'nok' ? 'NON OK' : (ctStatus.level === 'soon' ? 'BIENTÔT' : 'OK')}</span>`
+      : '';
+
+    const div = document.createElement('div');
+    div.className = 'lp-item';
+    div.style.flexDirection = 'column';
+    div.style.alignItems = 'stretch';
+    div.style.gap = '4px';
+    div.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="lp-num">${it.trailer || '(sans n°)'}</div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          ${ctBadgeHtml}
+          <div class="lp-badge ${badgeClass}">${badgeText}</div>
+        </div>
+      </div>
+      <div class="lp-meta">${it.label}${it.client ? ' · ' + it.client : ''}</div>
+      <div class="lp-meta">${days} jour${days > 1 ? 's' : ''} sur site${it.notes ? ' · ' + it.notes : ''}</div>
+    `;
+    div.onclick = () => {
+      closeListPanel();
+      if (it.lat != null && it.lng != null) {
+        map.flyTo([it.lat, it.lng], Math.max(map.getZoom(), 19), { duration: 0.6 });
+      }
+      openDetailView(it);
+    };
+    container.appendChild(div);
+  });
+}
+
+// ---------- HISTORIQUE ----------
+const historyPanel = document.getElementById('history-panel');
+function openHistoryPanel() { historyPanel.style.transform = 'translateX(0)'; overlay.classList.add('show'); renderHistoryPanel(); }
+function closeHistoryPanel() { historyPanel.style.transform = 'translateX(100%)'; overlay.classList.remove('show'); }
+document.getElementById('btn-history').onclick = openHistoryPanel;
+document.getElementById('btn-history-close').onclick = closeHistoryPanel;
+document.getElementById('hp-search-input').oninput = renderHistoryPanel;
+
+function formatDateTime(iso) {
+  if (!iso) return '?';
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-BE') + ' ' + d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderHistoryPanel() {
+  const q = document.getElementById('hp-search-input').value.trim().toLowerCase();
+  const filtered = q ? history.filter(h =>
+    (h.trailer||'').toLowerCase().includes(q) || (h.client||'').toLowerCase().includes(q) || (h.label||'').toLowerCase().includes(q)
+  ) : history;
+
+  document.getElementById('hp-count').textContent = history.length;
+  const container = document.getElementById('hp-items');
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty">Aucun historique</div>';
+    return;
+  }
+  container.innerHTML = '';
+  filtered.forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'lp-item';
+    div.style.flexDirection = 'column';
+    div.style.alignItems = 'stretch';
+    div.style.gap = '3px';
+    div.style.cursor = 'default';
+    div.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="lp-num">${h.trailer || '(sans n°)'}</div>
+        <div class="lp-badge ${h.status || 'pleine'}">${h.status === 'fleet' ? 'Fleet' : (h.status === 'vide' ? 'Vide' : (h.status === 'pleine' ? 'À vider' : (h.status === 'charge' ? 'Chargé' : (h.status || ''))))}</div>
+      </div>
+      <div class="lp-meta">${h.label}${h.client ? ' · ' + h.client : ''}</div>
+      <div class="lp-meta">📥 Déposé : ${formatDateTime(h.dropTime)}</div>
+      <div class="lp-meta">📤 Retiré : ${formatDateTime(h.removeTime)}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// ---------- VUE DÉTAIL PROPRE (depuis la liste) ----------
+const detailSheet = document.getElementById('detail-sheet');
+let detailTarget = null; // { type, id, lat, lng }
+
+function bearingTo(from, to) {
+  const φ1 = from.lat * Math.PI / 180, φ2 = to.lat * Math.PI / 180;
+  const Δλ = (to.lng - from.lng) * Math.PI / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+function distanceMeters(from, to) {
+  const R = 6371000;
+  const φ1 = from.lat * Math.PI / 180, φ2 = to.lat * Math.PI / 180;
+  const Δφ = (to.lat - from.lat) * Math.PI / 180;
+  const Δλ = (to.lng - from.lng) * Math.PI / 180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function openDetailView(item) {
+  detailTarget = item;
+  const days = daysSince(item.time);
+  document.getElementById('detail-title').textContent = item.trailer || '(sans n°)';
+
+  const badges = document.getElementById('detail-badges');
+  badges.innerHTML = '';
+  const vs = getVisualState(item);
+  const statusLabel = item.status === 'fleet' ? 'Fleet — Bloqué' : (item.status === 'vide' ? 'Vide' : (item.status === 'charge' ? 'Chargé' : 'À vider'));
+  badges.innerHTML += `<span class="detail-pill" style="background:${vs.color}22; color:${vs.color};">${statusLabel}</span>`;
+  if (days > alertThresholdDays) {
+    badges.innerHTML += `<span class="detail-pill" style="background:#dc262622; color:#f87171;">⚠ ${days} jours sur site</span>`;
+  }
+
+  document.getElementById('detail-client').textContent = item.client || '—';
+  document.getElementById('detail-location').textContent = item.label || '—';
+  document.getElementById('detail-days').textContent = `${days} jour${days > 1 ? 's' : ''}${item.time ? ' (depuis le ' + formatDateTime(item.time) + ')' : ''}`;
+  const notesRow = document.getElementById('detail-notes-row');
+  if (item.notes) {
+    notesRow.style.display = 'flex';
+    document.getElementById('detail-notes').textContent = item.notes;
+  } else {
+    notesRow.style.display = 'none';
+  }
+
+  const ctBox = document.getElementById('detail-ct-box');
+  const ctEntry = item.trailer ? trailerDB[item.trailer] : null;
+  if (ctEntry) {
+    const ctStatus = getCtStatus(ctEntry.ctExpiryDate);
+    ctBox.style.display = 'block';
+    ctBox.style.background = ctStatus.bg;
+    document.getElementById('detail-ct-text').style.color = ctStatus.color;
+    document.getElementById('detail-ct-text').textContent = ctStatus.label;
+  } else {
+    ctBox.style.display = 'none';
+  }
+
+  updateDetailCompass();
+
+  document.getElementById('btn-detail-edit').style.display = item.status === 'fleet' ? 'block' : 'none';
+  document.getElementById('btn-detail-edit').onclick = () => {
+    closeDetailView();
+    item.open();
+  };
+  document.getElementById('btn-detail-route').onclick = () => {
+    closeDetailView();
+    if (item.lat != null && item.lng != null) openRouteTo(item.lat, item.lng);
+  };
+  document.getElementById('btn-detail-qr').onclick = () => {
+    generatePickupAccess(item);
+  };
+  document.getElementById('btn-detail-remove').onclick = async () => {
+    if (!confirm(`Retirer la remorque ${item.trailer || ''} ?`)) return;
+    await performRemove(item._target);
+    closeDetailView();
+  };
+
+  detailSheet.classList.add('open');
+  overlay.classList.add('show');
+}
+
+function updateDetailCompass() {
+  const arrowEl = document.getElementById('detail-compass-arrow');
+  const distEl = document.getElementById('detail-distance');
+  if (!detailTarget || detailTarget.lat == null || detailTarget.lng == null || !userPos) {
+    distEl.textContent = 'Position GPS indisponible';
+    arrowEl.style.transform = 'rotate(0deg)';
+    return;
+  }
+  const bearing = bearingTo(userPos, detailTarget);
+  const dist = Math.round(distanceMeters(userPos, detailTarget));
+  arrowEl.style.transform = `rotate(${bearing}deg)`;
+  distEl.textContent = dist < 1000 ? `${dist} m` : `${(dist/1000).toFixed(1)} km`;
+}
+
+function closeDetailView() {
+  detailSheet.classList.remove('open');
+  overlay.classList.remove('show');
+  detailTarget = null;
+}
+document.getElementById('btn-detail-close').onclick = closeDetailView;
+
+// ---------- BASE DE DONNÉES REMORQUES (contrôle technique) ----------
+function checkDbAdminPin() {
+  if (dbAccessMode === 'open') return true; // accès libre décidé par l'admin principal
+  if (isDbAdmin) return true;
+  const entered = prompt("Code administrateur base de données requis :");
+  if (entered === null) return false;
+  if (entered === ADMIN_PIN_DB) {
+    isDbAdmin = true;
+    return true;
+  }
+  toast("Code incorrect");
+  return false;
+}
+
+const dbSheet = document.getElementById('db-sheet');
+const dbPanel = document.getElementById('db-panel');
+let dbCurrentTrailer = null;
+
+function openDbPanel() {
+  dbPanel.style.transform = 'translateX(0)';
+  overlay.classList.add('show');
+  renderDbPanel();
+}
+function closeDbPanel() {
+  dbPanel.style.transform = 'translateX(100%)';
+  overlay.classList.remove('show');
+}
+
+document.getElementById('btn-trailerdb').onclick = () => {
+  if (!checkDbAdminPin()) return;
+  openDbPanel();
+};
+document.getElementById('btn-db-panel-close').onclick = closeDbPanel;
+document.getElementById('btn-db-sheet-close').onclick = closeDbSheet;
+document.getElementById('db-panel-search').oninput = renderDbPanel;
+
+let dbActiveFilter = 'all';
+document.querySelectorAll('#db-panel-filters .lp-filter-btn').forEach(btn => {
+  btn.onclick = () => {
+    dbActiveFilter = btn.dataset.dbfilter;
+    document.querySelectorAll('#db-panel-filters .lp-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderDbPanel();
+  };
+});
+
+function renderDbPanel() {
+  const q = document.getElementById('db-panel-search').value.trim().toUpperCase();
+  const container = document.getElementById('db-panel-items');
+  let entries = Object.entries(trailerDB).filter(([num]) => !q || num.includes(q));
+  if (dbActiveFilter !== 'all') {
+    entries = entries.filter(([num, entry]) => {
+      const status = getCtStatus(entry.ctExpiryDate);
+      return status && status.level === dbActiveFilter;
+    });
+  }
+  document.getElementById('db-count').textContent = Object.keys(trailerDB).length;
+
+  if (!entries.length) {
+    container.innerHTML = '<div class="empty">Aucune remorque enregistrée</div>';
+    return;
+  }
+  container.innerHTML = '';
+  entries.forEach(([num, entry]) => {
+    const status = getCtStatus(entry.ctExpiryDate);
+    const badgeClass = status ? (status.level === 'nok' ? 'rouge15' : (status.level === 'soon' ? 'ctsoon' : 'pleine')) : '';
+    const badgeText = status ? (status.level === 'nok' ? 'NON OK' : (status.level === 'soon' ? 'BIENTÔT' : 'OK')) : '?';
+    const div = document.createElement('div');
+    div.className = 'lp-item';
+    div.innerHTML = `
+      <div>
+        <div class="lp-num">${num}</div>
+        <div class="lp-meta">${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de date'}</div>
+      </div>
+      <div class="lp-badge ${badgeClass}">${badgeText}</div>
+    `;
+    div.onclick = () => openDbSheet(num);
+    container.appendChild(div);
+  });
+}
+
+document.getElementById('btn-db-new').onclick = () => openDbSheet(null);
+
+function openDbSheet(trailerNum) {
+  dbCurrentTrailer = trailerNum;
+  const entry = trailerNum ? trailerDB[trailerNum] : null;
+  document.getElementById('db-f-trailer').value = trailerNum || '';
+  document.getElementById('db-f-trailer').disabled = !!trailerNum;
+  document.getElementById('db-f-date').value = entry ? (entry.ctExpiryDate || '') : '';
+  document.getElementById('db-f-notes').value = entry ? (entry.notes || '') : '';
+  document.getElementById('db-btn-delete').style.display = trailerNum ? 'block' : 'none';
+  updateDbCtPreview();
+  dbSheet.classList.add('open');
+  overlay.classList.add('show');
+}
+function closeDbSheet() {
+  dbSheet.classList.remove('open');
+  overlay.classList.remove('show');
+}
+
+document.getElementById('db-f-trailer').addEventListener('input', (e) => {
+  const pos = e.target.selectionStart;
+  e.target.value = e.target.value.toUpperCase();
+  e.target.setSelectionRange(pos, pos);
+});
+
+document.getElementById('db-f-date').addEventListener('input', updateDbCtPreview);
+
+function updateDbCtPreview() {
+  const date = document.getElementById('db-f-date').value;
+  const preview = document.getElementById('db-ct-preview');
+  const status = getCtStatus(date);
+  if (!status) { preview.style.display = 'none'; return; }
+  preview.style.display = 'block';
+  preview.style.background = status.bg;
+  preview.style.color = status.color;
+  preview.textContent = status.label;
+}
+
+document.getElementById('db-btn-save').onclick = async () => {
+  const trailerNum = document.getElementById('db-f-trailer').value.trim();
+  if (!trailerNum) { toast("Indique un n° de remorque"); return; }
+  const ctExpiryDate = document.getElementById('db-f-date').value;
+  if (!ctExpiryDate) { toast("Indique une date de validité"); return; }
+  const notes = document.getElementById('db-f-notes').value.trim();
+  trailerDB[trailerNum] = { ctExpiryDate, notes };
+  toast("Enregistré dans la base");
+  updateCtIndicator();
+  closeDbSheet();
+  renderDbPanel();
+  saveTrailerDB().catch(() => toast("Erreur de synchronisation"));
+};
+
+document.getElementById('db-btn-delete').onclick = async () => {
+  if (!dbCurrentTrailer) return;
+  delete trailerDB[dbCurrentTrailer];
+  toast("Supprimé de la base");
+  updateCtIndicator();
+  closeDbSheet();
+  renderDbPanel();
+  saveTrailerDB().catch(() => toast("Erreur de synchronisation"));
+};
+
+// ---------- OUTIL "CONTOUR DU SITE" ----------
+function addBoundaryPoint(latlng) {
+  const icon = L.divIcon({ className: '', html: '<div class="anchor-marker"></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
+  const marker = L.marker(latlng, { icon }).addTo(map);
+  boundaryDraftMarkers.push(marker);
+  boundaryDraftPoints.push({ lat: latlng.lat, lng: latlng.lng });
+
+  if (boundaryDraftPoints.length >= 2) {
+    if (boundaryLayer) { map.removeLayer(boundaryLayer); }
+    boundaryLayer = L.polygon(boundaryDraftPoints.map(p => [p.lat, p.lng]), {
+      color: '#facc15', weight: 3, fillColor: '#facc15', fillOpacity: 0.06, dashArray: '6,6'
+    }).addTo(map);
+  }
+  banner(`Contour : ${boundaryDraftPoints.length} point(s) placés. Continue à toucher les coins du site, puis appuie sur "✅ Terminer le contour".`);
+}
+
+function resetBoundaryDraft() {
+  boundaryDraftMarkers.forEach(m => map.removeLayer(m));
+  boundaryDraftMarkers = [];
+  boundaryDraftPoints = [];
+}
+
+document.getElementById('btn-boundary-mode').onclick = () => {
+  boundaryMode = !boundaryMode;
+  if (boundaryMode) {
+    resetBoundaryDraft();
+    if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
+    document.getElementById('btn-boundary-mode').textContent = '❌ Annuler le tracé';
+    document.getElementById('btn-boundary-finish').style.display = 'block';
+    banner('Touche les coins du site, dans l\'ordre, pour dessiner le contour. Minimum 3 points.', true);
+  } else {
+    resetBoundaryDraft();
+    renderBoundary();
+    document.getElementById('btn-boundary-mode').textContent = '📍 Définir le contour du site';
+    document.getElementById('btn-boundary-finish').style.display = 'none';
+    banner('', false);
+  }
+};
+
+document.getElementById('btn-boundary-finish').onclick = async () => {
+  if (boundaryDraftPoints.length < 3) {
+    toast("Il faut au moins 3 points pour fermer un contour");
+    return;
+  }
+  siteBoundary = boundaryDraftPoints.slice();
+  await saveSiteBoundary();
+  resetBoundaryDraft();
+  renderBoundary();
+  boundaryMode = false;
+  document.getElementById('btn-boundary-mode').textContent = '📍 Définir le contour du site';
+  document.getElementById('btn-boundary-finish').style.display = 'none';
+  toast("Contour du site enregistré — encodage limité à cette zone");
+
+  // Centre et cadre automatiquement tout le monde sur ce contour
+  const bounds = L.polygon(siteBoundary.map(p => [p.lat, p.lng])).getBounds();
+  map.fitBounds(bounds, { padding: [30, 30] });
+  const center = map.getCenter();
+  const zoom = map.getZoom();
+  const viewData = {
+    lat: center.lat, lng: center.lng, zoom,
+    bounds: {
+      south: bounds.getSouth(), west: bounds.getWest(),
+      north: bounds.getNorth(), east: bounds.getEast()
+    }
+  };
+  await saveMapView(viewData);
+  banner('', false);
+};
+
+// ---------- ACCÈS CHAUFFEUR TEMPORAIRE (QR code) ----------
+function genToken() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+const qrModal = document.getElementById('qr-modal');
+document.getElementById('btn-qr-close').onclick = () => qrModal.classList.remove('open');
+
+function showQrModal(token, expiresAt) {
+  const url = location.origin + location.pathname + '?access=' + token;
+  document.getElementById('qr-link-text').value = url;
+  const hours = Math.round((expiresAt - Date.now()) / (1000 * 60 * 60) * 10) / 10;
+  document.getElementById('qr-expiry-text').textContent = `Valable ${hours}h — expire à ${new Date(expiresAt).toLocaleString('fr-BE')}`;
+
+  const box = document.getElementById('qr-code-box');
+  box.innerHTML = '';
+  new QRCode(box, { text: url, width: 220, height: 220 });
+
+  overlay.classList.add('show');
+  qrModal.classList.add('open');
+}
+
+document.getElementById('btn-qr-copy').onclick = () => {
+  const input = document.getElementById('qr-link-text');
+  input.select();
+  navigator.clipboard?.writeText(input.value).then(() => toast("Lien copié")).catch(() => toast("Copie manuelle nécessaire"));
+};
+
+async function generatePickupAccess(item) {
+  const input = prompt("Durée de validité de l'accès (en heures) ?", "1");
+  const hours = parseFloat(input);
+  if (!hours || hours <= 0) { toast("Durée invalide"); return; }
+  const token = genToken();
+  const expiresAt = Date.now() + hours * 3600 * 1000;
+  tempAccesses[token] = {
+    type: 'pickup', trailer: item.trailer, target: item._target,
+    lat: item.lat, lng: item.lng, label: item.label,
+    createdAt: Date.now(), expiresAt, used: false
+  };
+  await saveTempAccesses();
+  showQrModal(token, expiresAt);
+}
+
+document.getElementById('btn-gen-encode-access').onclick = async () => {
+  const input = prompt("Durée de validité de l'accès dépôt (en heures) ?", "1");
+  const hours = parseFloat(input);
+  if (!hours || hours <= 0) { toast("Durée invalide"); return; }
+  const token = genToken();
+  const expiresAt = Date.now() + hours * 3600 * 1000;
+  tempAccesses[token] = { type: 'encode', createdAt: Date.now(), expiresAt, used: false };
+  await saveTempAccesses();
+  showQrModal(token, expiresAt);
+};
+
+// ---------- SETUP MODE (protégé par PIN) ----------
+function checkAdminPin() {
+  if (isAdmin) return true;
+  const entered = prompt("Code administrateur requis :");
+  if (entered === null) return false;
+  if (entered === ADMIN_PIN) {
+    isAdmin = true;
+    return true;
+  }
+  toast("Code incorrect");
+  return false;
+}
+
+const emailSheet = document.getElementById('email-sheet');
+function openEmailSheet() {
+  renderEmailList();
+  document.getElementById('f-threshold-days').value = alertThresholdDays;
+  document.getElementById('f-frequency-days').value = String(alertFrequencyDays);
+  emailSheet.classList.add('open');
+  overlay.classList.add('show');
+}
+function closeEmailSheet() {
+  emailSheet.classList.remove('open');
+  overlay.classList.remove('show');
+}
+function renderEmailList() {
+  const container = document.getElementById('email-list');
+  if (!emailRecipients.length) {
+    container.innerHTML = '<div style="color:#6b7280; font-size:13px;">Aucune adresse configurée</div>';
+  } else {
+    container.innerHTML = '';
+    emailRecipients.forEach((email, idx) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #1f2937;';
+      row.innerHTML = `<span style="font-size:14px;">${email}</span>`;
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '✕';
+      delBtn.className = 'btn btn-danger';
+      delBtn.style.padding = '4px 10px';
+      delBtn.onclick = async () => {
+        emailRecipients.splice(idx, 1);
+        await saveEmailConfig();
+        renderEmailList();
+        toast("Adresse supprimée");
+      };
+      row.appendChild(delBtn);
+      container.appendChild(row);
+    });
+  }
+  renderCtEmailList();
+}
+
+function renderCtEmailList() {
+  const container = document.getElementById('ct-email-list');
+  if (!ctAlertRecipients.length) {
+    container.innerHTML = '<div style="color:#6b7280; font-size:13px;">Aucune adresse configurée</div>';
+    return;
+  }
+  container.innerHTML = '';
+  ctAlertRecipients.forEach((email, idx) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #1f2937;';
+    row.innerHTML = `<span style="font-size:14px;">${email}</span>`;
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '✕';
+    delBtn.className = 'btn btn-danger';
+    delBtn.style.padding = '4px 10px';
+    delBtn.onclick = async () => {
+      ctAlertRecipients.splice(idx, 1);
+      await saveEmailConfig();
+      renderCtEmailList();
+      toast("Adresse supprimée");
+    };
+    row.appendChild(delBtn);
+    container.appendChild(row);
+  });
+}
+
+document.getElementById('btn-add-ct-email').onclick = async () => {
+  const input = document.getElementById('f-new-ct-email');
+  const val = input.value.trim();
+  if (!val || !val.includes('@')) { toast("Adresse invalide"); return; }
+  if (ctAlertRecipients.includes(val)) { toast("Déjà dans la liste"); return; }
+  ctAlertRecipients.push(val);
+  await saveEmailConfig();
+  input.value = '';
+  renderCtEmailList();
+  toast("Adresse ajoutée");
+};
+
+document.getElementById('btn-save-alert-settings').onclick = async () => {
+  const threshold = parseInt(document.getElementById('f-threshold-days').value);
+  const frequency = parseInt(document.getElementById('f-frequency-days').value);
+  if (!threshold || threshold < 1) { toast("Seuil invalide"); return; }
+  alertThresholdDays = threshold;
+  alertFrequencyDays = frequency;
+  await saveEmailConfig();
+  renderSpots();
+  renderFreeTrailers();
+  renderListPanel();
+  toast("Réglages enregistrés");
+};
+
+document.getElementById('btn-emails').onclick = () => {
+  if (!checkAdminPin()) return;
+  openEmailSheet();
+};
+document.getElementById('btn-email-sheet-close').onclick = closeEmailSheet;
+document.getElementById('btn-add-email').onclick = async () => {
+  const input = document.getElementById('f-new-email');
+  const val = input.value.trim();
+  if (!val || !val.includes('@')) { toast("Adresse invalide"); return; }
+  if (emailRecipients.includes(val)) { toast("Déjà dans la liste"); return; }
+  emailRecipients.push(val);
+  await saveEmailConfig();
+  input.value = '';
+  renderEmailList();
+  toast("Adresse ajoutée");
+};
+
+document.getElementById('btn-setup').onclick = () => {
+  if (!setupMode) {
+    if (!checkAdminPin()) return;
+    setupMode = true;
+    map.setMaxBounds(null);
+    map.setMinZoom(1);
+  } else {
+    setupMode = false;
+    rowMode = false;
+    resetRowAnchors();
+    if (boundaryMode) {
+      boundaryMode = false;
+      resetBoundaryDraft();
+      renderBoundary();
+      document.getElementById('btn-boundary-mode').textContent = '📍 Définir le contour du site';
+      document.getElementById('btn-boundary-finish').style.display = 'none';
+    }
+  }
+  const remaining = numFixedSpots - Object.keys(spotsConfig).length;
+  banner('', false);
+  if (setupMode) toast(`Mode configuration activé (${remaining} emplacement(s) restants)`);
+  document.getElementById('btn-setup').style.background = setupMode ? '#d97706' : '#1f2937';
+  document.getElementById('btn-reframe').style.display = setupMode ? 'inline-block' : 'none';
+  toggleRowModeUI(setupMode);
+  renderSpots();
+  renderFreeTrailers();
+};
+
+document.getElementById('btn-reframe').onclick = async () => {
+  if (!checkAdminPin()) return;
+  const center = map.getCenter();
+  const zoom = map.getZoom();
+  const bounds = map.getBounds();
+  const viewData = {
+    lat: center.lat, lng: center.lng, zoom,
+    bounds: {
+      south: bounds.getSouth(), west: bounds.getWest(),
+      north: bounds.getNorth(), east: bounds.getEast()
+    }
+  };
+  try {
+    await saveMapView(viewData);
+    toast("Cadrage enregistré et verrouillé pour les autres utilisateurs");
+    applyViewLock(viewData);
+  } catch(e) {
+    console.error("Erreur reframe:", e);
+    toast("Erreur: " + (e && e.message ? e.message : String(e)));
+  }
+};
+
+function applyViewLock(viewData) {
+  if (isAdmin) return; // l'admin garde toujours une navigation libre
+  if (!viewData.bounds) return;
+  const b = viewData.bounds;
+  const leafletBounds = L.latLngBounds([b.south, b.west], [b.north, b.east]);
+  map.setMaxBounds(leafletBounds);
+  map.setMinZoom(viewData.zoom);
+  map.options.maxBoundsViscosity = 1.0;
+}
+
+// ---------- GEOCODAGE + BOOT ----------
+async function geocodeAndInit() {
+  // priorité : cadrage fixé par l'admin
+  try {
+    const d = await backendGetAll();
+    if (d.mapView && d.mapView.lat != null) {
+      const v = d.mapView;
+      await initMap([v.lat, v.lng], v.zoom);
+      applyViewLock(v);
+      return;
+    }
+  } catch(e) { /* pas encore de cadrage fixé, on continue */ }
+
+  try {
+    const resp = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(SITE_ADDRESS));
+    const data = await resp.json();
+    if (data && data.length) {
+      await initMap([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+      return;
+    }
+  } catch(e) { /* fallback */ }
+  await initMap(FALLBACK_COORDS);
+}
+
+// ---------- MODE CHAUFFEUR (accès restreint via QR) ----------
+// Supprimé : le dépôt/retrait se fait au bureau, avant que le chauffeur arrive,
+// un mode chauffeur séparé n'a pas de sens pour ce workflow.
+
+// ---------- MODE ACCÈS CHAUFFEUR (démarrage restreint via QR/lien) ----------
+async function markAccessUsed() {
+  if (!driverMode) return;
+  tempAccesses[driverMode.token] = { ...driverMode.entry, used: true };
+  driverMode.entry = tempAccesses[driverMode.token];
+  await saveTempAccesses();
+}
+
+function showDriverThankYou(msg) {
+  document.getElementById('driver-thankyou-text').textContent = msg;
+  document.getElementById('driver-thankyou').style.display = 'flex';
+  document.getElementById('driver-card').style.display = 'none';
+}
+
+function showDriverPickupCard() {
+  const entry = driverMode.entry;
+  document.getElementById('driver-card-title').textContent = entry.trailer || 'Remorque';
+  document.getElementById('driver-card-body').innerHTML = `<div>${entry.label || ''}</div>`;
+  document.getElementById('driver-card').style.display = 'block';
+
+  document.getElementById('btn-driver-route').onclick = () => {
+    if (entry.lat != null && entry.lng != null) openRouteTo(entry.lat, entry.lng);
+  };
+  document.getElementById('btn-driver-done').onclick = async () => {
+    if (!confirm("Confirmer la reprise de cette remorque ?")) return;
+    await performRemove(entry.target);
+    await markAccessUsed();
+    showDriverThankYou("Remorque marquée comme récupérée. Merci !");
+  };
+}
+
+function renderDriverAccessError(message) {
+  document.body.innerHTML = `
+    <div style="height:100vh; display:flex; align-items:center; justify-content:center; background:#0f172a; color:#fff; text-align:center; padding:30px;">
+      <div>
+        <div style="font-size:48px; margin-bottom:16px;">⚠️</div>
+        <div style="font-size:18px; font-weight:600;">${message}</div>
+      </div>
+    </div>`;
+}
+
+async function bootDriverMode(token) {
+  let d = {};
+  try { d = await backendGetAll(); } catch(e) { renderDriverAccessError("Impossible de contacter le serveur."); return; }
+  const entry = (d.tempAccesses || {})[token];
+  if (!entry) { renderDriverAccessError("Ce lien d'accès n'existe pas ou a été supprimé."); return; }
+  if (entry.used) { renderDriverAccessError("Ce lien d'accès a déjà été utilisé."); return; }
+  if (Date.now() > entry.expiresAt) { renderDriverAccessError("Ce lien d'accès a expiré."); return; }
+
+  driverMode = { token, entry };
+  document.body.classList.add('driver-mode');
+  await loadAll(d);
+
+  const savedView = d.mapView;
+  let center, zoom;
+  if (entry.type === 'pickup' && entry.lat != null) {
+    center = [entry.lat, entry.lng];
+    zoom = (savedView && savedView.zoom) || 19;
+  } else if (savedView && savedView.lat != null) {
+    center = [savedView.lat, savedView.lng];
+    zoom = savedView.zoom || 18;
+  } else if (siteBoundary.length >= 3) {
+    const b = L.polygon(siteBoundary.map(p => [p.lat, p.lng])).getBounds();
+    center = [b.getCenter().lat, b.getCenter().lng];
+    zoom = 18;
+  } else {
+    center = FALLBACK_COORDS;
+    zoom = 18;
+  }
+
+  await initMap(center, zoom, true);
+  if (savedView) applyViewLock(savedView);
+
+  if (entry.type === 'pickup') {
+    showDriverPickupCard();
+  } else if (entry.type === 'encode') {
+    toast("Touche la carte à l'endroit où déposer la remorque");
+  }
+}
+
+async function boot() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get('access');
+  if (token) {
+    await bootDriverMode(token);
+  } else {
+    await geocodeAndInit();
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
