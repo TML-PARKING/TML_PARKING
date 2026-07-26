@@ -571,11 +571,12 @@ let tempAccesses = {}; // { token: {type:'pickup'|'encode', trailer, target, lat
 let driverMode = null; // {token, entry} si on est en accès chauffeur restreint
 
 // ---------- HELPERS ----------
-function toast(msg) {
+function toast(msg, duration=2000) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => t.classList.remove('show'), duration);
 }
 function banner(msg, show=true) {
   const b = document.getElementById('banner');
@@ -739,7 +740,8 @@ async function pollForUpdates() {
     const newCount = (d.spotCount && parseInt(d.spotCount.count)) || 25;
     const newBoundary = Array.isArray(d.siteBoundary) ? d.siteBoundary : [];
     const newTrailerDB = d.trailerDB || {};
-    const snap = snapshotOf(newSpots, newOcc, newFree) + '|' + newCount + '|' + JSON.stringify(newBoundary) + '|' + JSON.stringify(newTrailerDB);
+    const newHistory = Array.isArray(d.history) ? d.history : [];
+    const snap = snapshotOf(newSpots, newOcc, newFree) + '|' + newCount + '|' + JSON.stringify(newBoundary) + '|' + JSON.stringify(newTrailerDB) + '|' + newHistory.length;
 
     if (snap !== lastSyncSnapshot) {
       lastSyncSnapshot = snap;
@@ -749,10 +751,12 @@ async function pollForUpdates() {
       numFixedSpots = newCount;
       siteBoundary = newBoundary;
       trailerDB = newTrailerDB;
+      history = newHistory;
       renderSpots();
       renderFreeTrailers();
       if (!boundaryMode) renderBoundary();
       if (listPanel.classList.contains('open')) renderListPanel();
+      if (historyPanelOpen) renderHistoryPanel();
     }
   } catch (e) {
     console.warn("Sync temps réel indisponible:", e);
@@ -760,7 +764,7 @@ async function pollForUpdates() {
 }
 
 function startLiveSync() {
-  lastSyncSnapshot = snapshotOf(spotsConfig, occupancy, freeTrailers) + '|' + numFixedSpots + '|' + JSON.stringify(siteBoundary) + '|' + JSON.stringify(trailerDB);
+  lastSyncSnapshot = snapshotOf(spotsConfig, occupancy, freeTrailers) + '|' + numFixedSpots + '|' + JSON.stringify(siteBoundary) + '|' + JSON.stringify(trailerDB) + '|' + history.length;
   setInterval(pollForUpdates, 3000);
 }
 
@@ -785,6 +789,17 @@ function startGpsTracking() {
 
 let routeLine = null;
 
+async function fetchRoute(profile, from, to) {
+  const base = profile === 'foot'
+    ? 'https://routing.openstreetmap.de/routed-foot/route/v1/foot/'
+    : 'https://routing.openstreetmap.de/routed-car/route/v1/driving/';
+  const url = `${base}${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  if (!data.routes || !data.routes.length) return null;
+  return data.routes[0];
+}
+
 async function openRouteTo(lat, lng) {
   if (!userPos) {
     toast("Position GPS non disponible, réessaie dans un instant");
@@ -793,26 +808,33 @@ async function openRouteTo(lat, lng) {
   if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
 
   toast("Calcul de l'itinéraire...");
+  const target = { lat, lng };
   try {
-    const url = `https://router.project-osrm.org/route/v1/foot/${userPos.lng},${userPos.lat};${lng},${lat}?overview=full&geometries=geojson`;
-    const resp = await fetch(url);
-    const data = await resp.json();
-    if (!data.routes || !data.routes.length) {
+    const [footRoute, carRoute] = await Promise.all([
+      fetchRoute('foot', userPos, target).catch(() => null),
+      fetchRoute('car', userPos, target).catch(() => null)
+    ]);
+
+    const mainRoute = footRoute || carRoute;
+    if (!mainRoute) {
       toast("Itinéraire introuvable, ligne directe affichée");
-      drawStraightLine(userPos, { lat, lng });
+      drawStraightLine(userPos, target);
       return;
     }
-    const route = data.routes[0];
-    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    const coords = mainRoute.geometry.coordinates.map(c => [c[1], c[0]]);
     routeLine = L.polyline(coords, { color: '#2563eb', weight: 5, opacity: 0.85 }).addTo(map);
     map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
-    const distanceM = Math.round(route.distance);
-    const durationMin = Math.round(route.duration / 60);
-    toast(`${distanceM} m · environ ${durationMin} min à pied`);
+
+    const distanceM = Math.round(mainRoute.distance);
+    const distanceLabel = distanceM < 1000 ? `${distanceM} m` : `${(distanceM/1000).toFixed(1)} km`;
+    const parts = [distanceLabel];
+    if (footRoute) parts.push(`🚶 ${Math.round(footRoute.duration/60)} min à pied`);
+    if (carRoute) parts.push(`🚗 ${Math.round(carRoute.duration/60)} min en voiture`);
+    toast(parts.join(' · '), 6000);
   } catch (e) {
     console.error("Erreur itinéraire:", e);
     toast("Itinéraire indisponible, ligne directe affichée");
-    drawStraightLine(userPos, { lat, lng });
+    drawStraightLine(userPos, target);
   }
 }
 
@@ -1309,6 +1331,7 @@ async function performRemove(target) {
   }
   toast("Retiré");
   renderListPanel();
+  if (historyPanelOpen) renderHistoryPanel();
 }
 
 document.getElementById('btn-remove').onclick = async () => {
@@ -1397,8 +1420,9 @@ function renderListPanel() {
 
 // ---------- HISTORIQUE ----------
 const historyPanel = document.getElementById('history-panel');
-function openHistoryPanel() { historyPanel.style.transform = 'translateX(0)'; overlay.classList.add('show'); renderHistoryPanel(); }
-function closeHistoryPanel() { historyPanel.style.transform = 'translateX(100%)'; overlay.classList.remove('show'); }
+let historyPanelOpen = false;
+function openHistoryPanel() { historyPanelOpen = true; historyPanel.style.transform = 'translateX(0)'; overlay.classList.add('show'); renderHistoryPanel(); }
+function closeHistoryPanel() { historyPanelOpen = false; historyPanel.style.transform = 'translateX(100%)'; overlay.classList.remove('show'); }
 document.getElementById('btn-history').onclick = openHistoryPanel;
 document.getElementById('btn-history-close').onclick = closeHistoryPanel;
 document.getElementById('hp-search-input').oninput = renderHistoryPanel;
