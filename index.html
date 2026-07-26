@@ -261,9 +261,6 @@
   <button class="btn btn-warn" id="btn-toggle-db-access"></button>
   <button class="btn btn-warn" id="btn-boundary-mode">📍 Définir le contour du site</button>
   <button class="btn btn-primary" id="btn-boundary-finish" style="display:none;">✅ Terminer le contour</button>
-  <button class="btn btn-warn" id="btn-road-mode">🛣️ Ajouter un sens de circulation</button>
-  <button class="btn btn-primary" id="btn-road-finish" style="display:none;">✅ Terminer ce sens</button>
-  <button class="btn btn-danger" id="btn-road-clear">🗑️ Effacer le réseau routier</button>
 </div>
 
 <div id="banner"></div>
@@ -572,11 +569,7 @@ let boundaryDraftPoints = [];
 let boundaryDraftMarkers = [];
 let tempAccesses = {}; // { token: {type:'pickup'|'encode', trailer, target, lat, lng, label, expiresAt, createdAt, used} }
 let driverMode = null; // {token, entry} si on est en accès chauffeur restreint
-let roadSegments = []; // [{points:[{lat,lng},...], oneway:true/false}] réseau routier interne du site
-let roadNetworkMode = false;
-let roadDraftPoints = [];
-let roadDraftMarkers = [];
-let roadDraftLine = null;
+
 
 // ---------- HELPERS ----------
 function toast(msg, duration=2000) {
@@ -632,7 +625,6 @@ async function loadAll(preFetched) {
   dbAccessMode = (d.dbAccessMode && d.dbAccessMode.mode) || 'restricted';
   siteBoundary = Array.isArray(d.siteBoundary) ? d.siteBoundary : [];
   tempAccesses = d.tempAccesses || {};
-  roadSegments = Array.isArray(d.roadSegments) ? d.roadSegments : [];
 }
 
 async function saveSpotsConfig() {
@@ -682,10 +674,7 @@ async function saveTempAccesses() {
   try { await backendSave('saveTempAccesses', 'yard:temp-access', tempAccesses); }
   catch(e) { toast("Erreur sauvegarde des accès chauffeur"); }
 }
-async function saveRoadSegments() {
-  try { await backendSave('saveRoadSegments', 'yard:road-segments', roadSegments); }
-  catch(e) { toast("Erreur sauvegarde du réseau routier"); }
-}
+
 async function saveMapView(viewData) {
   try { await backendSave('saveMapView', STORAGE_KEY_MAP_VIEW, viewData); }
   catch(e) { toast("Erreur sauvegarde du cadrage"); }
@@ -821,18 +810,6 @@ async function openRouteTo(lat, lng) {
   if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
 
   const target = { lat, lng };
-
-  // Priorité au réseau routier interne du site (respecte les sens uniques définis)
-  const internal = computeInternalRoute(userPos, target);
-  if (internal) {
-    routeLine = L.polyline(internal.coords, { color: '#2563eb', weight: 5, opacity: 0.85 }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
-    const distanceLabel = internal.distance < 1000 ? `${Math.round(internal.distance)} m` : `${(internal.distance/1000).toFixed(1)} km`;
-    const walkMin = Math.round(internal.distance / 1000 / 4.5 * 60);
-    const driveMin = Math.max(1, Math.round(internal.distance / 1000 / 15 * 60));
-    toast(`${distanceLabel} (site) · 🚶 ${walkMin} min à pied · 🚗 ${driveMin} min en voiture`, 6000);
-    return;
-  }
 
   toast("Calcul de l'itinéraire...");
   try {
@@ -974,10 +951,6 @@ function finalizeRow() {
 }
 
 function onMapClick(e) {
-  if (roadNetworkMode) {
-    addRoadPoint(e.latlng);
-    return;
-  }
   if (driverMode) {
     if (driverMode.entry.type !== 'encode') return; // rien d'autre autorisé en mode reprise
     if (driverMode.entry.used) { toast("Accès déjà utilisé"); return; }
@@ -1741,137 +1714,6 @@ document.getElementById('db-btn-delete').onclick = async () => {
   saveTrailerDB().catch(() => toast("Erreur de synchronisation"));
 };
 
-// ---------- OUTIL "RÉSEAU ROUTIER DU SITE" (sens de circulation) ----------
-function resetRoadDraft() {
-  roadDraftMarkers.forEach(m => map.removeLayer(m));
-  roadDraftMarkers = [];
-  roadDraftPoints = [];
-  if (roadDraftLine) { map.removeLayer(roadDraftLine); roadDraftLine = null; }
-}
-
-function addRoadPoint(latlng) {
-  const icon = L.divIcon({ className: '', html: '<div class="anchor-marker"></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
-  const marker = L.marker(latlng, { icon }).addTo(map);
-  roadDraftMarkers.push(marker);
-  roadDraftPoints.push({ lat: latlng.lat, lng: latlng.lng });
-
-  if (roadDraftLine) map.removeLayer(roadDraftLine);
-  if (roadDraftPoints.length >= 2) {
-    roadDraftLine = L.polyline(roadDraftPoints.map(p => [p.lat, p.lng]), {
-      color: '#22d3ee', weight: 4, dashArray: '4,6', opacity: 0.9
-    }).addTo(map);
-  }
-  banner(`Tronçon : ${roadDraftPoints.length} point(s) — touche dans le sens de circulation autorisé, puis "Terminer ce sens".`);
-}
-
-document.getElementById('btn-road-mode').onclick = () => {
-  roadNetworkMode = !roadNetworkMode;
-  resetRoadDraft();
-  document.getElementById('btn-road-mode').style.background = roadNetworkMode ? '#2563eb' : '#d97706';
-  document.getElementById('btn-road-finish').style.display = roadNetworkMode ? 'block' : 'none';
-  banner(roadNetworkMode ? 'Touche les points du tronçon, DANS L\'ORDRE du sens autorisé (2 points minimum).' : '', roadNetworkMode);
-};
-
-document.getElementById('btn-road-finish').onclick = async () => {
-  if (roadDraftPoints.length < 2) { toast("Il faut au moins 2 points"); return; }
-  const bidir = confirm("Ce tronçon est-il à double sens ?\nOK = double sens\nAnnuler = sens unique (dans l'ordre tracé)");
-  roadSegments.push({ points: roadDraftPoints.slice(), oneway: !bidir });
-  await saveRoadSegments();
-  resetRoadDraft();
-  toast(`Tronçon ajouté (${bidir ? 'double sens' : 'sens unique'}) — total ${roadSegments.length}`);
-  banner('Touche les points du prochain tronçon, ou "Terminer" pour arrêter.', true);
-};
-
-document.getElementById('btn-road-clear').onclick = async () => {
-  if (!confirm("Effacer tout le réseau routier défini ?")) return;
-  roadSegments = [];
-  await saveRoadSegments();
-  toast("Réseau routier effacé");
-};
-
-// ---------- MOTEUR DE ROUTAGE INTERNE (respecte les sens uniques) ----------
-const ROAD_NODE_MERGE_METERS = 6; // points à moins de 6m sont considérés comme le même croisement
-
-function buildRoadGraph() {
-  const nodes = {}; // key -> {lat,lng}
-  const adj = {}; // key -> [{to:key, dist}]
-  let nextId = 0;
-
-  function ensureNode(p) {
-    // Cherche un nœud existant suffisamment proche (fusionne les points d'intersection entre tronçons)
-    for (const k of Object.keys(nodes)) {
-      if (distanceMeters(nodes[k], p) <= ROAD_NODE_MERGE_METERS) return k;
-    }
-    const k = 'n' + (nextId++);
-    nodes[k] = p;
-    adj[k] = [];
-    return k;
-  }
-
-  roadSegments.forEach(seg => {
-    for (let i = 0; i < seg.points.length - 1; i++) {
-      const a = seg.points[i], b = seg.points[i+1];
-      const ka = ensureNode(a), kb = ensureNode(b);
-      if (ka === kb) continue;
-      const d = distanceMeters(a, b);
-      adj[ka].push({ to: kb, dist: d });
-      if (!seg.oneway) adj[kb].push({ to: ka, dist: d });
-    }
-  });
-  return { nodes, adj };
-}
-
-function nearestNode(nodes, p) {
-  let best = null, bestDist = Infinity;
-  Object.entries(nodes).forEach(([k, n]) => {
-    const d = distanceMeters(p, n);
-    if (d < bestDist) { bestDist = d; best = k; }
-  });
-  return best;
-}
-
-function dijkstra(adj, startKey, endKey) {
-  const dist = {}, prev = {}, visited = {};
-  Object.keys(adj).forEach(k => dist[k] = Infinity);
-  dist[startKey] = 0;
-  const queue = new Set(Object.keys(adj));
-  while (queue.size) {
-    let u = null, best = Infinity;
-    queue.forEach(k => { if (dist[k] < best) { best = dist[k]; u = k; } });
-    if (u === null) break;
-    queue.delete(u);
-    if (u === endKey) break;
-    (adj[u] || []).forEach(edge => {
-      const alt = dist[u] + edge.dist;
-      if (alt < dist[edge.to]) { dist[edge.to] = alt; prev[edge.to] = u; }
-    });
-  }
-  if (dist[endKey] === Infinity) return null;
-  const path = [endKey];
-  let cur = endKey;
-  while (prev[cur] !== undefined) { cur = prev[cur]; path.unshift(cur); }
-  return { path, distance: dist[endKey] };
-}
-
-// Calcule un itinéraire respectant les sens uniques définis, si un réseau existe.
-// Retourne {coords:[[lat,lng],...], distance} ou null si pas de réseau / pas de chemin trouvé.
-function computeInternalRoute(from, to) {
-  if (!roadSegments.length) return null;
-  const { nodes, adj } = buildRoadGraph();
-  if (!Object.keys(nodes).length) return null;
-  const startKey = nearestNode(nodes, from);
-  const endKey = nearestNode(nodes, to);
-  if (!startKey || !endKey || startKey === endKey) return null;
-  const MAX_SNAP_METERS = 150; // au-delà, le réseau ne couvre probablement pas cette zone
-  if (distanceMeters(from, nodes[startKey]) > MAX_SNAP_METERS) return null;
-  if (distanceMeters(nodes[endKey], to) > MAX_SNAP_METERS) return null;
-  const result = dijkstra(adj, startKey, endKey);
-  if (!result) return null;
-  const coords = [[from.lat, from.lng], ...result.path.map(k => [nodes[k].lat, nodes[k].lng]), [to.lat, to.lng]];
-  const entryDist = distanceMeters(from, nodes[startKey]);
-  const exitDist = distanceMeters(nodes[endKey], to);
-  return { coords, distance: result.distance + entryDist + exitDist };
-}
 function addBoundaryPoint(latlng) {
   const icon = L.divIcon({ className: '', html: '<div class="anchor-marker"></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
   const marker = L.marker(latlng, { icon }).addTo(map);
