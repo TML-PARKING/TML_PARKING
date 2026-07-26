@@ -265,12 +265,6 @@
 
 <div id="banner"></div>
 
-<div class="legend">
-  <div><span style="background:#16a34a"></span>Emplacement libre</div>
-  <div><span style="background:#dc2626"></span>Emplacement occupé</div>
-  <div><span style="background:#ea580c;border-radius:50%"></span>Remorque en zone libre</div>
-</div>
-
 <div id="overlay"></div>
 
 <div id="list-panel">
@@ -991,7 +985,7 @@ function renderSpots(centerFallback) {
   for (let i = 1; i <= numFixedSpots; i++) {
     const pos = spotsConfig[i];
     if (!pos) continue;
-    if (driverMode) {
+    if (driverMode && driverMode.entry.type === 'pickup') {
       const t = driverMode.entry.target;
       if (!(t && t.type === 'spot' && String(t.id) === String(i))) continue;
     }
@@ -1001,8 +995,7 @@ function renderSpots(centerFallback) {
     if (setupMode) {
       markerColor = '#d97706';
     } else if (occ) {
-      const vs = getVisualState(occ);
-      markerColor = vs.color;
+      markerColor = '#dc2626'; // occupé = rouge
     }
     const icon = L.divIcon({
       className: '',
@@ -1012,7 +1005,13 @@ function renderSpots(centerFallback) {
     const marker = L.marker([pos.lat, pos.lng], { icon, draggable: setupMode }).addTo(map);
     marker.on('click', () => {
       if (setupMode) return;
-      if (driverMode) { showDriverPickupCard(); return; }
+      if (driverMode && driverMode.entry.type === 'pickup') { showDriverPickupCard(); return; }
+      if (driverMode && driverMode.entry.type === 'encode') {
+        if (driverMode.entry.used) { toast("Accès déjà utilisé"); return; }
+        if (occ) { toast("Cet emplacement est déjà occupé"); return; }
+        openEditSheetForSpot(i);
+        return;
+      }
       openSheetForSpot(i);
     });
     if (setupMode) {
@@ -1271,6 +1270,12 @@ document.getElementById('btn-save').onclick = async () => {
     occupancy[currentTarget.id] = data;
     renderSpots();
     saveOccupancy().catch(() => toast("Erreur de synchronisation"));
+    if (driverMode && driverMode.entry.type === 'encode') {
+      markAccessUsed().catch(() => {});
+      closeSheet();
+      showDriverThankYou("Remorque déposée avec succès. Merci !");
+      return;
+    }
   } else if (currentTarget.type === 'free') {
     freeTrailers[currentTarget.id] = { ...freeTrailers[currentTarget.id], ...data };
     renderFreeTrailers();
