@@ -1790,20 +1790,29 @@ document.getElementById('btn-road-clear').onclick = async () => {
 };
 
 // ---------- MOTEUR DE ROUTAGE INTERNE (respecte les sens uniques) ----------
-function nodeKey(p) { return p.lat.toFixed(6) + ',' + p.lng.toFixed(6); }
+const ROAD_NODE_MERGE_METERS = 6; // points à moins de 6m sont considérés comme le même croisement
 
 function buildRoadGraph() {
   const nodes = {}; // key -> {lat,lng}
   const adj = {}; // key -> [{to:key, dist}]
+  let nextId = 0;
+
   function ensureNode(p) {
-    const k = nodeKey(p);
-    if (!nodes[k]) { nodes[k] = p; adj[k] = []; }
+    // Cherche un nœud existant suffisamment proche (fusionne les points d'intersection entre tronçons)
+    for (const k of Object.keys(nodes)) {
+      if (distanceMeters(nodes[k], p) <= ROAD_NODE_MERGE_METERS) return k;
+    }
+    const k = 'n' + (nextId++);
+    nodes[k] = p;
+    adj[k] = [];
     return k;
   }
+
   roadSegments.forEach(seg => {
     for (let i = 0; i < seg.points.length - 1; i++) {
       const a = seg.points[i], b = seg.points[i+1];
       const ka = ensureNode(a), kb = ensureNode(b);
+      if (ka === kb) continue;
       const d = distanceMeters(a, b);
       adj[ka].push({ to: kb, dist: d });
       if (!seg.oneway) adj[kb].push({ to: ka, dist: d });
@@ -1853,6 +1862,9 @@ function computeInternalRoute(from, to) {
   const startKey = nearestNode(nodes, from);
   const endKey = nearestNode(nodes, to);
   if (!startKey || !endKey || startKey === endKey) return null;
+  const MAX_SNAP_METERS = 150; // au-delà, le réseau ne couvre probablement pas cette zone
+  if (distanceMeters(from, nodes[startKey]) > MAX_SNAP_METERS) return null;
+  if (distanceMeters(nodes[endKey], to) > MAX_SNAP_METERS) return null;
   const result = dijkstra(adj, startKey, endKey);
   if (!result) return null;
   const coords = [[from.lat, from.lng], ...result.path.map(k => [nodes[k].lat, nodes[k].lng]), [to.lat, to.lng]];
