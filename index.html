@@ -192,7 +192,7 @@
   /* Mode accès chauffeur restreint : masque toute la navigation normale */
   body.driver-mode #btn-list, body.driver-mode #btn-reframe, body.driver-mode #btn-emails,
   body.driver-mode #btn-trailerdb, body.driver-mode #btn-setup, body.driver-mode #btn-history,
-  body.driver-mode .legend { display: none !important; }
+  body.driver-mode #btn-gen-encode-access, body.driver-mode .legend { display: none !important; }
 
   #driver-card {
     position: fixed; left: 50%; bottom: 0; width: 100%; max-width: 460px; transform: translateX(-50%);
@@ -1806,6 +1806,7 @@ document.getElementById('btn-qr-copy').onclick = () => {
 };
 
 async function generatePickupAccess(item) {
+  if (driverMode) { toast("Non disponible en accès chauffeur"); return; }
   const input = prompt("Durée de validité de l'accès (en heures) ?", "1");
   const hours = parseFloat(input);
   if (!hours || hours <= 0) { toast("Durée invalide"); return; }
@@ -1821,6 +1822,7 @@ async function generatePickupAccess(item) {
 }
 
 document.getElementById('btn-gen-encode-access').onclick = async () => {
+  if (driverMode) { toast("Non disponible en accès chauffeur"); return; }
   const input = prompt("Durée de validité de l'accès dépôt (en heures) ?", "1");
   const hours = parseFloat(input);
   if (!hours || hours <= 0) { toast("Durée invalide"); return; }
