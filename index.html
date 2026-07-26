@@ -683,7 +683,7 @@ async function saveMapView(viewData) {
 }
 
 // ---------- MAP INIT ----------
-async function initMap(center, zoom, dataAlreadyLoaded) {
+async function initMap(center, zoom, preloadedData) {
   map = L.map('map', {
     zoomControl: false, tap: true,
     rotate: true, rotateControl: false, touchRotate: true, bearing: 0
@@ -699,7 +699,7 @@ async function initMap(center, zoom, dataAlreadyLoaded) {
 
   map.on('click', onMapClick);
 
-  if (!dataAlreadyLoaded) await loadAll();
+  await loadAll(preloadedData);
   renderSpots(center);
   renderFreeTrailers();
   renderBoundary();
@@ -735,7 +735,10 @@ function snapshotOf(spots, occ, free) {
   return JSON.stringify({ spots, occ, free });
 }
 
+let pollInFlight = false;
 async function pollForUpdates() {
+  if (pollInFlight) return; // évite d'empiler des requêtes si le réseau est lent
+  pollInFlight = true;
   try {
     const d = await backendGetAll();
     const newOcc = d.occupancy || {};
@@ -764,6 +767,8 @@ async function pollForUpdates() {
     }
   } catch (e) {
     console.warn("Sync temps réel indisponible:", e);
+  } finally {
+    pollInFlight = false;
   }
 }
 
@@ -2003,26 +2008,26 @@ function applyViewLock(viewData) {
 
 // ---------- GEOCODAGE + BOOT ----------
 async function geocodeAndInit() {
+  let d = {};
+  try { d = await backendGetAll(); } catch(e) { d = {}; }
+
   // priorité : cadrage fixé par l'admin
-  try {
-    const d = await backendGetAll();
-    if (d.mapView && d.mapView.lat != null) {
-      const v = d.mapView;
-      await initMap([v.lat, v.lng], v.zoom);
-      applyViewLock(v);
-      return;
-    }
-  } catch(e) { /* pas encore de cadrage fixé, on continue */ }
+  if (d.mapView && d.mapView.lat != null) {
+    const v = d.mapView;
+    await initMap([v.lat, v.lng], v.zoom, d);
+    applyViewLock(v);
+    return;
+  }
 
   try {
     const resp = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(SITE_ADDRESS));
-    const data = await resp.json();
-    if (data && data.length) {
-      await initMap([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+    const geo = await resp.json();
+    if (geo && geo.length) {
+      await initMap([parseFloat(geo[0].lat), parseFloat(geo[0].lon)], null, d);
       return;
     }
   } catch(e) { /* fallback */ }
-  await initMap(FALLBACK_COORDS);
+  await initMap(FALLBACK_COORDS, null, d);
 }
 
 // ---------- MODE CHAUFFEUR (accès restreint via QR) ----------
@@ -2099,7 +2104,7 @@ async function bootDriverMode(token) {
     zoom = 18;
   }
 
-  await initMap(center, zoom, true);
+  await initMap(center, zoom, d);
   if (savedView) applyViewLock(savedView);
 
   if (entry.type === 'pickup') {
