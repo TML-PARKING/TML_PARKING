@@ -934,6 +934,7 @@ function finalizeRow() {
 }
 
 function onMapClick(e) {
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
   if (driverMode) {
     if (driverMode.entry.type !== 'encode') return; // rien d'autre autorisé en mode reprise
     if (driverMode.entry.used) { toast("Accès déjà utilisé"); return; }
@@ -1473,6 +1474,7 @@ function distanceMeters(from, to) {
 }
 
 function openDetailView(item) {
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
   detailTarget = item;
   const days = daysSince(item.time);
   document.getElementById('detail-title').textContent = item.trailer || '(sans n°)';
