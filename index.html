@@ -160,6 +160,18 @@
   .detail-label { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; flex-shrink:0; }
   .detail-value { font-size:14px; font-weight:600; text-align:right; }
   .detail-pill { padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; }
+
+  .marker-selected { box-shadow: 0 0 0 4px #facc15, 0 0 14px 4px #facc15aa !important; animation: pulseSelect 1.2s infinite; }
+  @keyframes pulseSelect {
+    0% { box-shadow: 0 0 0 4px #facc15, 0 0 14px 4px #facc15aa; }
+    50% { box-shadow: 0 0 0 7px #facc15, 0 0 20px 8px #facc15cc; }
+    100% { box-shadow: 0 0 0 4px #facc15, 0 0 14px 4px #facc15aa; }
+  }
+  .lp-icon-btn {
+    background: #1f2937; border: 1px solid #374151; border-radius: 8px;
+    width: 30px; height: 30px; font-size: 14px; cursor: pointer; color: #fff;
+  }
+  .lp-icon-btn:active { background: #374151; }
   .lp-filter-btn { font-size: 11px; padding: 6px 10px; white-space: nowrap; flex: 0 0 auto; }
   .lp-filter-btn.active { background: #2563eb; color: #fff; }
   #list-panel .empty { padding: 20px 14px; color: #6b7280; font-size: 13px; text-align: center; }
@@ -244,7 +256,7 @@
     </div>
     <div class="top-actions">
       <button class="btn btn-ghost" id="btn-list">📋 Liste</button>
-      <button class="btn btn-primary" id="btn-gen-encode-access">🔑 Accès dépôt</button>
+      <button class="btn btn-primary" id="btn-gen-encode-access" title="Accès chauffeur (dépôt)" style="padding:8px 10px; font-size:16px;">🔑</button>
       <button class="btn btn-ghost" id="btn-history">🕓</button>
       <button class="btn btn-warn" id="btn-reframe" style="display:none;">📍 Fixer le cadrage</button>
       <button class="btn btn-ghost" id="btn-emails" style="display:none;">✉️</button>
@@ -273,12 +285,14 @@
     <button class="btn btn-ghost" id="btn-list-close" style="padding:4px 8px;">✕</button>
   </div>
   <div class="lp-search"><input type="text" id="lp-search-input" placeholder="Rechercher n°, client..."></div>
-  <div id="lp-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px;">
+  <div id="lp-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; align-items:center;">
     <button class="btn btn-ghost lp-filter-btn active" data-filter="all" style="flex-shrink:0;">Tous</button>
     <button class="btn btn-ghost lp-filter-btn" data-filter="pleine" style="flex-shrink:0;">À vider</button>
     <button class="btn btn-ghost lp-filter-btn" data-filter="vide" style="flex-shrink:0;">Vide</button>
     <button class="btn btn-ghost lp-filter-btn" data-filter="fleet" style="flex-shrink:0;">Fleet</button>
     <button class="btn btn-ghost lp-filter-btn" data-filter="charge" style="flex-shrink:0;">Chargé</button>
+    <button class="btn btn-ghost lp-filter-btn" data-filter="fixed" style="flex-shrink:0;">P</button>
+    <button class="lp-icon-btn" id="btn-lp-sort" title="Trier A-Z" style="margin-left:auto;">⬇️</button>
   </div>
   <div id="lp-items"></div>
 </div>
@@ -418,7 +432,7 @@
 
     <button class="btn-route" id="btn-detail-route" style="margin-top:0;">🧭 Tracer l'itinéraire sur la carte</button>
     <button class="btn btn-ghost" id="btn-detail-edit" style="width:100%; padding:12px; margin-top:10px;">✏️ Voir / modifier la fiche</button>
-    <button class="btn btn-primary" id="btn-detail-qr" style="width:100%; padding:12px; margin-top:10px;">🔑 Accès chauffeur temporaire (reprise)</button>
+    <button class="btn btn-primary" id="btn-detail-qr" title="Accès chauffeur temporaire (reprise)" style="width:46px; height:46px; padding:0; margin:10px auto 0; display:block; font-size:18px; border-radius:10px;">🔑</button>
     <button class="btn btn-danger" id="btn-detail-remove" style="width:100%; padding:12px; margin-top:10px;">🗑️ Retirer cette remorque</button>
   </div>
 </div>
@@ -446,11 +460,13 @@
     <button class="btn btn-ghost" id="btn-db-panel-close" style="padding:4px 8px;">✕</button>
   </div>
   <div class="lp-search"><input type="text" id="db-panel-search" placeholder="Rechercher n° remorque..."></div>
-  <div id="db-panel-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px;">
+  <div id="db-panel-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; align-items:center;">
     <button class="btn btn-ghost lp-filter-btn active" data-dbfilter="all">Tous</button>
     <button class="btn btn-ghost lp-filter-btn" data-dbfilter="ok">✅ OK</button>
     <button class="btn btn-ghost lp-filter-btn" data-dbfilter="soon">🟠 &lt; 2 mois</button>
     <button class="btn btn-ghost lp-filter-btn" data-dbfilter="nok">⚠️ Non OK</button>
+    <button class="lp-icon-btn" id="btn-db-sort" title="Trier par n° A-Z" style="width:auto; padding:0 8px;">🔤⬇️</button>
+    <button class="lp-icon-btn" id="btn-db-sort-date" title="Trier par date" style="width:auto; padding:0 8px; margin-left:auto;">📅⬇️</button>
   </div>
   <div style="padding:0 14px 10px;">
     <button class="btn btn-success" id="btn-db-new" style="width:100%; padding:10px;">➕ Ajouter une remorque</button>
@@ -468,6 +484,7 @@
     <div class="field">
       <label>N° Remorque</label>
       <input type="text" id="db-f-trailer" placeholder="Ex: TR-4521" autocomplete="off">
+      <div id="db-trailer-warning" style="margin-top:6px; font-size:12px; color:#fb923c; display:none;">⚠ Cette remorque existe déjà dans la base</div>
     </div>
     <div class="field">
       <label>Date de validité du contrôle technique</label>
@@ -555,6 +572,7 @@ let setupMode = false;
 let currentTarget = null;  // {type:'spot', id} or {type:'free', id} or {type:'new-free', lat,lng} or {type:'new-spot', num}
 let userMarker = null;
 let userPos = null;
+let selectedTargetKey = null; // ex: "spot-3" ou "free-abc123" — pour surligner le marqueur ciblé
 const STORAGE_KEY_SITE_BOUNDARY = "yard:site-boundary";
 let siteBoundary = []; // [{lat,lng}, ...] contour du site défini par l'admin
 let boundaryLayer = null;
@@ -999,7 +1017,7 @@ function renderSpots(centerFallback) {
     }
     const icon = L.divIcon({
       className: '',
-      html: `<div class="spot-marker" style="background:${markerColor}">${labelText}</div>`,
+      html: `<div class="spot-marker${selectedTargetKey === 'spot-'+i ? ' marker-selected' : ''}" style="background:${markerColor}">${labelText}</div>`,
       iconSize: [34, 34], iconAnchor: [17, 17]
     });
     const marker = L.marker([pos.lat, pos.lng], { icon, draggable: setupMode }).addTo(map);
@@ -1037,7 +1055,7 @@ function renderFreeTrailers() {
     const vs = getVisualState(t);
     const icon = L.divIcon({
       className: '',
-      html: `<div class="trailer-marker" style="background:${vs.color}">🚛</div>`,
+      html: `<div class="trailer-marker${selectedTargetKey === 'free-'+id ? ' marker-selected' : ''}" style="background:${vs.color}">🚛</div>`,
       iconSize: [30, 30], iconAnchor: [15, 15]
     });
     const marker = L.marker([t.lat, t.lng], { icon, draggable: false }).addTo(map);
@@ -1319,6 +1337,7 @@ async function performRemove(target) {
       trailer: removedData.trailer,
       client: removedData.client,
       status: removedData.status,
+      notes: removedData.notes,
       label,
       dropTime: removedData.time,
       removeTime: new Date().toISOString()
@@ -1345,10 +1364,16 @@ document.getElementById('btn-list-close').onclick = closeListPanel;
 document.getElementById('lp-search-input').oninput = renderListPanel;
 
 let lpActiveFilter = 'all';
-document.querySelectorAll('.lp-filter-btn').forEach(btn => {
+let lpSortAsc = null; // null = pas trié (ordre naturel), true = A-Z, false = Z-A
+document.getElementById('btn-lp-sort').onclick = () => {
+  lpSortAsc = lpSortAsc === true ? false : true;
+  document.getElementById('btn-lp-sort').textContent = lpSortAsc ? '⬇️' : '⬆️';
+  renderListPanel();
+};
+document.querySelectorAll('#lp-filters .lp-filter-btn').forEach(btn => {
   btn.onclick = () => {
     lpActiveFilter = btn.dataset.filter;
-    document.querySelectorAll('.lp-filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#lp-filters .lp-filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     renderListPanel();
   };
@@ -1364,10 +1389,23 @@ function renderListPanel() {
   Object.entries(freeTrailers).forEach(([id, d]) => {
     items.push({ label: 'Zone libre', sub: d.client || '', ...d, _target: { type: 'free', id }, open: () => openEditSheetForFree(id) });
   });
-  let filtered = lpActiveFilter === 'all' ? items : items.filter(it => it.status === lpActiveFilter);
+  let filtered = lpActiveFilter === 'all' ? items
+    : lpActiveFilter === 'fixed' ? items.filter(it => it._target.type === 'spot')
+    : items.filter(it => it.status === lpActiveFilter);
   filtered = q ? filtered.filter(it =>
     (it.trailer||'').toLowerCase().includes(q) || (it.client||'').toLowerCase().includes(q) || (it.label||'').toLowerCase().includes(q)
   ) : filtered;
+  if (lpSortAsc !== null) {
+    filtered = filtered.slice().sort((a, b) => {
+      let cmp;
+      if (lpActiveFilter === 'fixed') {
+        cmp = parseInt(a._target.id) - parseInt(b._target.id);
+      } else {
+        cmp = (a.trailer || '').localeCompare(b.trailer || '', 'fr', { numeric: true });
+      }
+      return lpSortAsc ? cmp : -cmp;
+    });
+  }
 
   document.getElementById('lp-count').textContent = items.length;
   const container = document.getElementById('lp-items');
@@ -1393,6 +1431,7 @@ function renderListPanel() {
     div.style.flexDirection = 'column';
     div.style.alignItems = 'stretch';
     div.style.gap = '4px';
+    const compactLabel = it._target.type === 'spot' ? 'P' + it._target.id : '';
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-num">${it.trailer || '(sans n°)'}</div>
@@ -1401,11 +1440,32 @@ function renderListPanel() {
           <div class="lp-badge ${badgeClass}">${badgeText}</div>
         </div>
       </div>
-      <div class="lp-meta">${it.label}${it.client ? ' · ' + it.client : ''}</div>
-      <div class="lp-meta">${days} jour${days > 1 ? 's' : ''} sur site${it.notes ? ' · ' + it.notes : ''}</div>
+      <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}</div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="lp-meta">🔄 ${days}j${it.notes ? ' · ' + it.notes : ''}</div>
+        <div style="display:flex; gap:4px; flex-shrink:0;">
+          <button class="lp-icon-btn" data-action="locate" title="Localiser sur la carte">📍</button>
+          <button class="lp-icon-btn" data-action="detail" title="Voir le détail">👁️</button>
+        </div>
+      </div>
     `;
-    div.onclick = () => {
+    const targetKey = it._target.type === 'spot' ? 'spot-' + it._target.id : 'free-' + it._target.id;
+    div.querySelector('[data-action="locate"]').onclick = (ev) => {
+      ev.stopPropagation();
       closeListPanel();
+      selectedTargetKey = targetKey;
+      renderSpots();
+      renderFreeTrailers();
+      if (it.lat != null && it.lng != null) {
+        map.flyTo([it.lat, it.lng], Math.max(map.getZoom(), 19), { duration: 0.6 });
+      }
+    };
+    div.querySelector('[data-action="detail"]').onclick = (ev) => {
+      ev.stopPropagation();
+      closeListPanel();
+      selectedTargetKey = targetKey;
+      renderSpots();
+      renderFreeTrailers();
       if (it.lat != null && it.lng != null) {
         map.flyTo([it.lat, it.lng], Math.max(map.getZoom(), 19), { duration: 0.6 });
       }
@@ -1450,6 +1510,15 @@ function renderHistoryPanel() {
     div.style.alignItems = 'stretch';
     div.style.gap = '3px';
     div.style.cursor = 'default';
+
+    let durationText = '';
+    if (h.dropTime && h.removeTime) {
+      const durMs = new Date(h.removeTime).getTime() - new Date(h.dropTime).getTime();
+      const durDays = Math.floor(durMs / (1000*60*60*24));
+      const durHours = Math.floor((durMs % (1000*60*60*24)) / (1000*60*60));
+      durationText = durDays > 0 ? `${durDays}j ${durHours}h` : `${durHours}h`;
+    }
+
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-num">${h.trailer || '(sans n°)'}</div>
@@ -1458,6 +1527,8 @@ function renderHistoryPanel() {
       <div class="lp-meta">${h.label}${h.client ? ' · ' + h.client : ''}</div>
       <div class="lp-meta">📥 Déposé : ${formatDateTime(h.dropTime)}</div>
       <div class="lp-meta">📤 Retiré : ${formatDateTime(h.removeTime)}</div>
+      ${durationText ? `<div class="lp-meta">⏱️ Durée sur site : ${durationText}</div>` : ''}
+      ${h.notes ? `<div class="lp-meta">📝 ${h.notes}</div>` : ''}
     `;
     container.appendChild(div);
   });
@@ -1603,6 +1674,22 @@ document.getElementById('btn-db-sheet-close').onclick = closeDbSheet;
 document.getElementById('db-panel-search').oninput = renderDbPanel;
 
 let dbActiveFilter = 'all';
+let dbSortAsc = null;
+let dbDateSortAsc = null;
+document.getElementById('btn-db-sort').onclick = () => {
+  dbSortAsc = dbSortAsc === true ? false : true;
+  dbDateSortAsc = null;
+  document.getElementById('btn-db-sort').textContent = dbSortAsc ? '🔤⬇️' : '🔤⬆️';
+  document.getElementById('btn-db-sort-date').textContent = '📅⬇️';
+  renderDbPanel();
+};
+document.getElementById('btn-db-sort-date').onclick = () => {
+  dbDateSortAsc = dbDateSortAsc === true ? false : true;
+  dbSortAsc = null;
+  document.getElementById('btn-db-sort-date').textContent = dbDateSortAsc ? '📅⬇️' : '📅⬆️';
+  document.getElementById('btn-db-sort').textContent = '🔤⬇️';
+  renderDbPanel();
+};
 document.querySelectorAll('#db-panel-filters .lp-filter-btn').forEach(btn => {
   btn.onclick = () => {
     dbActiveFilter = btn.dataset.dbfilter;
@@ -1620,6 +1707,19 @@ function renderDbPanel() {
     entries = entries.filter(([num, entry]) => {
       const status = getCtStatus(entry.ctExpiryDate);
       return status && status.level === dbActiveFilter;
+    });
+  }
+  if (dbSortAsc !== null) {
+    entries = entries.slice().sort((a, b) => {
+      const cmp = a[0].localeCompare(b[0], 'fr', { numeric: true });
+      return dbSortAsc ? cmp : -cmp;
+    });
+  } else if (dbDateSortAsc !== null) {
+    entries = entries.slice().sort((a, b) => {
+      const da = a[1].ctExpiryDate || '';
+      const db_ = b[1].ctExpiryDate || '';
+      const cmp = da.localeCompare(db_);
+      return dbDateSortAsc ? cmp : -cmp;
     });
   }
   document.getElementById('db-count').textContent = Object.keys(trailerDB).length;
@@ -1657,6 +1757,7 @@ function openDbSheet(trailerNum) {
   document.getElementById('db-f-date').value = entry ? (entry.ctExpiryDate || '') : '';
   document.getElementById('db-f-notes').value = entry ? (entry.notes || '') : '';
   document.getElementById('db-btn-delete').style.display = trailerNum ? 'block' : 'none';
+  document.getElementById('db-trailer-warning').style.display = 'none';
   updateDbCtPreview();
   dbSheet.classList.add('open');
   overlay.classList.add('show');
@@ -1670,6 +1771,9 @@ document.getElementById('db-f-trailer').addEventListener('input', (e) => {
   const pos = e.target.selectionStart;
   e.target.value = e.target.value.toUpperCase();
   e.target.setSelectionRange(pos, pos);
+  const val = e.target.value.trim();
+  const exists = val && trailerDB[val] && val !== dbCurrentTrailer;
+  document.getElementById('db-trailer-warning').style.display = exists ? 'block' : 'none';
 });
 
 document.getElementById('db-f-date').addEventListener('input', updateDbCtPreview);
