@@ -256,11 +256,12 @@
     </div>
     <div class="top-actions">
       <button class="btn btn-ghost" id="btn-list">📋 Liste</button>
-      <button class="btn btn-primary" id="btn-gen-encode-access" title="Accès chauffeur (dépôt)" style="padding:8px 10px; font-size:16px;">🔑</button>
+      <button class="btn btn-primary" id="btn-gen-encode-access" title="Accès chauffeur (dépôt)" style="display:none; padding:8px 10px; font-size:16px;">🔑</button>
       <button class="btn btn-ghost" id="btn-history">🕓</button>
       <button class="btn btn-warn" id="btn-reframe" style="display:none;">📍 Fixer le cadrage</button>
       <button class="btn btn-ghost" id="btn-emails" style="display:none;">✉️</button>
       <button class="btn btn-ghost" id="btn-trailerdb">🗄️</button>
+      <button class="btn btn-ghost" id="btn-manage-users" style="display:none;">👤</button>
       <button class="btn btn-ghost" id="btn-setup">⚙️</button>
     </div>
   </header>
@@ -413,6 +414,7 @@
       <div class="detail-row"><span class="detail-label">Emplacement</span><span id="detail-location" class="detail-value">—</span></div>
       <div class="detail-row"><span class="detail-label">Déposée depuis</span><span id="detail-days" class="detail-value">—</span></div>
       <div class="detail-row" id="detail-notes-row"><span class="detail-label">Notes</span><span id="detail-notes" class="detail-value">—</span></div>
+      <div class="detail-row" id="detail-encodedby-row"><span class="detail-label">Encodé par</span><span id="detail-encodedby" class="detail-value">—</span></div>
     </div>
 
     <div id="detail-ct-box" style="border-radius:12px; padding:14px; margin-bottom:14px; display:none;">
@@ -452,6 +454,26 @@
     </div>
     <button class="btn btn-primary" id="btn-qr-copy" style="width:100%; padding:12px;">📋 Copier le lien</button>
   </div>
+</div>
+
+<div id="users-panel" style="position:fixed; top:52px; right:0; bottom:0; width:300px; max-width:88vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
+  <div class="lp-header">
+    <h3>Utilisateurs (<span id="users-count">0</span>)</h3>
+    <button class="btn btn-ghost" id="btn-users-panel-close" style="padding:4px 8px;">✕</button>
+  </div>
+  <div style="padding:14px;">
+    <div class="field">
+      <label>Nom / Prénom</label>
+      <input type="text" id="f-new-user-name" placeholder="Ex: Marc Dubois" autocomplete="off">
+    </div>
+    <div id="new-user-code-preview" style="font-size:13px; color:#9ca3af; margin-bottom:12px;"></div>
+    <div class="field">
+      <label>Accès autorisés</label>
+      <div id="new-user-permissions" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+    <button class="btn btn-success" id="btn-add-user" style="width:100%; padding:10px; margin-top:6px;">➕ Créer l'utilisateur</button>
+  </div>
+  <div id="users-items"></div>
 </div>
 
 <div id="db-panel" style="position:fixed; top:52px; right:0; bottom:0; width:300px; max-width:88vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
@@ -509,7 +531,7 @@ const FALLBACK_COORDS = [50.4700, 3.9280]; // approx Ghlin industrial zone, corr
 
 // Renseigne ici l'URL de déploiement Apps Script (Déployer > Nouveau déploiement > Application web)
 // une fois copiée depuis Google. Obligatoire : sans elle, l'app ne peut pas fonctionner.
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbySqX-2TWedMzSHyHpUyOFWDy_vFALhCAIWv9fIUQhvtSMTySY0-JWpLfwdFE8BJQmPUA/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxCi_qoaG3vMhK8S1iZyKSLXChx2A_gaxht870bTg5OFN0a6Jqv5g8DAa9tOBNVaOhSYA/exec";
 
 // ---------- COUCHE DE DONNÉES (Google Sheets via Apps Script) ----------
 async function backendGetAll() {
@@ -527,11 +549,21 @@ async function backendSave(action, storageKey, data) {
     return;
   }
   // text/plain évite le preflight CORS que Apps Script ne gère pas
-  await fetch(APPS_SCRIPT_URL, {
+  const resp = await fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action, data })
   });
+  let result;
+  try { result = await resp.json(); } catch(e) {
+    console.error("Réponse backend illisible pour", action, e);
+    toast("Erreur serveur (réponse invalide) — voir console");
+    return;
+  }
+  if (!result || result.ok === false) {
+    console.error("Échec backend pour", action, result);
+    toast("Échec de sauvegarde (" + action + ") : " + (result && result.error ? result.error : "erreur inconnue"));
+  }
 }
 
 let backendWarningShown = false;
@@ -542,8 +574,6 @@ function showBackendMissingWarning() {
 }
 let numFixedSpots = 25;
 const STORAGE_KEY_SPOT_COUNT = "yard:spot-count";
-const ADMIN_PIN = "1506";
-const ADMIN_PIN_DB = "2007";
 const STORAGE_KEY_TRAILER_DB = "yard:trailer-db";
 const STORAGE_KEY_SPOTS_CONFIG = "yard:spots-config";
 const STORAGE_KEY_OCCUPANCY = "yard:occupancy";
@@ -551,11 +581,24 @@ const STORAGE_KEY_FREE_TRAILERS = "yard:free-trailers";
 const STORAGE_KEY_MAP_VIEW = "yard:map-view";
 const STORAGE_KEY_EMAIL_CONFIG = "yard:email-config";
 const STORAGE_KEY_HISTORY = "yard:history";
-let isAdmin = false;
-let isDbAdmin = false;
+const PERMISSION_DEFS = [
+  { key: 'list', label: '📋 Liste' },
+  { key: 'history', label: '🕓 Historique' },
+  { key: 'trailerdb', label: '🗄️ Base remorques (contrôle technique)' },
+  { key: 'emails', label: '✉️ Alertes e-mail' },
+  { key: 'setup', label: '⚙️ Configuration (emplacements, cadrage, contour...)' },
+  { key: 'tempAccess', label: '🔑 Générer des accès chauffeur temporaires' },
+  { key: 'users', label: '👤 Créer un utilisateur' },
+  { key: 'usersEdit', label: '✏️ Modifier un profil utilisateur existant' },
+  { key: 'usersViewCodes', label: '🔑 Voir les codes des utilisateurs existants' },
+  { key: 'usersDelete', label: '🗑️ Supprimer un profil utilisateur' }
+];
+function hasPermission(key) {
+  return !!(currentUser && currentUser.permissions && currentUser.permissions[key]);
+}
 let trailerDB = {}; // { "TR-1234": { ctExpiryDate: "YYYY-MM-DD", notes: "" } }
 const STORAGE_KEY_DB_ACCESS_MODE = "yard:db-access-mode";
-let dbAccessMode = 'restricted'; // 'restricted' = PIN 2007 requis, 'open' = accès libre
+let dbAccessMode = 'restricted'; // 'restricted' = permission requise, 'open' = accès libre
 let emailRecipients = [];
 let alertThresholdDays = 15;
 let alertFrequencyDays = 1;
@@ -575,6 +618,8 @@ let userPos = null;
 let selectedTargetKey = null; // ex: "spot-3" ou "free-abc123" — pour surligner le marqueur ciblé
 const STORAGE_KEY_SITE_BOUNDARY = "yard:site-boundary";
 let siteBoundary = []; // [{lat,lng}, ...] contour du site défini par l'admin
+let teamUsers = {}; // { pin: { name } } comptes utilisateurs individuels
+let currentUser = null; // { pin, name } utilisateur actuellement identifié sur cet appareil
 let boundaryLayer = null;
 let boundaryMode = false;
 let boundaryDraftPoints = [];
@@ -638,6 +683,7 @@ async function loadAll(preFetched) {
   dbAccessMode = (d.dbAccessMode && d.dbAccessMode.mode) || 'restricted';
   siteBoundary = Array.isArray(d.siteBoundary) ? d.siteBoundary : [];
   tempAccesses = d.tempAccesses || {};
+  teamUsers = d.teamUsers || {};
 }
 
 async function saveSpotsConfig() {
@@ -687,6 +733,10 @@ async function saveTempAccesses() {
   try { await backendSave('saveTempAccesses', 'yard:temp-access', tempAccesses); }
   catch(e) { toast("Erreur sauvegarde des accès chauffeur"); }
 }
+async function saveTeamUsers() {
+  try { await backendSave('saveTeamUsers', 'yard:team-users', teamUsers); }
+  catch(e) { toast("Erreur sauvegarde des utilisateurs"); }
+}
 
 
 async function saveMapView(viewData) {
@@ -712,6 +762,7 @@ async function initMap(center, zoom, preloadedData) {
   map.on('click', onMapClick);
 
   await loadAll(preloadedData);
+  if (!driverMode) applyUserPermissions();
   renderSpots(center);
   renderFreeTrailers();
   renderBoundary();
@@ -1228,7 +1279,7 @@ function updateCtIndicator() {
 }
 
 document.getElementById('btn-sheet-close').onclick = closeSheet;
-overlay.onclick = () => { closeSheet(); closeListPanel(); closeEmailSheet(); closeHistoryPanel(); closeDbSheet(); closeDbPanel(); closeDetailView(); qrModal.classList.remove('open'); };
+overlay.onclick = () => { closeSheet(); closeListPanel(); closeEmailSheet(); closeHistoryPanel(); closeDbSheet(); closeDbPanel(); closeDetailView(); closeUsersPanel(); qrModal.classList.remove('open'); };
 
 document.getElementById('btn-route').onclick = () => {
   if (!currentTarget) return;
@@ -1280,9 +1331,14 @@ document.getElementById('btn-save').onclick = async () => {
   const status = activeChip ? activeChip.dataset.status : 'pleine';
 
   let existingTime = null;
-  if (currentTarget.type === 'spot') existingTime = occupancy[currentTarget.id]?.time;
-  else if (currentTarget.type === 'free') existingTime = freeTrailers[currentTarget.id]?.time;
-  const data = { trailer, client, status, notes, time: existingTime || new Date().toISOString() };
+  let existingEncodedBy = null;
+  if (currentTarget.type === 'spot') { existingTime = occupancy[currentTarget.id]?.time; existingEncodedBy = occupancy[currentTarget.id]?.encodedBy; }
+  else if (currentTarget.type === 'free') { existingTime = freeTrailers[currentTarget.id]?.time; existingEncodedBy = freeTrailers[currentTarget.id]?.encodedBy; }
+  const data = {
+    trailer, client, status, notes,
+    time: existingTime || new Date().toISOString(),
+    encodedBy: existingEncodedBy || (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : undefined)
+  };
 
   if (currentTarget.type === 'spot') {
     occupancy[currentTarget.id] = data;
@@ -1340,7 +1396,9 @@ async function performRemove(target) {
       notes: removedData.notes,
       label,
       dropTime: removedData.time,
-      removeTime: new Date().toISOString()
+      removeTime: new Date().toISOString(),
+      encodedBy: removedData.encodedBy,
+      removedBy: (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : undefined)
     });
     if (history.length > 500) history = history.slice(0, 500);
     saveHistory().catch(() => toast("Erreur de synchronisation (historique)"));
@@ -1525,8 +1583,8 @@ function renderHistoryPanel() {
         <div class="lp-badge ${h.status || 'pleine'}">${h.status === 'fleet' ? 'Fleet' : (h.status === 'vide' ? 'Vide' : (h.status === 'pleine' ? 'À vider' : (h.status === 'charge' ? 'Chargé' : (h.status || ''))))}</div>
       </div>
       <div class="lp-meta">${h.label}${h.client ? ' · ' + h.client : ''}</div>
-      <div class="lp-meta">📥 Déposé : ${formatDateTime(h.dropTime)}</div>
-      <div class="lp-meta">📤 Retiré : ${formatDateTime(h.removeTime)}</div>
+      <div class="lp-meta">📥 Déposé : ${formatDateTime(h.dropTime)}${h.encodedBy ? ' par ' + h.encodedBy : ''}</div>
+      <div class="lp-meta">📤 Retiré : ${formatDateTime(h.removeTime)}${h.removedBy ? ' par ' + h.removedBy : ''}</div>
       ${durationText ? `<div class="lp-meta">⏱️ Durée sur site : ${durationText}</div>` : ''}
       ${h.notes ? `<div class="lp-meta">📝 ${h.notes}</div>` : ''}
     `;
@@ -1579,6 +1637,13 @@ function openDetailView(item) {
   } else {
     notesRow.style.display = 'none';
   }
+  const encodedByRow = document.getElementById('detail-encodedby-row');
+  if (item.encodedBy) {
+    encodedByRow.style.display = 'flex';
+    document.getElementById('detail-encodedby').textContent = item.encodedBy;
+  } else {
+    encodedByRow.style.display = 'none';
+  }
 
   const ctBox = document.getElementById('detail-ct-box');
   const ctEntry = item.trailer ? trailerDB[item.trailer] : null;
@@ -1603,6 +1668,7 @@ function openDetailView(item) {
     closeDetailView();
     if (item.lat != null && item.lng != null) openRouteTo(item.lat, item.lng);
   };
+  document.getElementById('btn-detail-qr').style.display = hasPermission('tempAccess') ? 'block' : 'none';
   document.getElementById('btn-detail-qr').onclick = () => {
     generatePickupAccess(item);
   };
@@ -1637,19 +1703,131 @@ function closeDetailView() {
 }
 document.getElementById('btn-detail-close').onclick = closeDetailView;
 
+// ---------- GESTION DES UTILISATEURS (admin) ----------
+const usersPanel = document.getElementById('users-panel');
+let editingUserPin = null; // null = création, sinon code de l'utilisateur en cours d'édition
+
+function openUsersPanel() { usersPanel.style.transform = 'translateX(0)'; overlay.classList.add('show'); resetUserForm(); renderUsersPanel(); }
+function closeUsersPanel() { usersPanel.style.transform = 'translateX(100%)'; overlay.classList.remove('show'); }
+
+document.getElementById('btn-manage-users').onclick = () => {
+  if (!hasPermission('users')) { toast("Accès non autorisé"); return; }
+  openUsersPanel();
+};
+document.getElementById('btn-users-panel-close').onclick = closeUsersPanel;
+
+function generateUniqueCode() {
+  let code;
+  do {
+    code = String(Math.floor(10000 + Math.random() * 90000)); // 5 chiffres, 10000-99999
+  } while (teamUsers[code]);
+  return code;
+}
+
+function renderPermissionCheckboxes(checkedKeys) {
+  const container = document.getElementById('new-user-permissions');
+  container.innerHTML = '';
+  PERMISSION_DEFS.forEach(p => {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;';
+    label.innerHTML = `<input type="checkbox" data-perm="${p.key}" style="width:18px; height:18px;" ${checkedKeys && checkedKeys[p.key] ? 'checked' : ''}> ${p.label}`;
+    container.appendChild(label);
+  });
+}
+
+function resetUserForm() {
+  editingUserPin = null;
+  document.getElementById('f-new-user-name').value = '';
+  document.getElementById('new-user-code-preview').textContent = '';
+  document.getElementById('btn-add-user').textContent = "➕ Créer l'utilisateur";
+  renderPermissionCheckboxes(null);
+}
+
+function loadUserIntoForm(pin) {
+  const u = teamUsers[pin];
+  if (!u) return;
+  editingUserPin = pin;
+  document.getElementById('f-new-user-name').value = u.name;
+  document.getElementById('new-user-code-preview').textContent = hasPermission('usersViewCodes') ? 'Code : ' + pin : 'Code : masqué (accès non autorisé)';
+  document.getElementById('btn-add-user').textContent = "💾 Enregistrer les modifications";
+  renderPermissionCheckboxes(u.permissions || {});
+}
+
+document.getElementById('btn-add-user').onclick = async () => {
+  const name = document.getElementById('f-new-user-name').value.trim();
+  if (!name) { toast("Indique un nom"); return; }
+  const nameExists = Object.entries(teamUsers).some(([pin, u]) =>
+    u.name.trim().toLowerCase() === name.toLowerCase() && pin !== editingUserPin
+  );
+  if (nameExists) { toast("Un utilisateur avec ce nom existe déjà"); return; }
+
+  const permissions = {};
+  document.querySelectorAll('#new-user-permissions input[type="checkbox"]').forEach(cb => {
+    permissions[cb.dataset.perm] = cb.checked;
+  });
+
+  if (editingUserPin) {
+    if (!hasPermission('usersEdit')) { toast("Accès non autorisé pour modifier un profil"); return; }
+    teamUsers[editingUserPin] = { name, permissions };
+    toast("Utilisateur modifié");
+  } else {
+    if (!hasPermission('users')) { toast("Accès non autorisé pour créer un utilisateur"); return; }
+    const code = generateUniqueCode();
+    teamUsers[code] = { name, permissions };
+    toast(`Utilisateur créé — code : ${code}`);
+  }
+  resetUserForm();
+  renderUsersPanel();
+  saveTeamUsers().catch(() => toast("Erreur de synchronisation"));
+};
+
+function renderUsersPanel() {
+  const container = document.getElementById('users-items');
+  const entries = Object.entries(teamUsers);
+  document.getElementById('users-count').textContent = entries.length;
+  if (!entries.length) {
+    container.innerHTML = '<div class="empty">Aucun utilisateur configuré</div>';
+    return;
+  }
+  container.innerHTML = '';
+  entries.forEach(([pin, u]) => {
+    const permCount = u.permissions ? Object.values(u.permissions).filter(Boolean).length : 0;
+    const codeDisplay = hasPermission('usersViewCodes') ? pin : '••••';
+    const row = document.createElement('div');
+    row.style.cssText = `display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-bottom:1px solid #1f2937; cursor:${hasPermission('usersEdit') ? 'pointer' : 'default'};`;
+    row.innerHTML = `<div><div style="font-weight:600;">${u.name}</div><div style="font-size:11px; color:#9ca3af;">Code : ${codeDisplay} · ${permCount} accès</div></div>`;
+    row.onclick = () => {
+      if (!hasPermission('usersEdit')) return;
+      loadUserIntoForm(pin);
+    };
+    if (hasPermission('usersDelete')) {
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '✕';
+      delBtn.className = 'btn btn-danger';
+      delBtn.style.padding = '4px 10px';
+      delBtn.onclick = async (ev) => {
+        ev.stopPropagation();
+        if (!confirm(`Supprimer l'accès de ${u.name} ?`)) return;
+        delete teamUsers[pin];
+        await saveTeamUsers();
+        resetUserForm();
+        renderUsersPanel();
+        toast("Utilisateur supprimé");
+      };
+      row.appendChild(delBtn);
+    }
+    container.appendChild(row);
+  });
+}
+
 // ---------- BASE DE DONNÉES REMORQUES (contrôle technique) ----------
 function checkDbAdminPin() {
   if (dbAccessMode === 'open') return true; // accès libre décidé par l'admin principal
-  if (isDbAdmin) return true;
-  const entered = prompt("Code administrateur base de données requis :");
-  if (entered === null) return false;
-  if (entered === ADMIN_PIN_DB) {
-    isDbAdmin = true;
-    return true;
-  }
-  toast("Code incorrect");
+  if (hasPermission('trailerdb')) return true;
+  toast("Accès non autorisé");
   return false;
 }
+
 
 const dbSheet = document.getElementById('db-sheet');
 const dbPanel = document.getElementById('db-panel');
@@ -1911,6 +2089,7 @@ document.getElementById('btn-qr-copy').onclick = () => {
 
 async function generatePickupAccess(item) {
   if (driverMode) { toast("Non disponible en accès chauffeur"); return; }
+  if (!hasPermission('tempAccess')) { toast("Accès non autorisé"); return; }
   const input = prompt("Durée de validité de l'accès (en heures) ?", "1");
   const hours = parseFloat(input);
   if (!hours || hours <= 0) { toast("Durée invalide"); return; }
@@ -1927,6 +2106,7 @@ async function generatePickupAccess(item) {
 
 document.getElementById('btn-gen-encode-access').onclick = async () => {
   if (driverMode) { toast("Non disponible en accès chauffeur"); return; }
+  if (!hasPermission('tempAccess')) { toast("Accès non autorisé"); return; }
   const input = prompt("Durée de validité de l'accès dépôt (en heures) ?", "1");
   const hours = parseFloat(input);
   if (!hours || hours <= 0) { toast("Durée invalide"); return; }
@@ -1939,14 +2119,8 @@ document.getElementById('btn-gen-encode-access').onclick = async () => {
 
 // ---------- SETUP MODE (protégé par PIN) ----------
 function checkAdminPin() {
-  if (isAdmin) return true;
-  const entered = prompt("Code administrateur requis :");
-  if (entered === null) return false;
-  if (entered === ADMIN_PIN) {
-    isAdmin = true;
-    return true;
-  }
-  toast("Code incorrect");
+  if (hasPermission('setup')) return true;
+  toast("Accès non autorisé");
   return false;
 }
 
@@ -2041,7 +2215,7 @@ document.getElementById('btn-save-alert-settings').onclick = async () => {
 };
 
 document.getElementById('btn-emails').onclick = () => {
-  if (!checkAdminPin()) return;
+  if (!hasPermission('emails')) { toast("Accès non autorisé"); return; }
   openEmailSheet();
 };
 document.getElementById('btn-email-sheet-close').onclick = closeEmailSheet;
@@ -2118,9 +2292,9 @@ function applyViewLock(viewData) {
 }
 
 // ---------- GEOCODAGE + BOOT ----------
-async function geocodeAndInit() {
-  let d = {};
-  try { d = await backendGetAll(); } catch(e) { d = {}; }
+async function geocodeAndInit(preloadedData) {
+  let d = preloadedData;
+  if (!d) { try { d = await backendGetAll(); } catch(e) { d = {}; } }
 
   // priorité : cadrage fixé par l'admin
   if (d.mapView && d.mapView.lat != null) {
@@ -2139,6 +2313,88 @@ async function geocodeAndInit() {
     }
   } catch(e) { /* fallback */ }
   await initMap(FALLBACK_COORDS, null, d);
+}
+
+function applyUserPermissions() {
+  document.getElementById('btn-list').style.display = hasPermission('list') ? 'inline-block' : 'none';
+  document.getElementById('btn-history').style.display = hasPermission('history') ? 'inline-block' : 'none';
+  document.getElementById('btn-trailerdb').style.display = (hasPermission('trailerdb') || dbAccessMode === 'open') ? 'inline-block' : 'none';
+  document.getElementById('btn-emails').style.display = hasPermission('emails') ? 'inline-block' : 'none';
+  document.getElementById('btn-setup').style.display = hasPermission('setup') ? 'inline-block' : 'none';
+  document.getElementById('btn-gen-encode-access').style.display = hasPermission('tempAccess') ? 'inline-block' : 'none';
+  document.getElementById('btn-manage-users').style.display = hasPermission('users') ? 'inline-block' : 'none';
+}
+
+// ---------- IDENTIFICATION UTILISATEUR (une fois par appareil) ----------
+const USER_PIN_STORAGE_KEY = 'yardUserPin';
+
+function showIdentifyScreen() {
+  return new Promise((resolve) => {
+    const overlayDiv = document.createElement('div');
+    overlayDiv.style.cssText = 'position:fixed; inset:0; background:#0f172a; color:#fff; z-index:9999; display:flex; align-items:center; justify-content:center; padding:24px;';
+    overlayDiv.innerHTML = `
+      <div style="max-width:340px; width:100%; text-align:center;">
+        <div style="font-size:40px; margin-bottom:14px;">🔐</div>
+        <div style="font-size:17px; font-weight:600; margin-bottom:18px;">Entre ton code personnel pour accéder au site TML Ghlin</div>
+        <input type="password" id="identify-pin-input" inputmode="numeric" placeholder="Code PIN" style="width:100%; background:#1a2333; border:1px solid #374151; color:#fff; border-radius:10px; padding:14px; font-size:18px; text-align:center; letter-spacing:4px; margin-bottom:12px;">
+        <div id="identify-error" style="color:#f87171; font-size:13px; min-height:18px; margin-bottom:10px;"></div>
+        <button id="identify-submit" class="btn btn-primary" style="width:100%; padding:14px; font-size:15px;">Valider</button>
+      </div>
+    `;
+    document.body.appendChild(overlayDiv);
+
+    const input = overlayDiv.querySelector('#identify-pin-input');
+    const errorEl = overlayDiv.querySelector('#identify-error');
+    input.focus();
+
+    function trySubmit() {
+      const pin = input.value.trim();
+      const user = teamUsers[pin];
+      if (!user) {
+        errorEl.textContent = "Code incorrect, réessaie.";
+        input.value = '';
+        input.focus();
+        return;
+      }
+      localStorage.setItem(USER_PIN_STORAGE_KEY, pin);
+      currentUser = { pin, name: user.name, permissions: user.permissions || {} };
+      document.body.removeChild(overlayDiv);
+      resolve();
+    }
+    overlayDiv.querySelector('#identify-submit').onclick = trySubmit;
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') trySubmit(); });
+  });
+}
+
+async function ensureIdentified() {
+  let d = {};
+  try { d = await backendGetAll(); } catch(e) { d = {}; }
+  teamUsers = d.teamUsers || {};
+
+  if (!Object.keys(teamUsers).length) {
+    const allPerms = {};
+    PERMISSION_DEFS.forEach(p => allPerms[p.key] = true);
+    teamUsers['11050'] = { name: 'Donovan Decourty', permissions: allPerms };
+    await saveTeamUsers();
+  } else if (teamUsers['11050']) {
+    // Garantit que le compte principal garde toujours tous les accès,
+    // y compris les permissions ajoutées après sa création initiale.
+    const current = teamUsers['11050'].permissions || {};
+    let missing = false;
+    PERMISSION_DEFS.forEach(p => { if (!(p.key in current)) { current[p.key] = true; missing = true; } });
+    if (missing) {
+      teamUsers['11050'].permissions = current;
+      await saveTeamUsers();
+    }
+  }
+
+  const storedPin = localStorage.getItem(USER_PIN_STORAGE_KEY);
+  if (storedPin && teamUsers[storedPin]) {
+    currentUser = { pin: storedPin, name: teamUsers[storedPin].name, permissions: teamUsers[storedPin].permissions || {} };
+    return d;
+  }
+  await showIdentifyScreen();
+  return d;
 }
 
 // ---------- MODE CHAUFFEUR (accès restreint via QR) ----------
@@ -2231,7 +2487,8 @@ async function boot() {
   if (token) {
     await bootDriverMode(token);
   } else {
-    await geocodeAndInit();
+    const d = await ensureIdentified();
+    await geocodeAndInit(d);
   }
 }
 
