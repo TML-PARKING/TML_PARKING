@@ -22,9 +22,9 @@
   #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
 
   header {
-    background: #111827; color: #fff; padding: 10px 14px;
+    position: relative; background: #111827; color: #fff; padding: 10px 14px;
     display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid #1f2937; z-index: 1000; flex-shrink: 0;
+    border-bottom: 1px solid #1f2937; z-index: 1450; flex-shrink: 0;
     flex-wrap: wrap; row-gap: 8px;
   }
   header h1 { font-size: 15px; font-weight: 600; }
@@ -130,7 +130,7 @@
 
   /* Liste des remorques */
   #list-panel {
-    position: fixed; top: 52px; right: 0; bottom: 0; width: 280px; max-width: 82vw;
+    position: fixed; top: 52px; right: 0; bottom: 0; width: 360px; max-width: 92vw;
     background: #111827ee; color: #fff; transform: translateX(100%);
     transition: transform .2s ease; z-index: 1500; overflow-y: auto;
     border-left: 1px solid #1f2937;
@@ -176,7 +176,7 @@
   .lp-filter-btn.active { background: #2563eb; color: #fff; }
   #list-panel .empty { padding: 20px 14px; color: #6b7280; font-size: 13px; text-align: center; }
 
-  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1400; display: none; }
+  #overlay { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.4); z-index: 1400; display: none; }
   #overlay.show { display: block; }
 
   #banner {
@@ -278,6 +278,14 @@
 
 <div id="banner"></div>
 
+<div class="legend">
+  <div><span style="background:#6b7280"></span>Libre</div>
+  <div><span style="background:#16a34a"></span>Vide</div>
+  <div><span style="background:#dc2626"></span>À vider</div>
+  <div><span style="background:#0891b2"></span>Chargé</div>
+  <div><span style="background:#7c3aed"></span>Fleet (bloqué)</div>
+</div>
+
 <div id="overlay"></div>
 
 <div id="list-panel">
@@ -298,12 +306,19 @@
   <div id="lp-items"></div>
 </div>
 
-<div id="history-panel" style="position:fixed; top:52px; right:0; bottom:0; width:300px; max-width:88vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
+<div id="history-panel" style="position:fixed; top:52px; right:0; bottom:0; width:360px; max-width:92vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
   <div class="lp-header">
     <h3>Historique (<span id="hp-count">0</span>)</h3>
     <button class="btn btn-ghost" id="btn-history-close" style="padding:4px 8px;">✕</button>
   </div>
   <div class="lp-search"><input type="text" id="hp-search-input" placeholder="Rechercher n°, client..."></div>
+  <div style="padding:0 14px 10px;">
+    <div style="display:flex; gap:6px; margin-bottom:6px;">
+      <input type="date" id="hp-date-from" style="min-width:0; flex:1; background:#1f2937; border:1px solid #374151; color:#fff; border-radius:8px; padding:8px 6px; font-size:11px;">
+      <input type="date" id="hp-date-to" style="min-width:0; flex:1; background:#1f2937; border:1px solid #374151; color:#fff; border-radius:8px; padding:8px 6px; font-size:11px;">
+    </div>
+    <button class="btn btn-ghost" id="btn-hp-date-clear" style="width:100%; font-size:11px; padding:6px;">✕ Effacer les dates</button>
+  </div>
   <div id="hp-items"></div>
 </div>
 
@@ -368,8 +383,12 @@
   </div>
   <div class="sheet-body">
     <div class="field">
-      <label>Seuil d'alerte (jours sur site)</label>
+      <label>Seuil d'alerte (jours sur site) — À vider / Chargé</label>
       <input type="number" id="f-threshold-days" min="1" placeholder="15">
+    </div>
+    <div class="field">
+      <label>Seuil d'alerte Fleet (jours)</label>
+      <input type="number" id="f-fleet-threshold-days" min="1" placeholder="15">
     </div>
     <div class="field">
       <label>Fréquence d'envoi du récapitulatif</label>
@@ -422,20 +441,20 @@
       <div id="detail-ct-text" style="font-weight:600; font-size:14px;"></div>
     </div>
 
-    <div id="detail-compass-box" style="display:flex; align-items:center; gap:16px; background:#1f2937; border-radius:12px; padding:14px; margin-bottom:18px;">
-      <div id="detail-compass-arrow" style="width:46px; height:46px; flex-shrink:0; transition: transform .3s ease;">
-        <svg viewBox="0 0 24 24" width="46" height="46"><path d="M12 2 L19 21 L12 17 L5 21 Z" fill="#2563eb"/></svg>
-      </div>
-      <div>
-        <div style="font-weight:700; font-size:15px;" id="detail-distance">Position GPS indisponible</div>
-        <div style="font-size:12px; color:#9ca3af;">Direction approximative depuis ta position</div>
+    <div style="background:#1f2937; border-radius:12px; padding:14px; margin-bottom:14px;">
+      <div style="font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; margin-bottom:8px;">Commentaires</div>
+      <div id="detail-comments-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="detail-new-comment" placeholder="Ajouter un commentaire..." style="flex:1; background:#1a2333; border:1px solid #374151; color:#fff; border-radius:8px; padding:10px;">
+        <button class="btn btn-primary" id="btn-detail-add-comment" style="padding:10px 14px;">➕</button>
       </div>
     </div>
 
-    <button class="btn-route" id="btn-detail-route" style="margin-top:0;">🧭 Tracer l'itinéraire sur la carte</button>
-    <button class="btn btn-ghost" id="btn-detail-edit" style="width:100%; padding:12px; margin-top:10px;">✏️ Voir / modifier la fiche</button>
-    <button class="btn btn-primary" id="btn-detail-qr" title="Accès chauffeur temporaire (reprise)" style="width:46px; height:46px; padding:0; margin:10px auto 0; display:block; font-size:18px; border-radius:10px;">🔑</button>
-    <button class="btn btn-danger" id="btn-detail-remove" style="width:100%; padding:12px; margin-top:10px;">🗑️ Retirer cette remorque</button>
+    <div style="display:flex; gap:8px; margin-top:0;">
+      <button class="lp-icon-btn" id="btn-detail-route" title="Tracer l'itinéraire" style="flex:1; height:44px; font-size:18px;">🗺️</button>
+      <button class="lp-icon-btn" id="btn-detail-qr" title="Accès chauffeur temporaire (reprise)" style="flex:1; height:44px; font-size:18px;">🔑</button>
+      <button class="lp-icon-btn" id="btn-detail-remove" title="Retirer cette remorque" style="flex:1; height:44px; font-size:18px; background:#dc2626; border-color:#dc2626;">📤</button>
+    </div>
   </div>
 </div>
 
@@ -456,12 +475,24 @@
   </div>
 </div>
 
-<div id="users-panel" style="position:fixed; top:52px; right:0; bottom:0; width:300px; max-width:88vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
+<div id="users-panel" style="position:fixed; top:52px; right:0; bottom:0; width:360px; max-width:92vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
   <div class="lp-header">
     <h3>Utilisateurs (<span id="users-count">0</span>)</h3>
     <button class="btn btn-ghost" id="btn-users-panel-close" style="padding:4px 8px;">✕</button>
   </div>
-  <div style="padding:14px;">
+  <div style="padding:0 14px 10px;">
+    <button class="btn btn-success" id="btn-users-new" style="width:100%; padding:10px;">➕ Nouvel utilisateur</button>
+  </div>
+  <div id="users-items"></div>
+</div>
+
+<div id="user-edit-sheet" class="bottom-sheet" style="z-index:2000; max-height:85vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2 id="user-edit-title">Nouvel utilisateur</h2>
+    <button class="btn btn-ghost" id="btn-user-edit-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
     <div class="field">
       <label>Nom / Prénom</label>
       <input type="text" id="f-new-user-name" placeholder="Ex: Marc Dubois" autocomplete="off">
@@ -473,10 +504,9 @@
     </div>
     <button class="btn btn-success" id="btn-add-user" style="width:100%; padding:10px; margin-top:6px;">➕ Créer l'utilisateur</button>
   </div>
-  <div id="users-items"></div>
 </div>
 
-<div id="db-panel" style="position:fixed; top:52px; right:0; bottom:0; width:300px; max-width:88vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
+<div id="db-panel" style="position:fixed; top:52px; right:0; bottom:0; width:360px; max-width:92vw; background:#111827ee; color:#fff; transform:translateX(100%); transition:transform .2s ease; z-index:1500; overflow-y:auto; border-left:1px solid #1f2937;">
   <div class="lp-header">
     <h3>Base remorques (<span id="db-count">0</span>)</h3>
     <button class="btn btn-ghost" id="btn-db-panel-close" style="padding:4px 8px;">✕</button>
@@ -500,7 +530,10 @@
   <div class="handle"></div>
   <div class="sheet-header">
     <h2>Base de données remorques (contrôle technique)</h2>
-    <button class="btn btn-ghost" id="btn-db-sheet-close" style="padding:6px 10px;">✕</button>
+    <div style="display:flex; gap:6px;">
+      <button class="lp-icon-btn" id="btn-db-history" title="Historique des modifications" style="display:none;">🕓</button>
+      <button class="btn btn-ghost" id="btn-db-sheet-close" style="padding:6px 10px;">✕</button>
+    </div>
   </div>
   <div class="sheet-body">
     <div class="field">
@@ -588,6 +621,8 @@ const PERMISSION_DEFS = [
   { key: 'emails', label: '✉️ Alertes e-mail' },
   { key: 'setup', label: '⚙️ Configuration (emplacements, cadrage, contour...)' },
   { key: 'tempAccess', label: '🔑 Générer des accès chauffeur temporaires' },
+  { key: 'viewAuthors', label: '👁️ Voir qui a encodé / modifié (remorques et base CT)' },
+  { key: 'trailerdbDelete', label: '🗑️ Supprimer une remorque de la base CT' },
   { key: 'users', label: '👤 Créer un utilisateur' },
   { key: 'usersEdit', label: '✏️ Modifier un profil utilisateur existant' },
   { key: 'usersViewCodes', label: '🔑 Voir les codes des utilisateurs existants' },
@@ -601,6 +636,7 @@ const STORAGE_KEY_DB_ACCESS_MODE = "yard:db-access-mode";
 let dbAccessMode = 'restricted'; // 'restricted' = permission requise, 'open' = accès libre
 let emailRecipients = [];
 let alertThresholdDays = 15;
+let fleetAlertThresholdDays = 15;
 let alertFrequencyDays = 1;
 let ctAlertRecipients = [];
 let history = [];
@@ -652,13 +688,20 @@ function daysSince(isoTime) {
 
 // Détermine la couleur/état visuel d'une remorque : >15j = rouge (priorité), fleet = bloqué (violet), sinon couleur du statut
 function getVisualState(data) {
-  if (!data) return { color: '#16a34a', label: '' };
+  if (!data) return { color: '#6b7280', label: '' }; // libre = gris
   const days = daysSince(data.time);
+  if (data.status === 'fleet') {
+    if (days > fleetAlertThresholdDays) return { color: '#dc2626', label: `⚠ ${days}j` };
+    return { color: '#7c3aed', label: 'Bloqué' };
+  }
+  if (data.status === 'vide') return { color: '#16a34a', label: '' };
+  if (data.status === 'charge') {
+    if (days > alertThresholdDays) return { color: '#dc2626', label: `⚠ ${days}j` };
+    return { color: '#0891b2', label: '' };
+  }
+  // à vider (pleine) : rouge, avec alerte visuelle si le seuil de jours est dépassé
   if (days > alertThresholdDays) return { color: '#dc2626', label: `⚠ ${days}j` };
-  if (data.status === 'fleet') return { color: '#7c3aed', label: 'Bloqué' };
-  if (data.status === 'vide') return { color: '#6b7280', label: '' };
-  if (data.status === 'charge') return { color: '#0891b2', label: '' };
-  return { color: '#16a34a', label: '' };
+  return { color: '#dc2626', label: '' };
 }
 
 async function loadAll(preFetched) {
@@ -674,6 +717,7 @@ async function loadAll(preFetched) {
   const cfg = d.emailConfig || {};
   emailRecipients = cfg.recipients || [];
   alertThresholdDays = cfg.thresholdDays || 15;
+  fleetAlertThresholdDays = cfg.fleetThresholdDays || 15;
   alertFrequencyDays = cfg.frequencyDays || 1;
   ctAlertRecipients = cfg.ctRecipients || [];
 
@@ -703,6 +747,7 @@ async function saveEmailConfig() {
     await backendSave('saveEmailConfig', STORAGE_KEY_EMAIL_CONFIG, {
       recipients: emailRecipients,
       thresholdDays: alertThresholdDays,
+      fleetThresholdDays: fleetAlertThresholdDays,
       frequencyDays: alertFrequencyDays,
       ctRecipients: ctAlertRecipients
     });
@@ -852,7 +897,6 @@ function startGpsTracking() {
       } else {
         userMarker.setLatLng([userPos.lat, userPos.lng]);
       }
-      if (detailTarget) updateDetailCompass();
     },
     (err) => { console.warn("GPS indisponible:", err.message); },
     { enableHighAccuracy: true, maximumAge: 5000 }
@@ -1059,12 +1103,12 @@ function renderSpots(centerFallback) {
       if (!(t && t.type === 'spot' && String(t.id) === String(i))) continue;
     }
     const occ = occupancy[i];
-    let markerColor = '#16a34a'; // libre par défaut
+    let markerColor = '#6b7280'; // libre par défaut = gris
     let labelText = i;
     if (setupMode) {
       markerColor = '#d97706';
     } else if (occ) {
-      markerColor = '#dc2626'; // occupé = rouge
+      markerColor = getVisualState(occ).color;
     }
     const icon = L.divIcon({
       className: '',
@@ -1162,7 +1206,8 @@ function fillForm(data) {
   if (data && data.time) {
     const days = daysSince(data.time);
     const parts = [];
-    if (days > alertThresholdDays) parts.push(`⚠ Sur site depuis ${days} jours`);
+    const relevantThreshold = data.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
+    if (days > relevantThreshold) parts.push(`⚠ Sur site depuis ${days} jours`);
     if (data.status === 'fleet') parts.push('🔒 Bloqué (fleet)');
     warnEl.textContent = parts.join(' · ');
   } else {
@@ -1279,7 +1324,7 @@ function updateCtIndicator() {
 }
 
 document.getElementById('btn-sheet-close').onclick = closeSheet;
-overlay.onclick = () => { closeSheet(); closeListPanel(); closeEmailSheet(); closeHistoryPanel(); closeDbSheet(); closeDbPanel(); closeDetailView(); closeUsersPanel(); qrModal.classList.remove('open'); };
+overlay.onclick = () => { closeSheet(); closeListPanel(); closeEmailSheet(); closeHistoryPanel(); closeDbSheet(); closeDbPanel(); closeDetailView(); closeUsersPanel(); closeUserEditSheet(); qrModal.classList.remove('open'); };
 
 document.getElementById('btn-route').onclick = () => {
   if (!currentTarget) return;
@@ -1341,7 +1386,7 @@ document.getElementById('btn-save').onclick = async () => {
   };
 
   if (currentTarget.type === 'spot') {
-    occupancy[currentTarget.id] = data;
+    occupancy[currentTarget.id] = { ...occupancy[currentTarget.id], ...data };
     renderSpots();
     saveOccupancy().catch(() => toast("Erreur de synchronisation"));
     if (driverMode && driverMode.entry.type === 'encode') {
@@ -1394,6 +1439,7 @@ async function performRemove(target) {
       client: removedData.client,
       status: removedData.status,
       notes: removedData.notes,
+      comments: removedData.comments || [],
       label,
       dropTime: removedData.time,
       removeTime: new Date().toISOString(),
@@ -1415,7 +1461,14 @@ document.getElementById('btn-remove').onclick = async () => {
 
 // ---------- LISTE ----------
 const listPanel = document.getElementById('list-panel');
-function openListPanel() { listPanel.classList.add('open'); overlay.classList.add('show'); renderListPanel(); }
+function closeAllRightPanels() {
+  closeListPanel();
+  closeHistoryPanel();
+  closeUsersPanel();
+  closeDbPanel();
+}
+
+function openListPanel() { closeAllRightPanels(); listPanel.classList.add('open'); overlay.classList.add('show'); renderListPanel(); }
 function closeListPanel() { listPanel.classList.remove('open'); overlay.classList.remove('show'); }
 document.getElementById('btn-list').onclick = openListPanel;
 document.getElementById('btn-list-close').onclick = closeListPanel;
@@ -1475,8 +1528,10 @@ function renderListPanel() {
   filtered.forEach(it => {
     const vs = getVisualState(it);
     const days = daysSince(it.time);
-    const badgeClass = days > alertThresholdDays ? 'rouge15' : it.status;
-    const badgeText = days > alertThresholdDays ? `${days}j` : (it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : it.status))));
+    const relevantThreshold = it.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
+    const isOverThreshold = (it.status === 'pleine' || it.status === 'charge' || it.status === 'fleet') && days > relevantThreshold;
+    const badgeClass = isOverThreshold ? 'rouge15' : it.status;
+    const badgeText = isOverThreshold ? `${days}j` : (it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : it.status))));
 
     const ctEntry = it.trailer ? trailerDB[it.trailer] : null;
     const ctStatus = ctEntry ? getCtStatus(ctEntry.ctExpiryDate) : null;
@@ -1500,7 +1555,7 @@ function renderListPanel() {
       </div>
       <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}</div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-meta">🔄 ${days}j${it.notes ? ' · ' + it.notes : ''}</div>
+        <div class="lp-meta">🔄 ${days}j${it.notes ? ' · 📝 ' + it.notes : ''}</div>
         <div style="display:flex; gap:4px; flex-shrink:0;">
           <button class="lp-icon-btn" data-action="locate" title="Localiser sur la carte">📍</button>
           <button class="lp-icon-btn" data-action="detail" title="Voir le détail">👁️</button>
@@ -1536,11 +1591,18 @@ function renderListPanel() {
 // ---------- HISTORIQUE ----------
 const historyPanel = document.getElementById('history-panel');
 let historyPanelOpen = false;
-function openHistoryPanel() { historyPanelOpen = true; historyPanel.style.transform = 'translateX(0)'; overlay.classList.add('show'); renderHistoryPanel(); }
+function openHistoryPanel() { closeAllRightPanels(); historyPanelOpen = true; historyPanel.style.transform = 'translateX(0)'; overlay.classList.add('show'); renderHistoryPanel(); }
 function closeHistoryPanel() { historyPanelOpen = false; historyPanel.style.transform = 'translateX(100%)'; overlay.classList.remove('show'); }
 document.getElementById('btn-history').onclick = openHistoryPanel;
 document.getElementById('btn-history-close').onclick = closeHistoryPanel;
 document.getElementById('hp-search-input').oninput = renderHistoryPanel;
+document.getElementById('hp-date-from').onchange = renderHistoryPanel;
+document.getElementById('hp-date-to').onchange = renderHistoryPanel;
+document.getElementById('btn-hp-date-clear').onclick = () => {
+  document.getElementById('hp-date-from').value = '';
+  document.getElementById('hp-date-to').value = '';
+  renderHistoryPanel();
+};
 
 function formatDateTime(iso) {
   if (!iso) return '?';
@@ -1550,9 +1612,20 @@ function formatDateTime(iso) {
 
 function renderHistoryPanel() {
   const q = document.getElementById('hp-search-input').value.trim().toLowerCase();
-  const filtered = q ? history.filter(h =>
+  let filtered = q ? history.filter(h =>
     (h.trailer||'').toLowerCase().includes(q) || (h.client||'').toLowerCase().includes(q) || (h.label||'').toLowerCase().includes(q)
   ) : history;
+
+  const dateFrom = document.getElementById('hp-date-from').value;
+  const dateTo = document.getElementById('hp-date-to').value;
+  if (dateFrom) {
+    const fromTime = new Date(dateFrom + 'T00:00:00').getTime();
+    filtered = filtered.filter(h => h.removeTime && new Date(h.removeTime).getTime() >= fromTime);
+  }
+  if (dateTo) {
+    const toTime = new Date(dateTo + 'T23:59:59').getTime();
+    filtered = filtered.filter(h => h.removeTime && new Date(h.removeTime).getTime() <= toTime);
+  }
 
   document.getElementById('hp-count').textContent = history.length;
   const container = document.getElementById('hp-items');
@@ -1583,10 +1656,11 @@ function renderHistoryPanel() {
         <div class="lp-badge ${h.status || 'pleine'}">${h.status === 'fleet' ? 'Fleet' : (h.status === 'vide' ? 'Vide' : (h.status === 'pleine' ? 'À vider' : (h.status === 'charge' ? 'Chargé' : (h.status || ''))))}</div>
       </div>
       <div class="lp-meta">${h.label}${h.client ? ' · ' + h.client : ''}</div>
-      <div class="lp-meta">📥 Déposé : ${formatDateTime(h.dropTime)}${h.encodedBy ? ' par ' + h.encodedBy : ''}</div>
-      <div class="lp-meta">📤 Retiré : ${formatDateTime(h.removeTime)}${h.removedBy ? ' par ' + h.removedBy : ''}</div>
+      <div class="lp-meta">📥 Déposé : ${formatDateTime(h.dropTime)}${(h.encodedBy && hasPermission('viewAuthors')) ? ' par ' + h.encodedBy : ''}</div>
+      <div class="lp-meta">📤 Retiré : ${formatDateTime(h.removeTime)}${(h.removedBy && hasPermission('viewAuthors')) ? ' par ' + h.removedBy : ''}</div>
       ${durationText ? `<div class="lp-meta">⏱️ Durée sur site : ${durationText}</div>` : ''}
       ${h.notes ? `<div class="lp-meta">📝 ${h.notes}</div>` : ''}
+      ${(h.comments && h.comments.length) ? h.comments.map(c => `<div class="lp-meta">💬 ${c.text}${hasPermission('viewAuthors') ? ' — ' + c.author : ''}</div>`).join('') : ''}
     `;
     container.appendChild(div);
   });
@@ -1617,13 +1691,15 @@ function openDetailView(item) {
   detailTarget = item;
   const days = daysSince(item.time);
   document.getElementById('detail-title').textContent = item.trailer || '(sans n°)';
+  renderDetailComments(item);
 
   const badges = document.getElementById('detail-badges');
   badges.innerHTML = '';
   const vs = getVisualState(item);
   const statusLabel = item.status === 'fleet' ? 'Fleet — Bloqué' : (item.status === 'vide' ? 'Vide' : (item.status === 'charge' ? 'Chargé' : 'À vider'));
   badges.innerHTML += `<span class="detail-pill" style="background:${vs.color}22; color:${vs.color};">${statusLabel}</span>`;
-  if (days > alertThresholdDays) {
+  const relevantThreshold = item.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
+  if (days > relevantThreshold && (item.status === 'pleine' || item.status === 'charge' || item.status === 'fleet')) {
     badges.innerHTML += `<span class="detail-pill" style="background:#dc262622; color:#f87171;">⚠ ${days} jours sur site</span>`;
   }
 
@@ -1638,7 +1714,7 @@ function openDetailView(item) {
     notesRow.style.display = 'none';
   }
   const encodedByRow = document.getElementById('detail-encodedby-row');
-  if (item.encodedBy) {
+  if (item.encodedBy && hasPermission('viewAuthors')) {
     encodedByRow.style.display = 'flex';
     document.getElementById('detail-encodedby').textContent = item.encodedBy;
   } else {
@@ -1657,13 +1733,7 @@ function openDetailView(item) {
     ctBox.style.display = 'none';
   }
 
-  updateDetailCompass();
 
-  document.getElementById('btn-detail-edit').style.display = item.status === 'fleet' ? 'block' : 'none';
-  document.getElementById('btn-detail-edit').onclick = () => {
-    closeDetailView();
-    item.open();
-  };
   document.getElementById('btn-detail-route').onclick = () => {
     closeDetailView();
     if (item.lat != null && item.lng != null) openRouteTo(item.lat, item.lng);
@@ -1682,19 +1752,47 @@ function openDetailView(item) {
   overlay.classList.add('show');
 }
 
-function updateDetailCompass() {
-  const arrowEl = document.getElementById('detail-compass-arrow');
-  const distEl = document.getElementById('detail-distance');
-  if (!detailTarget || detailTarget.lat == null || detailTarget.lng == null || !userPos) {
-    distEl.textContent = 'Position GPS indisponible';
-    arrowEl.style.transform = 'rotate(0deg)';
-    return;
+function renderDetailComments(item) {
+  const list = document.getElementById('detail-comments-list');
+  const comments = item.comments || [];
+  if (!comments.length) {
+    list.innerHTML = '<div style="font-size:12px; color:#6b7280;">Aucun commentaire</div>';
+  } else {
+    list.innerHTML = comments.map(c => {
+      const authorLine = hasPermission('viewAuthors')
+        ? `<div style="font-size:11px; color:#9ca3af; margin-top:2px;">${c.author || '?'} · ${formatDateTime(c.date)}</div>`
+        : `<div style="font-size:11px; color:#9ca3af; margin-top:2px;">${formatDateTime(c.date)}</div>`;
+      return `<div style="background:#1a2333; border-radius:8px; padding:8px 10px;"><div style="font-size:13px;">${c.text}</div>${authorLine}</div>`;
+    }).join('');
   }
-  const bearing = bearingTo(userPos, detailTarget);
-  const dist = Math.round(distanceMeters(userPos, detailTarget));
-  arrowEl.style.transform = `rotate(${bearing}deg)`;
-  distEl.textContent = dist < 1000 ? `${dist} m` : `${(dist/1000).toFixed(1)} km`;
 }
+
+document.getElementById('btn-detail-add-comment').onclick = async () => {
+  const input = document.getElementById('detail-new-comment');
+  const text = input.value.trim();
+  if (!text) return;
+  if (!detailTarget || !detailTarget._target) return;
+
+  const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu');
+  const comment = { text, author: who, date: new Date().toISOString() };
+
+  const target = detailTarget._target;
+  let record = null;
+  if (target.type === 'spot') record = occupancy[target.id];
+  else if (target.type === 'free') record = freeTrailers[target.id];
+  if (!record) return;
+
+  record.comments = record.comments || [];
+  record.comments.push(comment);
+  detailTarget.comments = record.comments;
+
+  input.value = '';
+  renderDetailComments(detailTarget);
+  toast("Commentaire ajouté");
+
+  if (target.type === 'spot') saveOccupancy().catch(() => toast("Erreur de synchronisation"));
+  else saveFreeTrailers().catch(() => toast("Erreur de synchronisation"));
+};
 
 function closeDetailView() {
   detailSheet.classList.remove('open');
@@ -1705,16 +1803,27 @@ document.getElementById('btn-detail-close').onclick = closeDetailView;
 
 // ---------- GESTION DES UTILISATEURS (admin) ----------
 const usersPanel = document.getElementById('users-panel');
+const userEditSheet = document.getElementById('user-edit-sheet');
 let editingUserPin = null; // null = création, sinon code de l'utilisateur en cours d'édition
 
-function openUsersPanel() { usersPanel.style.transform = 'translateX(0)'; overlay.classList.add('show'); resetUserForm(); renderUsersPanel(); }
-function closeUsersPanel() { usersPanel.style.transform = 'translateX(100%)'; overlay.classList.remove('show'); }
+function openUsersPanel() { closeAllRightPanels(); usersPanel.style.transform = 'translateX(0)'; overlay.classList.add('show'); renderUsersPanel(); }
+function closeUsersPanel() { usersPanel.style.transform = 'translateX(100%)'; overlay.classList.remove('show'); closeUserEditSheet(); }
+function openUserEditSheet() { userEditSheet.classList.add('open'); overlay.classList.add('show'); }
+function closeUserEditSheet() { userEditSheet.classList.remove('open'); overlay.classList.remove('show'); }
 
 document.getElementById('btn-manage-users').onclick = () => {
-  if (!hasPermission('users')) { toast("Accès non autorisé"); return; }
+  if (!hasPermission('users') && !hasPermission('usersEdit')) { toast("Accès non autorisé"); return; }
   openUsersPanel();
 };
 document.getElementById('btn-users-panel-close').onclick = closeUsersPanel;
+document.getElementById('btn-user-edit-close').onclick = closeUserEditSheet;
+
+document.getElementById('btn-users-new').onclick = () => {
+  if (!hasPermission('users')) { toast("Accès non autorisé pour créer un utilisateur"); return; }
+  resetUserForm();
+  document.getElementById('user-edit-title').textContent = 'Nouvel utilisateur';
+  openUserEditSheet();
+};
 
 function generateUniqueCode() {
   let code;
@@ -1747,10 +1856,12 @@ function loadUserIntoForm(pin) {
   const u = teamUsers[pin];
   if (!u) return;
   editingUserPin = pin;
+  document.getElementById('user-edit-title').textContent = u.name;
   document.getElementById('f-new-user-name').value = u.name;
   document.getElementById('new-user-code-preview').textContent = hasPermission('usersViewCodes') ? 'Code : ' + pin : 'Code : masqué (accès non autorisé)';
   document.getElementById('btn-add-user').textContent = "💾 Enregistrer les modifications";
   renderPermissionCheckboxes(u.permissions || {});
+  openUserEditSheet();
 }
 
 document.getElementById('btn-add-user').onclick = async () => {
@@ -1776,7 +1887,7 @@ document.getElementById('btn-add-user').onclick = async () => {
     teamUsers[code] = { name, permissions };
     toast(`Utilisateur créé — code : ${code}`);
   }
-  resetUserForm();
+  closeUserEditSheet();
   renderUsersPanel();
   saveTeamUsers().catch(() => toast("Erreur de synchronisation"));
 };
@@ -1834,6 +1945,7 @@ const dbPanel = document.getElementById('db-panel');
 let dbCurrentTrailer = null;
 
 function openDbPanel() {
+  closeAllRightPanels();
   dbPanel.style.transform = 'translateX(0)';
   overlay.classList.add('show');
   renderDbPanel();
@@ -1913,12 +2025,16 @@ function renderDbPanel() {
     const badgeText = status ? (status.level === 'nok' ? 'NON OK' : (status.level === 'soon' ? 'BIENTÔT' : 'OK')) : '?';
     const div = document.createElement('div');
     div.className = 'lp-item';
+    div.style.flexDirection = 'column';
+    div.style.alignItems = 'stretch';
+    div.style.gap = '3px';
     div.innerHTML = `
-      <div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-num">${num}</div>
-        <div class="lp-meta">${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de date'}</div>
+        <div class="lp-badge ${badgeClass}">${badgeText}</div>
       </div>
-      <div class="lp-badge ${badgeClass}">${badgeText}</div>
+      <div class="lp-meta">${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de date'}</div>
+      ${entry.notes ? `<div class="lp-meta">📝 ${entry.notes}</div>` : ''}
     `;
     div.onclick = () => openDbSheet(num);
     container.appendChild(div);
@@ -1934,8 +2050,11 @@ function openDbSheet(trailerNum) {
   document.getElementById('db-f-trailer').disabled = !!trailerNum;
   document.getElementById('db-f-date').value = entry ? (entry.ctExpiryDate || '') : '';
   document.getElementById('db-f-notes').value = entry ? (entry.notes || '') : '';
-  document.getElementById('db-btn-delete').style.display = trailerNum ? 'block' : 'none';
+  document.getElementById('db-btn-delete').style.display = (trailerNum && hasPermission('trailerdbDelete')) ? 'block' : 'none';
   document.getElementById('db-trailer-warning').style.display = 'none';
+
+  document.getElementById('btn-db-history').style.display = (entry && hasPermission('viewAuthors')) ? 'inline-flex' : 'none';
+
   updateDbCtPreview();
   dbSheet.classList.add('open');
   overlay.classList.add('show');
@@ -1967,13 +2086,39 @@ function updateDbCtPreview() {
   preview.textContent = status.label;
 }
 
+document.getElementById('btn-db-history').onclick = () => {
+  if (!dbCurrentTrailer) return;
+  const entry = trailerDB[dbCurrentTrailer];
+  if (!entry) return;
+  const log = entry.history && entry.history.length ? entry.history : [
+    ...(entry.createdBy ? [{ action: 'created', by: entry.createdBy, date: entry.createdAt }] : []),
+    ...(entry.modifiedBy ? [{ action: 'modified', by: entry.modifiedBy, date: entry.modifiedAt }] : [])
+  ];
+  if (!log.length) { toast("Aucun historique disponible"); return; }
+  const lines = log.map(l => `${l.action === 'created' ? '➕ Créé' : '✏️ Modifié'} par ${l.by} le ${formatDateTime(l.date)}`);
+  alert(`Historique — ${dbCurrentTrailer}\n\n` + lines.join('\n'));
+};
+
 document.getElementById('db-btn-save').onclick = async () => {
   const trailerNum = document.getElementById('db-f-trailer').value.trim();
   if (!trailerNum) { toast("Indique un n° de remorque"); return; }
   const ctExpiryDate = document.getElementById('db-f-date').value;
   if (!ctExpiryDate) { toast("Indique une date de validité"); return; }
   const notes = document.getElementById('db-f-notes').value.trim();
-  trailerDB[trailerNum] = { ctExpiryDate, notes };
+  const existing = trailerDB[trailerNum];
+  const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu');
+  const now = new Date().toISOString();
+  const changeLog = (existing && existing.history) ? existing.history.slice() : [];
+  changeLog.push({ action: existing ? 'modified' : 'created', by: who, date: now });
+
+  trailerDB[trailerNum] = {
+    ctExpiryDate, notes,
+    createdBy: existing ? existing.createdBy : who,
+    createdAt: existing ? existing.createdAt : now,
+    modifiedBy: who,
+    modifiedAt: now,
+    history: changeLog
+  };
   toast("Enregistré dans la base");
   updateCtIndicator();
   closeDbSheet();
@@ -1983,6 +2128,7 @@ document.getElementById('db-btn-save').onclick = async () => {
 
 document.getElementById('db-btn-delete').onclick = async () => {
   if (!dbCurrentTrailer) return;
+  if (!hasPermission('trailerdbDelete')) { toast("Accès non autorisé"); return; }
   delete trailerDB[dbCurrentTrailer];
   toast("Supprimé de la base");
   updateCtIndicator();
@@ -2128,6 +2274,7 @@ const emailSheet = document.getElementById('email-sheet');
 function openEmailSheet() {
   renderEmailList();
   document.getElementById('f-threshold-days').value = alertThresholdDays;
+  document.getElementById('f-fleet-threshold-days').value = fleetAlertThresholdDays;
   document.getElementById('f-frequency-days').value = String(alertFrequencyDays);
   emailSheet.classList.add('open');
   overlay.classList.add('show');
@@ -2203,9 +2350,12 @@ document.getElementById('btn-add-ct-email').onclick = async () => {
 
 document.getElementById('btn-save-alert-settings').onclick = async () => {
   const threshold = parseInt(document.getElementById('f-threshold-days').value);
+  const fleetThreshold = parseInt(document.getElementById('f-fleet-threshold-days').value);
   const frequency = parseInt(document.getElementById('f-frequency-days').value);
   if (!threshold || threshold < 1) { toast("Seuil invalide"); return; }
+  if (!fleetThreshold || fleetThreshold < 1) { toast("Seuil Fleet invalide"); return; }
   alertThresholdDays = threshold;
+  fleetAlertThresholdDays = fleetThreshold;
   alertFrequencyDays = frequency;
   await saveEmailConfig();
   renderSpots();
