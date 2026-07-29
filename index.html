@@ -313,6 +313,7 @@
   </div>
   <div class="lp-search"><input type="text" id="hp-search-input" placeholder="Rechercher n°, client..."></div>
   <div style="padding:0 14px 10px;">
+    <div style="font-size:11px; color:#6b7280; margin-bottom:6px;">Affiche les 3 derniers mois par défaut — choisis des dates pour voir plus ancien</div>
     <div style="display:flex; gap:6px; margin-bottom:6px;">
       <input type="date" id="hp-date-from" style="min-width:0; flex:1; background:#1f2937; border:1px solid #374151; color:#fff; border-radius:8px; padding:8px 6px; font-size:11px;">
       <input type="date" id="hp-date-to" style="min-width:0; flex:1; background:#1f2937; border:1px solid #374151; color:#fff; border-radius:8px; padding:8px 6px; font-size:11px;">
@@ -575,6 +576,34 @@ async function backendGetAll() {
   }
   const resp = await fetch(APPS_SCRIPT_URL + '?action=getAll');
   return await resp.json();
+}
+
+// Comme backendGetAll, mais sans l'historique — utilisé pour l'actualisation
+// automatique toutes les 3s, afin de ne pas relire l'historique en boucle
+// pour rien (économie de lectures côté base de données).
+async function backendGetState() {
+  if (!APPS_SCRIPT_URL) {
+    showBackendMissingWarning();
+    return {};
+  }
+  const resp = await fetch(APPS_SCRIPT_URL + '?action=getState');
+  return await resp.json();
+}
+
+// Ne charge que l'historique — appelé uniquement à l'ouverture du panneau.
+// Par défaut limité aux 3 derniers mois côté serveur (réduit les lectures) ;
+// passe fromISO/toISO pour aller chercher une période plus ancienne à la demande.
+async function backendGetHistory(fromISO, toISO) {
+  if (!APPS_SCRIPT_URL) {
+    showBackendMissingWarning();
+    return [];
+  }
+  let url = APPS_SCRIPT_URL + '?action=getHistory';
+  if (fromISO) url += '&from=' + encodeURIComponent(fromISO);
+  if (toISO) url += '&to=' + encodeURIComponent(toISO);
+  const resp = await fetch(url);
+  const d = await resp.json();
+  return Array.isArray(d.history) ? d.history : [];
 }
 
 async function backendSave(action, storageKey, data) {
@@ -848,15 +877,14 @@ async function pollForUpdates() {
   if (pollInFlight) return; // évite d'empiler des requêtes si le réseau est lent
   pollInFlight = true;
   try {
-    const d = await backendGetAll();
+    const d = await backendGetState();
     const newOcc = d.occupancy || {};
     const newFree = d.freeTrailers || {};
     const newSpots = d.spotsConfig || {};
     const newCount = (d.spotCount && parseInt(d.spotCount.count)) || 25;
     const newBoundary = Array.isArray(d.siteBoundary) ? d.siteBoundary : [];
     const newTrailerDB = d.trailerDB || {};
-    const newHistory = Array.isArray(d.history) ? d.history : [];
-    const snap = snapshotOf(newSpots, newOcc, newFree) + '|' + newCount + '|' + JSON.stringify(newBoundary) + '|' + JSON.stringify(newTrailerDB) + '|' + newHistory.length;
+    const snap = snapshotOf(newSpots, newOcc, newFree) + '|' + newCount + '|' + JSON.stringify(newBoundary) + '|' + JSON.stringify(newTrailerDB);
 
     if (snap !== lastSyncSnapshot) {
       lastSyncSnapshot = snap;
@@ -866,12 +894,10 @@ async function pollForUpdates() {
       numFixedSpots = newCount;
       siteBoundary = newBoundary;
       trailerDB = newTrailerDB;
-      history = newHistory;
       renderSpots();
       renderFreeTrailers();
       if (!boundaryMode) renderBoundary();
       if (listPanel.classList.contains('open')) renderListPanel();
-      if (historyPanelOpen) renderHistoryPanel();
     }
   } catch (e) {
     console.warn("Sync temps réel indisponible:", e);
@@ -881,7 +907,7 @@ async function pollForUpdates() {
 }
 
 function startLiveSync() {
-  lastSyncSnapshot = snapshotOf(spotsConfig, occupancy, freeTrailers) + '|' + numFixedSpots + '|' + JSON.stringify(siteBoundary) + '|' + JSON.stringify(trailerDB) + '|' + history.length;
+  lastSyncSnapshot = snapshotOf(spotsConfig, occupancy, freeTrailers) + '|' + numFixedSpots + '|' + JSON.stringify(siteBoundary) + '|' + JSON.stringify(trailerDB);
   setInterval(pollForUpdates, 3000);
 }
 
@@ -1591,16 +1617,48 @@ function renderListPanel() {
 // ---------- HISTORIQUE ----------
 const historyPanel = document.getElementById('history-panel');
 let historyPanelOpen = false;
-function openHistoryPanel() { closeAllRightPanels(); historyPanelOpen = true; historyPanel.style.transform = 'translateX(0)'; overlay.classList.add('show'); renderHistoryPanel(); }
+async function openHistoryPanel() {
+  closeAllRightPanels();
+  historyPanelOpen = true;
+  historyPanel.style.transform = 'translateX(0)';
+  overlay.classList.add('show');
+  renderHistoryPanel(); // affichage immédiat avec ce qu'on a déjà (optimiste)
+  try {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    history = await backendGetHistory(threeMonthsAgo.toISOString());
+    if (historyPanelOpen) renderHistoryPanel(); // ré-affiche avec les données à jour
+  } catch(e) {
+    console.warn("Erreur chargement historique:", e);
+  }
+}
 function closeHistoryPanel() { historyPanelOpen = false; historyPanel.style.transform = 'translateX(100%)'; overlay.classList.remove('show'); }
 document.getElementById('btn-history').onclick = openHistoryPanel;
 document.getElementById('btn-history-close').onclick = closeHistoryPanel;
 document.getElementById('hp-search-input').oninput = renderHistoryPanel;
-document.getElementById('hp-date-from').onchange = renderHistoryPanel;
-document.getElementById('hp-date-to').onchange = renderHistoryPanel;
-document.getElementById('btn-hp-date-clear').onclick = () => {
+async function onHistoryDateFilterChange() {
+  const dateFrom = document.getElementById('hp-date-from').value;
+  const dateTo = document.getElementById('hp-date-to').value;
+  try {
+    history = await backendGetHistory(
+      dateFrom ? new Date(dateFrom + 'T00:00:00').toISOString() : null,
+      dateTo ? new Date(dateTo + 'T23:59:59').toISOString() : null
+    );
+  } catch(e) {
+    console.warn("Erreur chargement historique filtré:", e);
+  }
+  renderHistoryPanel();
+}
+document.getElementById('hp-date-from').onchange = onHistoryDateFilterChange;
+document.getElementById('hp-date-to').onchange = onHistoryDateFilterChange;
+document.getElementById('btn-hp-date-clear').onclick = async () => {
   document.getElementById('hp-date-from').value = '';
   document.getElementById('hp-date-to').value = '';
+  try {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    history = await backendGetHistory(threeMonthsAgo.toISOString());
+  } catch(e) { console.warn("Erreur chargement historique:", e); }
   renderHistoryPanel();
 };
 
