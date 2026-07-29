@@ -318,6 +318,7 @@
       <input type="date" id="hp-date-to" style="min-width:0; flex:1; background:#1f2937; border:1px solid #374151; color:#fff; border-radius:8px; padding:8px 6px; font-size:11px;">
     </div>
     <button class="btn btn-ghost" id="btn-hp-date-clear" style="width:100%; font-size:11px; padding:6px;">✕ Effacer les dates</button>
+    <button class="lp-icon-btn" id="btn-hp-sort" title="Trier par date de retrait" style="width:100%; margin-top:6px; font-size:12px;">⬇️ Plus récent d'abord</button>
   </div>
   <div id="hp-items"></div>
 </div>
@@ -1445,7 +1446,7 @@ async function performRemove(target) {
       encodedBy: removedData.encodedBy,
       removedBy: (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : undefined)
     });
-    if (history.length > 500) history = history.slice(0, 500);
+    // Plus de limite sur l'historique (Cloudflare D1 n'a pas la contrainte de taille de Google Sheets)
     saveHistory().catch(() => toast("Erreur de synchronisation (historique)"));
   }
   toast("Retiré");
@@ -1603,6 +1604,13 @@ document.getElementById('btn-hp-date-clear').onclick = () => {
   renderHistoryPanel();
 };
 
+let hpSortAsc = false; // false = plus récent d'abord (par défaut)
+document.getElementById('btn-hp-sort').onclick = () => {
+  hpSortAsc = !hpSortAsc;
+  document.getElementById('btn-hp-sort').textContent = hpSortAsc ? '⬆️ Plus ancien d\'abord' : '⬇️ Plus récent d\'abord';
+  renderHistoryPanel();
+};
+
 function formatDateTime(iso) {
   if (!iso) return '?';
   const d = new Date(iso);
@@ -1625,6 +1633,12 @@ function renderHistoryPanel() {
     const toTime = new Date(dateTo + 'T23:59:59').getTime();
     filtered = filtered.filter(h => h.removeTime && new Date(h.removeTime).getTime() <= toTime);
   }
+
+  filtered = filtered.slice().sort((a, b) => {
+    const ta = a.removeTime ? new Date(a.removeTime).getTime() : 0;
+    const tb = b.removeTime ? new Date(b.removeTime).getTime() : 0;
+    return hpSortAsc ? ta - tb : tb - ta;
+  });
 
   document.getElementById('hp-count').textContent = history.length;
   const container = document.getElementById('hp-items');
