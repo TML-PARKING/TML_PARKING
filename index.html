@@ -2431,7 +2431,7 @@ document.getElementById('btn-reframe').onclick = async () => {
 };
 
 function applyViewLock(viewData) {
-  if (isAdmin) return; // l'admin garde toujours une navigation libre
+  if (hasPermission('setup')) return; // les personnes avec accès configuration gardent une navigation libre
   if (!viewData.bounds) return;
   const b = viewData.bounds;
   const leafletBounds = L.latLngBounds([b.south, b.west], [b.north, b.east]);
