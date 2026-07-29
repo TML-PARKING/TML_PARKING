@@ -564,7 +564,7 @@ const FALLBACK_COORDS = [50.4700, 3.9280]; // approx Ghlin industrial zone, corr
 
 // Renseigne ici l'URL de déploiement Apps Script (Déployer > Nouveau déploiement > Application web)
 // une fois copiée depuis Google. Obligatoire : sans elle, l'app ne peut pas fonctionner.
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxCi_qoaG3vMhK8S1iZyKSLXChx2A_gaxht870bTg5OFN0a6Jqv5g8DAa9tOBNVaOhSYA/exec";
+const APPS_SCRIPT_URL = "https://tml-parking-apy.ddecourty111.workers.dev";
 
 // ---------- COUCHE DE DONNÉES (Google Sheets via Apps Script) ----------
 async function backendGetAll() {
@@ -581,10 +581,9 @@ async function backendSave(action, storageKey, data) {
     showBackendMissingWarning();
     return;
   }
-  // text/plain évite le preflight CORS que Apps Script ne gère pas
   const resp = await fetch(APPS_SCRIPT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, data })
   });
   let result;
