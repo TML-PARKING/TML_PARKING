@@ -288,6 +288,12 @@
 
 <div id="overlay"></div>
 
+<div id="rotate-controls" style="position:fixed; right:10px; top:60px; z-index:1200; display:none; flex-direction:column; gap:6px;">
+  <button class="lp-icon-btn" id="btn-rotate-left" title="Pivoter à gauche">⟲</button>
+  <button class="lp-icon-btn" id="btn-rotate-reset" title="Réinitialiser (nord)">⬆️</button>
+  <button class="lp-icon-btn" id="btn-rotate-right" title="Pivoter à droite">⟳</button>
+</div>
+
 <div id="list-panel">
   <div class="lp-header">
     <h3>Remorques sur site (<span id="lp-count">0</span>)</h3>
@@ -843,6 +849,16 @@ async function initMap(center, zoom, preloadedData) {
   updateHeader();
   startGpsTracking();
   startLiveSync();
+  setupRotateControls();
+}
+
+function setupRotateControls() {
+  const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (isTouchDevice) return; // sur mobile, le geste à deux doigts suffit déjà
+  document.getElementById('rotate-controls').style.display = 'flex';
+  document.getElementById('btn-rotate-left').onclick = () => map.setBearing((map.getBearing() - 15 + 360) % 360);
+  document.getElementById('btn-rotate-right').onclick = () => map.setBearing((map.getBearing() + 15) % 360);
+  document.getElementById('btn-rotate-reset').onclick = () => map.setBearing(0);
 }
 
 function renderBoundary() {
