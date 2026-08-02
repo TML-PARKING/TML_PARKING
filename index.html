@@ -262,7 +262,6 @@
       <button class="btn btn-ghost" id="btn-emails" style="display:none;">✉️</button>
       <button class="btn btn-ghost" id="btn-trailerdb">🗄️</button>
       <button class="btn btn-ghost" id="btn-manage-users" style="display:none;">👤</button>
-      <button class="btn btn-ghost" id="btn-usage-stats" style="display:none;">📊</button>
       <button class="btn btn-ghost" id="btn-setup">⚙️</button>
     </div>
   </header>
@@ -463,31 +462,6 @@
       <button class="lp-icon-btn" id="btn-detail-route" title="Tracer l'itinéraire" style="flex:1; height:44px; font-size:18px;">🗺️</button>
       <button class="lp-icon-btn" id="btn-detail-qr" title="Accès chauffeur temporaire (reprise)" style="flex:1; height:44px; font-size:18px;">🔑</button>
       <button class="lp-icon-btn" id="btn-detail-remove" title="Retirer cette remorque" style="flex:1; height:44px; font-size:18px; background:#dc2626; border-color:#dc2626;">📤</button>
-    </div>
-  </div>
-</div>
-
-<div id="usage-stats-modal" class="bottom-sheet" style="z-index:2200; max-height:70vh;">
-  <div class="handle"></div>
-  <div class="sheet-header">
-    <h2>Compteur de lectures serveur</h2>
-    <button class="btn btn-ghost" id="btn-usage-stats-close" style="padding:6px 10px;">✕</button>
-  </div>
-  <div class="sheet-body">
-    <div style="background:#1f2937; border-radius:12px; padding:16px; margin-bottom:12px;">
-      <div style="font-size:12px; color:#9ca3af; text-transform:uppercase; margin-bottom:6px;">Depuis l'ouverture de cet appareil</div>
-      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-        <span>Vérifications légères</span>
-        <span id="stat-version-checks" style="font-weight:700;">0</span>
-      </div>
-      <div style="display:flex; justify-content:space-between;">
-        <span>Lectures complètes déclenchées</span>
-        <span id="stat-full-reads" style="font-weight:700;">0</span>
-      </div>
-    </div>
-    <div style="font-size:12px; color:#9ca3af; line-height:1.6;">
-      Ceci est un compteur indicatif propre à cet appareil, depuis son dernier rechargement — pas le total réel de l'équipe.
-      Pour les chiffres exacts et complets, consulte le tableau de bord Cloudflare → ta base D1 → onglet "Metrics".
     </div>
   </div>
 </div>
@@ -698,8 +672,7 @@ const PERMISSION_DEFS = [
   { key: 'users', label: '👤 Créer un utilisateur' },
   { key: 'usersEdit', label: '✏️ Modifier un profil utilisateur existant' },
   { key: 'usersViewCodes', label: '🔑 Voir les codes des utilisateurs existants' },
-  { key: 'usersDelete', label: '🗑️ Supprimer un profil utilisateur' },
-  { key: 'usageStats', label: '📊 Voir le compteur de lectures serveur' }
+  { key: 'usersDelete', label: '🗑️ Supprimer un profil utilisateur' }
 ];
 function hasPermission(key) {
   return !!(currentUser && currentUser.permissions && currentUser.permissions[key]);
@@ -928,15 +901,12 @@ function snapshotOf(spots, occ, free) {
 
 let pollInFlight = false;
 let lastKnownVersion = null;
-let statsVersionChecks = 0;
-let statsFullReads = 0;
 
 async function pollForUpdates() {
   if (pollInFlight) return; // évite d'empiler des requêtes si le réseau est lent
   pollInFlight = true;
   try {
     const v = await backendGetVersion();
-    statsVersionChecks++;
     if (v !== null && v === lastKnownVersion) {
       pollInFlight = false;
       return; // rien n'a changé côté serveur, on ne relit rien (vérification à 1 ligne seulement)
@@ -944,7 +914,6 @@ async function pollForUpdates() {
     lastKnownVersion = v;
 
     const d = await backendGetState();
-    statsFullReads++;
     const newOcc = d.occupancy || {};
     const newFree = d.freeTrailers || {};
     const newSpots = d.spotsConfig || {};
@@ -1418,19 +1387,7 @@ function updateCtIndicator() {
 }
 
 document.getElementById('btn-sheet-close').onclick = closeSheet;
-overlay.onclick = () => { closeSheet(); closeListPanel(); closeEmailSheet(); closeHistoryPanel(); closeDbSheet(); closeDbPanel(); closeDetailView(); closeUsersPanel(); closeUserEditSheet(); qrModal.classList.remove('open'); document.getElementById('usage-stats-modal').classList.remove('open'); };
-
-document.getElementById('btn-usage-stats').onclick = () => {
-  if (!hasPermission('usageStats')) { toast("Accès non autorisé"); return; }
-  document.getElementById('stat-version-checks').textContent = statsVersionChecks;
-  document.getElementById('stat-full-reads').textContent = statsFullReads;
-  document.getElementById('usage-stats-modal').classList.add('open');
-  overlay.classList.add('show');
-};
-document.getElementById('btn-usage-stats-close').onclick = () => {
-  document.getElementById('usage-stats-modal').classList.remove('open');
-  overlay.classList.remove('show');
-};
+overlay.onclick = () => { closeSheet(); closeListPanel(); closeEmailSheet(); closeHistoryPanel(); closeDbSheet(); closeDbPanel(); closeDetailView(); closeUsersPanel(); closeUserEditSheet(); qrModal.classList.remove('open'); };
 
 document.getElementById('btn-route').onclick = () => {
   if (!currentTarget) return;
@@ -2624,7 +2581,6 @@ function applyUserPermissions() {
   document.getElementById('btn-setup').style.display = hasPermission('setup') ? 'inline-block' : 'none';
   document.getElementById('btn-gen-encode-access').style.display = hasPermission('tempAccess') ? 'inline-block' : 'none';
   document.getElementById('btn-manage-users').style.display = hasPermission('users') ? 'inline-block' : 'none';
-  document.getElementById('btn-usage-stats').style.display = hasPermission('usageStats') ? 'inline-block' : 'none';
 }
 
 // ---------- IDENTIFICATION UTILISATEUR (une fois par appareil) ----------
