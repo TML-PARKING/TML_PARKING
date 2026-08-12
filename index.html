@@ -149,8 +149,8 @@
   .lp-item .lp-num { font-weight: 700; font-size: 13px; }
   .lp-item .lp-meta { font-size: 11px; color: #9ca3af; }
   .lp-badge { font-size: 10px; padding: 3px 7px; border-radius: 6px; font-weight: 600; flex-shrink: 0; }
-  .lp-badge.pleine { background: #16a34a33; color: #4ade80; }
-  .lp-badge.vide { background: #6b728033; color: #d1d5db; }
+  .lp-badge.pleine { background: #dc262633; color: #f87171; }
+  .lp-badge.vide { background: #16a34a33; color: #4ade80; }
   .lp-badge.fleet { background: #7c3aed33; color: #c4b5fd; }
   .lp-badge.charge { background: #0891b233; color: #67e8f9; }
   .lp-badge.rouge15 { background: #dc262633; color: #f87171; }
@@ -1366,6 +1366,9 @@ function getCtStatus(expiryDate) {
   if (!expiryDate) return null;
   const now = new Date();
   const expiry = new Date(expiryDate);
+  if (isNaN(expiry.getTime())) {
+    return { level: 'nok', color: '#dc2626', bg: '#dc262633', label: `⚠️ Date de contrôle technique invalide (${expiryDate})` };
+  }
   const daysLeft = Math.floor((expiry - now) / (1000 * 60 * 60 * 24));
   if (daysLeft < 0) {
     return { level: 'nok', color: '#dc2626', bg: '#dc262633', label: `⚠️ CT NON CONFORME (expiré depuis ${Math.abs(daysLeft)}j)` };
@@ -1603,7 +1606,7 @@ function renderListPanel() {
     const relevantThreshold = it.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
     const isOverThreshold = (it.status === 'pleine' || it.status === 'charge' || it.status === 'fleet') && days > relevantThreshold;
     const badgeClass = isOverThreshold ? 'rouge15' : it.status;
-    const badgeText = isOverThreshold ? `${days}j` : (it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : it.status))));
+    const badgeText = it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : it.status)));
 
     const ctEntry = it.trailer ? trailerDB[it.trailer] : null;
     const ctStatus = ctEntry ? getCtStatus(ctEntry.ctExpiryDate) : null;
@@ -2195,6 +2198,7 @@ document.getElementById('db-import-file-input').addEventListener('change', async
     const now = new Date().toISOString();
     const updatedTrailerDB = { ...trailerDB }; // on part de la base actuelle, rien n'est supprimé
     let imported = 0;
+    let skipped = 0;
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -2206,10 +2210,13 @@ document.getElementById('db-import-file-input').addEventListener('change', async
         ctExpiryDate = ctExpiryDate.toISOString().slice(0, 10);
       } else if (typeof ctExpiryDate === 'string' && ctExpiryDate.includes('/')) {
         // Format JJ/MM/AAAA -> AAAA-MM-JJ
-        const parts = ctExpiryDate.split('/');
+        const parts = ctExpiryDate.trim().split('/');
         if (parts.length === 3) ctExpiryDate = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+      } else if (typeof ctExpiryDate === 'string') {
+        ctExpiryDate = ctExpiryDate.trim();
       }
-      if (!trailerNum || !ctExpiryDate) continue;
+      const isValidDate = typeof ctExpiryDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ctExpiryDate) && !isNaN(new Date(ctExpiryDate).getTime());
+      if (!trailerNum || !isValidDate) { skipped++; continue; }
 
       const existing = trailerDB[trailerNum];
       const changeLog = (existing && existing.history) ? existing.history.slice() : [];
@@ -2228,7 +2235,7 @@ document.getElementById('db-import-file-input').addEventListener('change', async
     }
 
     trailerDB = updatedTrailerDB;
-    toast(`${imported} remorque(s) importée(s)/mise(s) à jour — le reste de la base est inchangé`);
+    toast(`${imported} remorque(s) importée(s)/mise(s) à jour${skipped ? ' · ' + skipped + ' ligne(s) ignorée(s) (date illisible)' : ''}`, 6000);
     renderDbPanel();
     saveTrailerDB().catch(() => toast("Erreur de synchronisation"));
   } catch (err) {
