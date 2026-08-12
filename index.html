@@ -571,6 +571,7 @@
   <div style="padding:0 14px 10px;">
     <button class="btn btn-success" id="btn-db-new" style="width:100%; padding:10px;">➕ Ajouter une remorque</button>
     <button class="btn btn-warn" id="btn-db-import" style="width:100%; padding:10px; margin-top:8px; display:none;">📥 Importer un fichier Excel</button>
+    <button class="btn btn-ghost" id="btn-db-export" style="width:100%; padding:10px; margin-top:8px;">📤 Exporter en Excel (liste affichée)</button>
     <input type="file" id="db-import-file-input" accept=".xlsx,.xls" style="display:none;">
   </div>
   <div id="db-panel-items"></div>
@@ -1760,9 +1761,13 @@ function renderListPanel() {
   let filtered = items;
   if (lpActiveFilters.size > 0) filtered = filtered.filter(it => lpActiveFilters.has(it.status));
   if (lpFixedOnly) filtered = filtered.filter(it => it._target.type === 'spot');
-  filtered = q ? filtered.filter(it =>
-    (it.trailer||'').toLowerCase().includes(q) || (it.client||'').toLowerCase().includes(q) || (it.label||'').toLowerCase().includes(q)
-  ) : filtered;
+  filtered = q ? filtered.filter(it => {
+    const ctEntry = it.trailer ? trailerDB[it.trailer] : null;
+    const commentsText = (it.comments || []).map(c => c.text).join(' ');
+    const haystack = [it.trailer, it.client, it.label, it.notes, commentsText, ctEntry && ctEntry.plate]
+      .filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(q);
+  }) : filtered;
   if (lpSortAsc !== null) {
     filtered = filtered.slice().sort((a, b) => {
       let cmp;
@@ -1908,9 +1913,13 @@ function formatDateTime(iso) {
 
 function renderHistoryPanel() {
   const q = document.getElementById('hp-search-input').value.trim().toLowerCase();
-  let filtered = q ? history.filter(h =>
-    (h.trailer||'').toLowerCase().includes(q) || (h.client||'').toLowerCase().includes(q) || (h.label||'').toLowerCase().includes(q)
-  ) : history;
+  let filtered = q ? history.filter(h => {
+    const commentsText = (h.comments || []).map(c => c.text).join(' ');
+    const authorFields = hasPermission('viewAuthors') ? [h.encodedBy, h.removedBy] : [];
+    const haystack = [h.trailer, h.client, h.label, h.notes, commentsText, ...authorFields]
+      .filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(q);
+  }) : history;
 
   const dateFrom = document.getElementById('hp-date-from').value;
   const dateTo = document.getElementById('hp-date-to').value;
@@ -2273,6 +2282,7 @@ document.getElementById('btn-db-sheet-close').onclick = closeDbSheet;
 document.getElementById('db-panel-search').oninput = renderDbPanel;
 
 let dbActiveFilters = new Set(); // vide = "Tous"
+let lastFilteredDbEntries = [];
 let dbSortAsc = null;
 let dbDateSortAsc = null;
 document.getElementById('btn-db-sort').onclick = () => {
@@ -2309,7 +2319,15 @@ function renderDbPanel() {
   document.getElementById('btn-db-import').style.display = hasPermission('trailerdbImport') ? 'block' : 'none';
   const q = document.getElementById('db-panel-search').value.trim().toUpperCase();
   const container = document.getElementById('db-panel-items');
-  let entries = Object.entries(trailerDB).filter(([num]) => !q || num.includes(q));
+  let entries = Object.entries(trailerDB).filter(([num, entry]) => {
+    if (!q) return true;
+    const status = getCtStatus(entry.ctExpiryDate);
+    const statusLabel = status ? (status.level === 'nok' ? 'NON OK' : (status.level === 'soon' ? 'BIENTÔT' : 'OK')) : '';
+    const authorFields = hasPermission('viewAuthors') ? [entry.createdBy, entry.modifiedBy] : [];
+    const haystack = [num, entry.plate, entry.notes, entry.ctExpiryDate, statusLabel, ...authorFields]
+      .filter(Boolean).join(' ').toUpperCase();
+    return haystack.includes(q);
+  });
   if (dbActiveFilters.size > 0) {
     entries = entries.filter(([num, entry]) => {
       const status = getCtStatus(entry.ctExpiryDate);
@@ -2331,6 +2349,7 @@ function renderDbPanel() {
   }
   const totalCount = Object.keys(trailerDB).length;
   document.getElementById('db-count').textContent = entries.length === totalCount ? totalCount : `${entries.length} / ${totalCount}`;
+  lastFilteredDbEntries = entries;
 
   if (!entries.length) {
     container.innerHTML = '<div class="empty">Aucune remorque enregistrée</div>';
@@ -2361,6 +2380,22 @@ function renderDbPanel() {
 
 document.getElementById('btn-db-new').onclick = () => openDbSheet(null);
 document.getElementById('btn-db-import').onclick = () => document.getElementById('db-import-file-input').click();
+
+document.getElementById('btn-db-export').onclick = () => {
+  if (!lastFilteredDbEntries.length) { toast("Rien à exporter"); return; }
+  const rows = [['N°remorque', 'N°plaque', 'Échéance', 'Statut CT', 'Notes']];
+  lastFilteredDbEntries.forEach(([num, entry]) => {
+    const status = getCtStatus(entry.ctExpiryDate);
+    const statusLabel = status ? (status.level === 'nok' ? 'NON OK' : (status.level === 'soon' ? 'BIENTÔT' : 'OK')) : '';
+    rows.push([num, entry.plate || '', entry.ctExpiryDate || '', statusLabel, entry.notes || '']);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'CT');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `base-remorques-CT-${dateStr}.xlsx`);
+  toast(`${lastFilteredDbEntries.length} remorque(s) exportée(s)`);
+};
 
 document.getElementById('db-import-file-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
