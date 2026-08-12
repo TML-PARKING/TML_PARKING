@@ -1267,14 +1267,8 @@ function renderFreeTrailers() {
       html: `<div class="trailer-marker${selectedTargetKey === 'free-'+id ? ' marker-selected' : ''}" style="background:${vs.color}">🚛</div>`,
       iconSize: [30, 30], iconAnchor: [15, 15]
     });
-    const marker = L.marker([t.lat, t.lng], { icon, draggable: !driverMode }).addTo(map);
+    const marker = L.marker([t.lat, t.lng], { icon, draggable: false }).addTo(map);
     marker.on('click', () => { if (driverMode) { showDriverPickupCard(); return; } openSheetForFree(id); });
-    marker.on('dragend', (ev) => {
-      const p = ev.target.getLatLng();
-      freeTrailers[id].lat = p.lat;
-      freeTrailers[id].lng = p.lng;
-      saveFreeTrailers().catch(() => toast("Erreur de synchronisation"));
-    });
     freeMarkers[id] = marker;
   });
   updateHeader();
