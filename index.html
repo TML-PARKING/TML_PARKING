@@ -16,6 +16,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; overflow: hidden; position: fixed; width: 100%; }
@@ -530,6 +531,8 @@
   </div>
   <div style="padding:0 14px 10px;">
     <button class="btn btn-success" id="btn-db-new" style="width:100%; padding:10px;">➕ Ajouter une remorque</button>
+    <button class="btn btn-warn" id="btn-db-import" style="width:100%; padding:10px; margin-top:8px; display:none;">📥 Importer un fichier Excel</button>
+    <input type="file" id="db-import-file-input" accept=".xlsx,.xls" style="display:none;">
   </div>
   <div id="db-panel-items"></div>
 </div>
@@ -548,6 +551,10 @@
       <label>N° Remorque</label>
       <input type="text" id="db-f-trailer" placeholder="Ex: TR-4521" autocomplete="off">
       <div id="db-trailer-warning" style="margin-top:6px; font-size:12px; color:#fb923c; display:none;">⚠ Cette remorque existe déjà dans la base</div>
+    </div>
+    <div class="field">
+      <label>N° Plaque</label>
+      <input type="text" id="db-f-plate" placeholder="Ex: QAMX-398" autocomplete="off">
     </div>
     <div class="field">
       <label>Date de validité du contrôle technique</label>
@@ -669,6 +676,7 @@ const PERMISSION_DEFS = [
   { key: 'tempAccess', label: '🔑 Générer des accès chauffeur temporaires' },
   { key: 'viewAuthors', label: '👁️ Voir qui a encodé / modifié (remorques et base CT)' },
   { key: 'trailerdbDelete', label: '🗑️ Supprimer une remorque de la base CT' },
+  { key: 'trailerdbImport', label: '📥 Importer un fichier Excel (remplace toute la base CT)' },
   { key: 'users', label: '👤 Créer un utilisateur' },
   { key: 'usersEdit', label: '✏️ Modifier un profil utilisateur existant' },
   { key: 'usersViewCodes', label: '🔑 Voir les codes des utilisateurs existants' },
@@ -1383,7 +1391,8 @@ function updateCtIndicator() {
   indicator.style.display = 'block';
   indicator.style.background = status.bg;
   indicator.style.color = status.color;
-  indicator.textContent = status.label;
+  const plate = trailerDB[trailerNum].plate;
+  indicator.textContent = status.label + (plate ? ` · Plaque ${plate}` : '');
 }
 
 document.getElementById('btn-sheet-close').onclick = closeSheet;
@@ -2098,6 +2107,7 @@ document.querySelectorAll('#db-panel-filters .lp-filter-btn').forEach(btn => {
 });
 
 function renderDbPanel() {
+  document.getElementById('btn-db-import').style.display = hasPermission('trailerdbImport') ? 'block' : 'none';
   const q = document.getElementById('db-panel-search').value.trim().toUpperCase();
   const container = document.getElementById('db-panel-items');
   let entries = Object.entries(trailerDB).filter(([num]) => !q || num.includes(q));
@@ -2141,7 +2151,7 @@ function renderDbPanel() {
         <div class="lp-num">${num}</div>
         <div class="lp-badge ${badgeClass}">${badgeText}</div>
       </div>
-      <div class="lp-meta">${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de date'}</div>
+      <div class="lp-meta">${entry.plate ? '🔖 ' + entry.plate + ' · ' : ''}${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de date'}</div>
       ${entry.notes ? `<div class="lp-meta">📝 ${entry.notes}</div>` : ''}
     `;
     div.onclick = () => openDbSheet(num);
@@ -2150,6 +2160,83 @@ function renderDbPanel() {
 }
 
 document.getElementById('btn-db-new').onclick = () => openDbSheet(null);
+document.getElementById('btn-db-import').onclick = () => document.getElementById('db-import-file-input').click();
+
+document.getElementById('db-import-file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!hasPermission('trailerdbImport')) { toast("Accès non autorisé"); return; }
+
+  const confirmMsg = "Ce fichier va mettre à jour la base : les remorques du fichier seront ajoutées/actualisées, celles déjà en base mais absentes du fichier resteront inchangées. Continuer ?";
+  if (!confirm(confirmMsg)) { e.target.value = ''; return; }
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+
+    if (!rows.length) { toast("Fichier vide"); e.target.value = ''; return; }
+
+    // Repère les colonnes par leur en-tête (insensible à la casse/accents), peu importe l'ordre
+    const headerRow = rows[0].map(h => String(h || '').trim().toLowerCase());
+    const findCol = (...names) => headerRow.findIndex(h => names.some(n => h.includes(n)));
+    const colTrailer = findCol('remorque', 'n°remorque', 'numero remorque');
+    const colPlate = findCol('plaque');
+    const colDate = findCol('échéance', 'echeance', 'date');
+
+    if (colTrailer === -1 || colDate === -1) {
+      toast("Colonnes non reconnues — vérifie les en-têtes (N°remorque / N°plaque / Échéance)");
+      e.target.value = '';
+      return;
+    }
+
+    const who = (currentUser && currentUser.name) || 'Inconnu';
+    const now = new Date().toISOString();
+    const updatedTrailerDB = { ...trailerDB }; // on part de la base actuelle, rien n'est supprimé
+    let imported = 0;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !row[colTrailer]) continue;
+      const trailerNum = String(row[colTrailer]).trim().toUpperCase();
+      const plate = colPlate !== -1 ? String(row[colPlate] || '').trim().toUpperCase() : '';
+      let ctExpiryDate = row[colDate];
+      if (ctExpiryDate instanceof Date) {
+        ctExpiryDate = ctExpiryDate.toISOString().slice(0, 10);
+      } else if (typeof ctExpiryDate === 'string' && ctExpiryDate.includes('/')) {
+        // Format JJ/MM/AAAA -> AAAA-MM-JJ
+        const parts = ctExpiryDate.split('/');
+        if (parts.length === 3) ctExpiryDate = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+      }
+      if (!trailerNum || !ctExpiryDate) continue;
+
+      const existing = trailerDB[trailerNum];
+      const changeLog = (existing && existing.history) ? existing.history.slice() : [];
+      changeLog.push({ action: existing ? 'import (mise à jour)' : 'import (création)', by: who, date: now });
+
+      updatedTrailerDB[trailerNum] = {
+        ctExpiryDate, plate,
+        notes: existing ? (existing.notes || '') : '',
+        createdBy: existing ? existing.createdBy : who,
+        createdAt: existing ? existing.createdAt : now,
+        modifiedBy: who,
+        modifiedAt: now,
+        history: changeLog
+      };
+      imported++;
+    }
+
+    trailerDB = updatedTrailerDB;
+    toast(`${imported} remorque(s) importée(s)/mise(s) à jour — le reste de la base est inchangé`);
+    renderDbPanel();
+    saveTrailerDB().catch(() => toast("Erreur de synchronisation"));
+  } catch (err) {
+    console.error(err);
+    toast("Erreur de lecture du fichier Excel");
+  }
+  e.target.value = '';
+});
 
 function openDbSheet(trailerNum) {
   dbCurrentTrailer = trailerNum;
@@ -2157,6 +2244,7 @@ function openDbSheet(trailerNum) {
   document.getElementById('db-f-trailer').value = trailerNum || '';
   document.getElementById('db-f-trailer').disabled = !!trailerNum;
   document.getElementById('db-f-date').value = entry ? (entry.ctExpiryDate || '') : '';
+  document.getElementById('db-f-plate').value = entry ? (entry.plate || '') : '';
   document.getElementById('db-f-notes').value = entry ? (entry.notes || '') : '';
   document.getElementById('db-btn-delete').style.display = (trailerNum && hasPermission('trailerdbDelete')) ? 'block' : 'none';
   document.getElementById('db-trailer-warning').style.display = 'none';
@@ -2213,6 +2301,7 @@ document.getElementById('db-btn-save').onclick = async () => {
   const ctExpiryDate = document.getElementById('db-f-date').value;
   if (!ctExpiryDate) { toast("Indique une date de validité"); return; }
   const notes = document.getElementById('db-f-notes').value.trim();
+  const plate = document.getElementById('db-f-plate').value.trim();
   const existing = trailerDB[trailerNum];
   const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu');
   const now = new Date().toISOString();
@@ -2220,7 +2309,7 @@ document.getElementById('db-btn-save').onclick = async () => {
   changeLog.push({ action: existing ? 'modified' : 'created', by: who, date: now });
 
   trailerDB[trailerNum] = {
-    ctExpiryDate, notes,
+    ctExpiryDate, plate, notes,
     createdBy: existing ? existing.createdBy : who,
     createdAt: existing ? existing.createdAt : now,
     modifiedBy: who,
