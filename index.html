@@ -1818,6 +1818,7 @@ function renderListPanel() {
           <button class="lp-icon-btn" data-action="detail" title="Voir le détail">👁️</button>
         </div>
       </div>
+      ${(it.comments && it.comments.length) ? `<div class="lp-meta">💬 ${it.comments[it.comments.length-1].text}</div>` : ''}
     `;
     const targetKey = it._target.type === 'spot' ? 'spot-' + it._target.id : 'free-' + it._target.id;
     div.querySelector('[data-action="locate"]').onclick = (ev) => {
@@ -2102,6 +2103,7 @@ document.getElementById('btn-detail-add-comment').onclick = async () => {
   input.value = '';
   renderDetailComments(detailTarget);
   toast("Commentaire ajouté");
+  if (listPanel.classList.contains('open')) renderListPanel();
 
   if (target.type === 'spot') saveOccupancy().catch(() => toast("Erreur de synchronisation"));
   else saveFreeTrailers().catch(() => toast("Erreur de synchronisation"));
