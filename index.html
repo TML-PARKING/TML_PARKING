@@ -1812,7 +1812,7 @@ function renderListPanel() {
       </div>
       <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}</div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-meta" style="${isOverThreshold ? 'color:#f87171; font-weight:700;' : ''}">🔄 ${days}j${it.notes ? ' · 📝 ' + it.notes : ''}</div>
+        <div class="lp-meta">🔄 <span style="${isOverThreshold ? 'color:#f87171; font-weight:700;' : ''}">${days}j</span>${it.notes ? ' · 📝 ' + it.notes : ''}</div>
         <div style="display:flex; gap:4px; flex-shrink:0;">
           <button class="lp-icon-btn" data-action="locate" title="Localiser sur la carte">📍</button>
           <button class="lp-icon-btn" data-action="detail" title="Voir le détail">👁️</button>
