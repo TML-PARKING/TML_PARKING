@@ -445,6 +445,7 @@
       <div class="detail-row"><span class="detail-label">Déposée depuis</span><span id="detail-days" class="detail-value">—</span></div>
       <div class="detail-row" id="detail-notes-row"><span class="detail-label">Notes</span><span id="detail-notes" class="detail-value">—</span></div>
       <div class="detail-row" id="detail-encodedby-row"><span class="detail-label">Encodé par</span><span id="detail-encodedby" class="detail-value">—</span></div>
+      <div class="detail-row" id="detail-movedby-row"><span class="detail-label">Déplacé par</span><span id="detail-movedby" class="detail-value">—</span></div>
     </div>
 
     <div id="detail-ct-box" style="border-radius:12px; padding:14px; margin-bottom:14px; display:none;">
@@ -463,9 +464,45 @@
 
     <div style="display:flex; gap:8px; margin-top:0;">
       <button class="lp-icon-btn" id="btn-detail-route" title="Tracer l'itinéraire" style="flex:1; height:44px; font-size:18px;">🗺️</button>
+      <button class="lp-icon-btn" id="btn-detail-move" title="Déplacer cette remorque" style="flex:1; height:44px; font-size:18px;">🔀</button>
       <button class="lp-icon-btn" id="btn-detail-qr" title="Accès chauffeur temporaire (reprise)" style="flex:1; height:44px; font-size:18px;">🔑</button>
       <button class="lp-icon-btn" id="btn-detail-remove" title="Retirer cette remorque" style="flex:1; height:44px; font-size:18px; background:#dc2626; border-color:#dc2626;">📤</button>
     </div>
+  </div>
+</div>
+
+<div id="move-choice-modal" class="bottom-sheet" style="z-index:2200; max-height:50vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Déplacer vers...</h2>
+    <button class="btn btn-ghost" id="btn-move-choice-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <button class="btn btn-primary" id="btn-move-to-spot" style="width:100%; padding:14px; margin-bottom:10px; font-size:15px;">🅿️ Un emplacement fixe</button>
+    <button class="btn btn-primary" id="btn-move-to-free" style="width:100%; padding:14px; font-size:15px;">📍 La zone libre (toucher la carte)</button>
+  </div>
+</div>
+
+<div id="move-spot-picker-modal" class="bottom-sheet" style="z-index:2200; max-height:70vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Choisir un emplacement libre</h2>
+    <button class="btn btn-ghost" id="btn-move-spot-picker-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div id="move-spot-picker-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+  </div>
+</div>
+
+<div id="move-confirm-modal" class="bottom-sheet" style="z-index:2200; max-height:40vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Confirmer le déplacement</h2>
+    <button class="btn btn-ghost" id="btn-move-confirm-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div id="move-confirm-text" style="margin-bottom:16px; font-size:14px;"></div>
+    <button class="btn btn-success" id="btn-move-confirm-yes" style="width:100%; padding:14px; font-size:15px;">✅ Valider le déplacement</button>
   </div>
 </div>
 
@@ -742,22 +779,13 @@ function daysSince(isoTime) {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
-// Détermine la couleur/état visuel d'une remorque : >15j = rouge (priorité), fleet = bloqué (violet), sinon couleur du statut
+// Détermine la couleur d'une remorque selon son statut uniquement (fixe, ne change jamais avec les jours)
 function getVisualState(data) {
   if (!data) return { color: '#6b7280', label: '' }; // libre = gris
-  const days = daysSince(data.time);
-  if (data.status === 'fleet') {
-    if (days > fleetAlertThresholdDays) return { color: '#dc2626', label: `⚠ ${days}j` };
-    return { color: '#7c3aed', label: 'Bloqué' };
-  }
+  if (data.status === 'fleet') return { color: '#7c3aed', label: 'Bloqué' };
   if (data.status === 'vide') return { color: '#16a34a', label: '' };
-  if (data.status === 'charge') {
-    if (days > alertThresholdDays) return { color: '#dc2626', label: `⚠ ${days}j` };
-    return { color: '#0891b2', label: '' };
-  }
-  // à vider (pleine) : rouge, avec alerte visuelle si le seuil de jours est dépassé
-  if (days > alertThresholdDays) return { color: '#dc2626', label: `⚠ ${days}j` };
-  return { color: '#dc2626', label: '' };
+  if (data.status === 'charge') return { color: '#0891b2', label: '' };
+  return { color: '#dc2626', label: '' }; // à vider (pleine) = rouge
 }
 
 async function loadAll(preFetched) {
@@ -1118,7 +1146,19 @@ function finalizeRow() {
   document.getElementById('btn-row-mode').style.background = '#d97706';
 }
 
+let moveMapMode = false;
+
 function onMapClick(e) {
+  if (moveMapMode) {
+    moveMapMode = false;
+    if (!isPointInBoundary(e.latlng.lat, e.latlng.lng)) {
+      toast("Hors de la zone autorisée du site");
+      return;
+    }
+    movePending = { type: 'free', lat: e.latlng.lat, lng: e.latlng.lng };
+    showMoveConfirm("Déplacer la remorque à cet endroit ?");
+    return;
+  }
   if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
   if (driverMode) {
     if (driverMode.entry.type !== 'encode') return; // rien d'autre autorisé en mode reprise
@@ -1414,7 +1454,13 @@ function updateCtIndicator() {
 }
 
 document.getElementById('btn-sheet-close').onclick = closeSheet;
-overlay.onclick = () => { closeSheet(); closeListPanel(); closeEmailSheet(); closeHistoryPanel(); closeDbSheet(); closeDbPanel(); closeDetailView(); closeUsersPanel(); closeUserEditSheet(); qrModal.classList.remove('open'); };
+overlay.onclick = () => {
+  closeSheet(); closeListPanel(); closeEmailSheet(); closeHistoryPanel(); closeDbSheet(); closeDbPanel(); closeDetailView(); closeUsersPanel(); closeUserEditSheet(); qrModal.classList.remove('open');
+  document.getElementById('move-choice-modal').classList.remove('open');
+  document.getElementById('move-spot-picker-modal').classList.remove('open');
+  document.getElementById('move-confirm-modal').classList.remove('open');
+  moveSource = null; movePending = null;
+};
 
 document.getElementById('btn-route').onclick = () => {
   if (!currentTarget) return;
@@ -1506,6 +1552,113 @@ document.getElementById('btn-save').onclick = async () => {
   renderListPanel();
 };
 
+// ---------- DÉPLACER UNE REMORQUE (emplacement fixe ↔ zone libre) ----------
+let moveSource = null; // { target, data, label }
+let movePending = null; // { type:'spot', id } ou { type:'free', lat, lng }
+
+function getRecordFor(target) {
+  if (target.type === 'spot') return occupancy[target.id];
+  if (target.type === 'free') return freeTrailers[target.id];
+  return null;
+}
+
+function startMove(item) {
+  if (!item._target) return;
+  const data = getRecordFor(item._target);
+  if (!data) { toast("Introuvable"); return; }
+  moveSource = { target: item._target, data, label: item.label };
+  document.getElementById('move-choice-modal').classList.add('open');
+  overlay.classList.add('show');
+}
+
+document.getElementById('btn-detail-move').onclick = () => {
+  closeDetailView();
+  startMove(detailTarget);
+};
+document.getElementById('btn-move-choice-close').onclick = () => {
+  document.getElementById('move-choice-modal').classList.remove('open');
+  overlay.classList.remove('show');
+  moveSource = null;
+};
+
+document.getElementById('btn-move-to-spot').onclick = () => {
+  document.getElementById('move-choice-modal').classList.remove('open');
+  const list = document.getElementById('move-spot-picker-list');
+  list.innerHTML = '';
+  let anyFree = false;
+  for (let i = 1; i <= numFixedSpots; i++) {
+    if (!spotsConfig[i]) continue;
+    if (occupancy[i]) continue; // seulement les emplacements libres
+    if (moveSource.target.type === 'spot' && String(moveSource.target.id) === String(i)) continue;
+    anyFree = true;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-warn';
+    btn.style.cssText = 'padding:12px 16px; font-weight:700;';
+    btn.textContent = 'P' + i;
+    btn.onclick = () => {
+      document.getElementById('move-spot-picker-modal').classList.remove('open');
+      movePending = { type: 'spot', id: i };
+      showMoveConfirm(`Déplacer vers l'emplacement P${i} ?`);
+    };
+    list.appendChild(btn);
+  }
+  if (!anyFree) list.innerHTML = '<div class="empty">Aucun emplacement fixe libre</div>';
+  document.getElementById('move-spot-picker-modal').classList.add('open');
+};
+document.getElementById('btn-move-spot-picker-close').onclick = () => {
+  document.getElementById('move-spot-picker-modal').classList.remove('open');
+  overlay.classList.remove('show');
+  moveSource = null;
+};
+
+document.getElementById('btn-move-to-free').onclick = () => {
+  document.getElementById('move-choice-modal').classList.remove('open');
+  overlay.classList.remove('show');
+  moveMapMode = true;
+  toast("Touche la carte à l'endroit où déplacer la remorque");
+};
+
+function showMoveConfirm(text) {
+  document.getElementById('move-confirm-text').textContent = text;
+  document.getElementById('move-confirm-modal').classList.add('open');
+  overlay.classList.add('show');
+}
+document.getElementById('btn-move-confirm-close').onclick = () => {
+  document.getElementById('move-confirm-modal').classList.remove('open');
+  overlay.classList.remove('show');
+  moveSource = null;
+  movePending = null;
+};
+
+document.getElementById('btn-move-confirm-yes').onclick = async () => {
+  if (!moveSource || !movePending) return;
+  const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu');
+  const data = { ...moveSource.data, movedBy: who, movedAt: new Date().toISOString() };
+
+  // Retire de l'ancien emplacement
+  if (moveSource.target.type === 'spot') delete occupancy[moveSource.target.id];
+  else delete freeTrailers[moveSource.target.id];
+
+  // Place dans le nouveau
+  if (movePending.type === 'spot') {
+    occupancy[movePending.id] = data;
+  } else {
+    const id = genId();
+    freeTrailers[id] = { ...data, lat: movePending.lat, lng: movePending.lng };
+  }
+
+  renderSpots();
+  renderFreeTrailers();
+  saveOccupancy().catch(() => toast("Erreur de synchronisation"));
+  saveFreeTrailers().catch(() => toast("Erreur de synchronisation"));
+
+  toast("Remorque déplacée");
+  document.getElementById('move-confirm-modal').classList.remove('open');
+  overlay.classList.remove('show');
+  moveSource = null;
+  movePending = null;
+};
+
 async function performRemove(target) {
   if (!target) return;
   let removedData = null;
@@ -1564,7 +1717,8 @@ document.getElementById('btn-list').onclick = openListPanel;
 document.getElementById('btn-list-close').onclick = closeListPanel;
 document.getElementById('lp-search-input').oninput = renderListPanel;
 
-let lpActiveFilter = 'all';
+let lpActiveFilters = new Set(); // statuts sélectionnés (pleine/vide/fleet/charge), vide = tous
+let lpFixedOnly = false; // filtre "P" (emplacements fixes uniquement)
 let lpSortAsc = null; // null = pas trié (ordre naturel), true = A-Z, false = Z-A
 document.getElementById('btn-lp-sort').onclick = () => {
   lpSortAsc = lpSortAsc === true ? false : true;
@@ -1573,9 +1727,22 @@ document.getElementById('btn-lp-sort').onclick = () => {
 };
 document.querySelectorAll('#lp-filters .lp-filter-btn').forEach(btn => {
   btn.onclick = () => {
-    lpActiveFilter = btn.dataset.filter;
-    document.querySelectorAll('#lp-filters .lp-filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    const key = btn.dataset.filter;
+    if (key === 'all') {
+      lpActiveFilters.clear();
+      lpFixedOnly = false;
+    } else if (key === 'fixed') {
+      lpFixedOnly = !lpFixedOnly;
+    } else {
+      if (lpActiveFilters.has(key)) lpActiveFilters.delete(key);
+      else lpActiveFilters.add(key);
+    }
+    document.querySelectorAll('#lp-filters .lp-filter-btn').forEach(b => {
+      const k = b.dataset.filter;
+      if (k === 'all') b.classList.toggle('active', lpActiveFilters.size === 0 && !lpFixedOnly);
+      else if (k === 'fixed') b.classList.toggle('active', lpFixedOnly);
+      else b.classList.toggle('active', lpActiveFilters.has(k));
+    });
     renderListPanel();
   };
 });
@@ -1590,16 +1757,16 @@ function renderListPanel() {
   Object.entries(freeTrailers).forEach(([id, d]) => {
     items.push({ label: 'Zone libre', sub: d.client || '', ...d, _target: { type: 'free', id }, open: () => openEditSheetForFree(id) });
   });
-  let filtered = lpActiveFilter === 'all' ? items
-    : lpActiveFilter === 'fixed' ? items.filter(it => it._target.type === 'spot')
-    : items.filter(it => it.status === lpActiveFilter);
+  let filtered = items;
+  if (lpActiveFilters.size > 0) filtered = filtered.filter(it => lpActiveFilters.has(it.status));
+  if (lpFixedOnly) filtered = filtered.filter(it => it._target.type === 'spot');
   filtered = q ? filtered.filter(it =>
     (it.trailer||'').toLowerCase().includes(q) || (it.client||'').toLowerCase().includes(q) || (it.label||'').toLowerCase().includes(q)
   ) : filtered;
   if (lpSortAsc !== null) {
     filtered = filtered.slice().sort((a, b) => {
       let cmp;
-      if (lpActiveFilter === 'fixed') {
+      if (lpFixedOnly) {
         cmp = parseInt(a._target.id) - parseInt(b._target.id);
       } else {
         cmp = (a.trailer || '').localeCompare(b.trailer || '', 'fr', { numeric: true });
@@ -1608,7 +1775,7 @@ function renderListPanel() {
     });
   }
 
-  document.getElementById('lp-count').textContent = items.length;
+  document.getElementById('lp-count').textContent = filtered.length === items.length ? items.length : `${filtered.length} / ${items.length}`;
   const container = document.getElementById('lp-items');
   if (!filtered.length) {
     container.innerHTML = '<div class="empty">Aucune remorque sur site</div>';
@@ -1619,8 +1786,8 @@ function renderListPanel() {
     const vs = getVisualState(it);
     const days = daysSince(it.time);
     const relevantThreshold = it.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
-    const isOverThreshold = (it.status === 'pleine' || it.status === 'charge' || it.status === 'fleet') && days > relevantThreshold;
-    const badgeClass = isOverThreshold ? 'rouge15' : it.status;
+    const isOverThreshold = (it.status === 'pleine' || it.status === 'charge') && days > relevantThreshold;
+    const badgeClass = it.status;
     const badgeText = it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : it.status)));
 
     const ctEntry = it.trailer ? trailerDB[it.trailer] : null;
@@ -1645,7 +1812,7 @@ function renderListPanel() {
       </div>
       <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}</div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-meta">🔄 ${days}j${it.notes ? ' · 📝 ' + it.notes : ''}</div>
+        <div class="lp-meta" style="${isOverThreshold ? 'color:#f87171; font-weight:700;' : ''}">🔄 ${days}j${it.notes ? ' · 📝 ' + it.notes : ''}</div>
         <div style="display:flex; gap:4px; flex-shrink:0;">
           <button class="lp-icon-btn" data-action="locate" title="Localiser sur la carte">📍</button>
           <button class="lp-icon-btn" data-action="detail" title="Voir le détail">👁️</button>
@@ -1762,7 +1929,7 @@ function renderHistoryPanel() {
     return hpSortAsc ? ta - tb : tb - ta;
   });
 
-  document.getElementById('hp-count').textContent = history.length;
+  document.getElementById('hp-count').textContent = filtered.length === history.length ? history.length : `${filtered.length} / ${history.length}`;
   const container = document.getElementById('hp-items');
   if (!filtered.length) {
     container.innerHTML = '<div class="empty">Aucun historique</div>';
@@ -1834,7 +2001,7 @@ function openDetailView(item) {
   const statusLabel = item.status === 'fleet' ? 'Fleet — Bloqué' : (item.status === 'vide' ? 'Vide' : (item.status === 'charge' ? 'Chargé' : 'À vider'));
   badges.innerHTML += `<span class="detail-pill" style="background:${vs.color}22; color:${vs.color};">${statusLabel}</span>`;
   const relevantThreshold = item.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
-  if (days > relevantThreshold && (item.status === 'pleine' || item.status === 'charge' || item.status === 'fleet')) {
+  if (days > relevantThreshold && (item.status === 'pleine' || item.status === 'charge')) {
     badges.innerHTML += `<span class="detail-pill" style="background:#dc262622; color:#f87171;">⚠ ${days} jours sur site</span>`;
   }
 
@@ -1854,6 +2021,13 @@ function openDetailView(item) {
     document.getElementById('detail-encodedby').textContent = item.encodedBy;
   } else {
     encodedByRow.style.display = 'none';
+  }
+  const movedByRow = document.getElementById('detail-movedby-row');
+  if (item.movedBy && hasPermission('viewAuthors')) {
+    movedByRow.style.display = 'flex';
+    document.getElementById('detail-movedby').textContent = item.movedBy + (item.movedAt ? ' (' + formatDateTime(item.movedAt) + ')' : '');
+  } else {
+    movedByRow.style.display = 'none';
   }
 
   const ctBox = document.getElementById('detail-ct-box');
@@ -2098,7 +2272,7 @@ document.getElementById('btn-db-panel-close').onclick = closeDbPanel;
 document.getElementById('btn-db-sheet-close').onclick = closeDbSheet;
 document.getElementById('db-panel-search').oninput = renderDbPanel;
 
-let dbActiveFilter = 'all';
+let dbActiveFilters = new Set(); // vide = "Tous"
 let dbSortAsc = null;
 let dbDateSortAsc = null;
 document.getElementById('btn-db-sort').onclick = () => {
@@ -2117,9 +2291,16 @@ document.getElementById('btn-db-sort-date').onclick = () => {
 };
 document.querySelectorAll('#db-panel-filters .lp-filter-btn').forEach(btn => {
   btn.onclick = () => {
-    dbActiveFilter = btn.dataset.dbfilter;
-    document.querySelectorAll('#db-panel-filters .lp-filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    const key = btn.dataset.dbfilter;
+    if (key === 'all') {
+      dbActiveFilters.clear();
+    } else {
+      if (dbActiveFilters.has(key)) dbActiveFilters.delete(key);
+      else dbActiveFilters.add(key);
+    }
+    document.querySelectorAll('#db-panel-filters .lp-filter-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.dbfilter === 'all' ? dbActiveFilters.size === 0 : dbActiveFilters.has(b.dataset.dbfilter));
+    });
     renderDbPanel();
   };
 });
@@ -2129,10 +2310,10 @@ function renderDbPanel() {
   const q = document.getElementById('db-panel-search').value.trim().toUpperCase();
   const container = document.getElementById('db-panel-items');
   let entries = Object.entries(trailerDB).filter(([num]) => !q || num.includes(q));
-  if (dbActiveFilter !== 'all') {
+  if (dbActiveFilters.size > 0) {
     entries = entries.filter(([num, entry]) => {
       const status = getCtStatus(entry.ctExpiryDate);
-      return status && status.level === dbActiveFilter;
+      return status && dbActiveFilters.has(status.level);
     });
   }
   if (dbSortAsc !== null) {
@@ -2148,7 +2329,8 @@ function renderDbPanel() {
       return dbDateSortAsc ? cmp : -cmp;
     });
   }
-  document.getElementById('db-count').textContent = Object.keys(trailerDB).length;
+  const totalCount = Object.keys(trailerDB).length;
+  document.getElementById('db-count').textContent = entries.length === totalCount ? totalCount : `${entries.length} / ${totalCount}`;
 
   if (!entries.length) {
     container.innerHTML = '<div class="empty">Aucune remorque enregistrée</div>';
