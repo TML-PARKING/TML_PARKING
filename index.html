@@ -7,61 +7,129 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="TML Ghlin">
-<meta name="theme-color" content="#111827">
+<meta name="theme-color" content="#101318">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23111827'/%3E%3Ctext x='50' y='62' font-size='55' text-anchor='middle'%3E%F0%9F%9A%9B%3C/text%3E%3C/svg%3E">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23111827'/%3E%3Ctext x='50' y='62' font-size='55' text-anchor='middle'%3E%F0%9F%9A%9B%3C/text%3E%3C/svg%3E">
 <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Plan%20Site%20TML%20Ghlin%22%2C%22short_name%22%3A%22TML%20Ghlin%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%23111827%22%7D">
 <title>Plan Site TML Ghlin - Gestion Remorques</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
+  :root {
+    --bg: #0a0c0f;
+    --panel: #12151a;
+    --panel-2: #171b21;
+    --panel-hair: #262b33;
+    --ink: #f2f3f5;
+    --ink-dim: #9299a6;
+    --ink-faint: #656d7a;
+    --amber: #ffb020;
+    --amber-ink: #1a1200;
+    --steel: #4d90ff;
+    --radius-lg: 4px 18px 4px 18px;
+    --radius-md: 10px;
+    --radius-sm: 7px;
+    --ease: cubic-bezier(.22,.9,.32,1);
+    --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; overflow: hidden; position: fixed; width: 100%; }
-  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+  html, body {
+    height: 100%; overflow: hidden; position: fixed; width: 100%;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, #151a1f 0%, transparent 60%),
+      var(--bg);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; background: transparent; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a3038; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #383f4a; }
 
   header {
-    position: relative; background: #111827; color: #fff; padding: 10px 14px;
+    position: relative; background: #101318; color: var(--ink);
+    padding: 11px 16px 11px 14px;
     display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid #1f2937; z-index: 1450; flex-shrink: 0;
+    z-index: 1450; flex-shrink: 0;
     flex-wrap: wrap; row-gap: 8px;
+    border-left: 4px solid var(--amber);
   }
-  header h1 { font-size: 15px; font-weight: 600; }
-  header .sub { font-size: 11px; color: #9ca3af; }
+  header::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -3px; height: 3px;
+    background: repeating-linear-gradient(-45deg, var(--amber) 0 8px, #101318 8px 16px);
+    opacity: .55;
+  }
+  header h1 {
+    font-size: 15px; font-weight: 700; letter-spacing: .01em; text-transform: uppercase;
+  }
+  header .sub {
+    font-family: var(--font-mono); font-size: 11px; color: var(--amber); margin-top: 3px;
+    font-weight: 500; letter-spacing: .01em; font-variant-numeric: tabular-nums;
+  }
   header > div:first-child { min-width: 0; }
   .top-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
   .btn {
-    border: none; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: opacity .15s; color: #fff; white-space: nowrap;
+    border: none; border-radius: var(--radius-sm); padding: 9px 13px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: transform .12s var(--ease), filter .12s var(--ease), background-color .15s var(--ease);
+    color: #fff; white-space: nowrap; letter-spacing: .01em;
+    box-shadow: 0 1px 2px rgba(0,0,0,.4);
+    font-family: var(--font-display);
   }
-  .btn:active { opacity: .7; }
-  .btn-primary { background: #2563eb; }
-  .btn-ghost { background: #1f2937; color: #d1d5db; }
-  .btn-danger { background: #dc2626; }
-  .btn-success { background: #16a34a; }
-  .btn-warn { background: #d97706; }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:active { transform: scale(.96); filter: brightness(.9); }
+  .btn-primary { background: var(--amber); color: var(--amber-ink); font-weight: 700; }
+  .btn-ghost { background: #1a1e24; color: #c6cbd4; box-shadow: inset 0 0 0 1px #2a303a; }
+  .btn-ghost:hover { background: #21262e; }
+  .btn-danger { background: #e0393f; }
+  .btn-success { background: #1fa15a; }
+  .btn-warn { background: #cf7d1f; }
 
   #map { flex: 1; width: 100%; }
 
-  .leaflet-container { background: #0f172a; }
+  .leaflet-container { background: var(--bg); font-family: inherit; }
+  .leaflet-control-zoom a {
+    background: #14171c !important; color: #dfe7f3 !important; border-color: #262b33 !important;
+    font-family: var(--font-mono) !important;
+  }
+  .leaflet-control-zoom a:hover { background: #1c2128 !important; }
+  .leaflet-bar { box-shadow: 0 2px 10px rgba(0,0,0,.5) !important; border: none !important; border-radius: 6px !important; overflow: hidden; }
 
   /* Marqueurs emplacements fixes */
   .spot-marker {
-    width: 34px; height: 34px; border-radius: 8px;
+    width: 34px; height: 34px; border-radius: 9px;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 12px; color: #fff;
-    border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+    font-weight: 600; font-size: 12px; color: #fff; font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    border: 2px solid rgba(255,255,255,.92); box-shadow: 0 2px 6px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.15);
+    transition: box-shadow .15s var(--ease);
   }
   .spot-free { background: #16a34a; }
   .spot-occupied { background: #dc2626; }
   .spot-editing { background: #d97706; }
 
+  /* Marqueurs quais (mêmes règles que les emplacements fixes, forme distincte) */
+  .dock-marker {
+    width: 34px; height: 34px; border-radius: 50% 50% 9px 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 12px; color: #fff; font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    border: 2px solid rgba(255,255,255,.92); box-shadow: 0 2px 6px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.15);
+  }
+
   .trailer-marker {
     width: 30px; height: 30px; border-radius: 50%;
-    background: #ea580c; border: 2px solid #fff;
-    box-shadow: 0 1px 4px rgba(0,0,0,.5);
+    background: #ea580c; border: 2px solid rgba(255,255,255,.92);
+    box-shadow: 0 2px 6px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.15);
     display: flex; align-items: center; justify-content: center;
     font-size: 15px;
   }
@@ -69,54 +137,62 @@
   /* Panneau bas coulissant */
   #sheet {
     position: fixed; left: 50%; right: auto; bottom: 0; width: 100%;
-    background: #111827; color: #fff; border-radius: 16px 16px 0 0;
-    box-shadow: 0 -4px 20px rgba(0,0,0,.4);
-    transform: translate(-50%, 100%); transition: transform .25s ease;
+    background: var(--panel); color: var(--ink); border-radius: var(--radius-lg);
+    box-shadow: 0 -8px 30px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
+    transform: translate(-50%, 100%); transition: transform .3s var(--ease);
     z-index: 2000; max-height: 80vh; display: flex; flex-direction: column;
+    border-top: 2px solid var(--amber);
   }
   #sheet.open { transform: translate(-50%, 0); }
 
   .bottom-sheet {
     position: fixed; left: 50%; right: auto; bottom: 0; width: 100%;
-    background: #111827; color: #fff; border-radius: 16px 16px 0 0;
-    box-shadow: 0 -4px 20px rgba(0,0,0,.4);
-    transform: translate(-50%, 100%); transition: transform .25s ease;
+    background: var(--panel); color: var(--ink); border-radius: var(--radius-lg);
+    box-shadow: 0 -8px 30px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
+    transform: translate(-50%, 100%); transition: transform .3s var(--ease);
     display: flex; flex-direction: column;
+    border-top: 2px solid var(--amber);
   }
   .bottom-sheet.open { transform: translate(-50%, 0); }
 
   @media (min-width: 768px) {
     #sheet, .bottom-sheet {
-      max-width: 460px; bottom: 24px; border-radius: 16px;
-      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      max-width: 460px; bottom: 24px; border-radius: var(--radius-lg);
+      box-shadow: 0 20px 50px rgba(0,0,0,.6), 0 0 0 1px var(--panel-hair);
     }
   }
   #sheet .handle, .bottom-sheet .handle {
-    width: 40px; height: 4px; background: #4b5563; border-radius: 2px;
-    margin: 10px auto 6px;
+    width: 36px; height: 4px; background: #363c45; border-radius: 2px;
+    margin: 12px auto 6px;
   }
-  .sheet-header { padding: 0 18px 8px; display: flex; justify-content: space-between; align-items: center; }
-  .sheet-header h2 { font-size: 16px; }
-  .sheet-body { padding: 4px 18px 20px; overflow-y: auto; }
+  .sheet-header { padding: 2px 18px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-hair); margin-bottom: 14px; }
+  .sheet-header h2 {
+    font-size: 15px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sheet-header h2::before { content: ''; width: 6px; height: 6px; background: var(--amber); border-radius: 1px; flex-shrink: 0; }
+  .sheet-body { padding: 4px 18px 22px; overflow-y: auto; }
 
   .field { margin-bottom: 16px; }
-  .field label { display: block; font-size: 11px; color: #9ca3af; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+  .field label { display: block; font-size: 10.5px; color: var(--ink-dim); margin-bottom: 7px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
   .field input, .field select, .field textarea {
-    width: 100%; background: #1a2333; border: 1px solid #374151; color: #fff;
-    border-radius: 10px; padding: 12px 14px; font-size: 15px; transition: border-color .15s;
+    width: 100%; background: #0d131d; border: 1px solid var(--panel-hair); color: var(--ink);
+    border-radius: var(--radius-md); padding: 12px 14px; font-size: 15px; transition: border-color .15s var(--ease), background-color .15s var(--ease);
   }
   .field input:focus, .field select:focus, .field textarea:focus {
-    outline: none; border-color: #2563eb; background: #1f2937;
+    outline: none; border-color: var(--amber); background: #171310;
+    box-shadow: 0 0 0 3px #ffb02026;
   }
   .field textarea { resize: vertical; min-height: 50px; }
 
   .status-options { display: flex; gap: 8px; flex-wrap: wrap; }
   .status-chip {
-    flex: 1; min-width: 90px; padding: 12px 8px; text-align: center; border-radius: 10px;
-    background: #1a2333; border: 1px solid #374151; font-size: 12.5px; font-weight: 700;
-    cursor: pointer; color: #d1d5db; transition: all .15s;
+    flex: 1; min-width: 90px; padding: 12px 8px; text-align: center; border-radius: var(--radius-md);
+    background: #0d131d; border: 1px solid var(--panel-hair); font-size: 12.5px; font-weight: 700;
+    cursor: pointer; color: #cbd5e1; transition: all .15s var(--ease);
   }
-  .status-chip.active { border-color: transparent; }
+  .status-chip:hover { border-color: #3a475e; }
+  .status-chip.active { border-color: transparent; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
   .status-chip[data-status="pleine"].active { background: #16a34a; color: #fff; }
   .status-chip[data-status="vide"].active { background: #6b7280; color: #fff; }
   .status-chip[data-status="fleet"].active { background: #7c3aed; color: #fff; }
@@ -131,24 +207,31 @@
 
   /* Liste des remorques */
   #list-panel {
-    position: fixed; top: 52px; right: 0; bottom: 0; width: 360px; max-width: 92vw;
-    background: #111827ee; color: #fff; transform: translateX(100%);
-    transition: transform .2s ease; z-index: 1500; overflow-y: auto;
-    border-left: 1px solid #1f2937;
+    position: fixed; top: 53px; right: 0; bottom: 0; width: 360px; max-width: 92vw;
+    background: rgba(16,22,31,.97); backdrop-filter: blur(6px); color: var(--ink); transform: translateX(100%);
+    transition: transform .25s var(--ease); z-index: 1500; overflow-y: auto;
+    border-left: 1px solid var(--panel-hair); box-shadow: -12px 0 30px rgba(0,0,0,.35);
   }
   #list-panel.open { transform: translateX(0); }
-  #list-panel .lp-header { padding: 12px 14px; border-bottom: 1px solid #1f2937; display:flex; justify-content:space-between; align-items:center; }
-  #list-panel .lp-header h3 { font-size: 14px; }
-  .lp-search { padding: 10px 14px; border-bottom: 1px solid #1f2937; }
-  .lp-search input { width: 100%; background: #1f2937; border: 1px solid #374151; color: #fff; border-radius: 8px; padding: 8px 10px; font-size: 13px; }
-  .lp-item {
-    padding: 10px 14px; border-bottom: 1px solid #1f293780; cursor: pointer;
-    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  #list-panel .lp-header {
+    padding: 13px 14px; border-bottom: 1px solid var(--panel-hair); display:flex; justify-content:space-between; align-items:center;
+    border-left: 3px solid var(--amber);
   }
-  .lp-item:active { background: #1f2937; }
-  .lp-item .lp-num { font-weight: 700; font-size: 13px; }
-  .lp-item .lp-meta { font-size: 11px; color: #9ca3af; }
-  .lp-badge { font-size: 10px; padding: 3px 7px; border-radius: 6px; font-weight: 600; flex-shrink: 0; }
+  #list-panel .lp-header h3 { font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+  #list-panel .lp-header #lp-count { font-family: var(--font-mono); color: var(--amber); }
+  .lp-search { padding: 10px 14px; border-bottom: 1px solid var(--panel-hair); }
+  .lp-search input { width: 100%; background: #0d131d; border: 1px solid var(--panel-hair); color: var(--ink); border-radius: var(--radius-sm); padding: 9px 11px; font-size: 13px; transition: border-color .15s var(--ease); }
+  .lp-search input:focus { outline: none; border-color: var(--amber); }
+  .lp-item {
+    padding: 11px 14px; border-bottom: 1px solid #1c2431; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    transition: background-color .12s var(--ease);
+  }
+  .lp-item:hover { background: #141c28; }
+  .lp-item:active { background: #1a2330; }
+  .lp-item .lp-num { font-weight: 600; font-size: 13px; letter-spacing: .01em; font-family: var(--font-mono); }
+  .lp-item .lp-meta { font-size: 11px; color: var(--ink-dim); }
+  .lp-badge { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 700; flex-shrink: 0; letter-spacing: .01em; }
   .lp-badge.pleine { background: #dc262633; color: #f87171; }
   .lp-badge.vide { background: #16a34a33; color: #4ade80; }
   .lp-badge.fleet { background: #7c3aed33; color: #c4b5fd; }
@@ -158,11 +241,11 @@
   .lp-badge.ctok { background: #16a34a33; color: #4ade80; }
   .lp-badge.ctnok { background: #dc262633; color: #f87171; }
 
-  .detail-row { display:flex; justify-content:space-between; align-items:flex-start; padding:8px 0; border-bottom:1px solid #37415180; gap:12px; }
+  .detail-row { display:flex; justify-content:space-between; align-items:flex-start; padding:9px 0; border-bottom:1px solid #1c2431; gap:12px; }
   .detail-row:last-child { border-bottom:none; }
-  .detail-label { font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#9ca3af; flex-shrink:0; }
-  .detail-value { font-size:14px; font-weight:600; text-align:right; }
-  .detail-pill { padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; }
+  .detail-label { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-dim); flex-shrink:0; font-weight: 600; }
+  .detail-value { font-size:14px; font-weight:600; text-align:right; font-family: var(--font-mono); }
+  .detail-pill { padding:6px 13px; border-radius:20px; font-size:12px; font-weight:700; }
 
   .marker-selected { box-shadow: 0 0 0 4px #facc15, 0 0 14px 4px #facc15aa !important; animation: pulseSelect 1.2s infinite; }
   @keyframes pulseSelect {
@@ -171,82 +254,105 @@
     100% { box-shadow: 0 0 0 4px #facc15, 0 0 14px 4px #facc15aa; }
   }
   .lp-icon-btn {
-    background: #1f2937; border: 1px solid #374151; border-radius: 8px;
+    background: #1a2230; border: 1px solid var(--panel-hair); border-radius: var(--radius-sm);
     width: 30px; height: 30px; font-size: 14px; cursor: pointer; color: #fff;
+    transition: background-color .12s var(--ease), transform .12s var(--ease);
   }
-  .lp-icon-btn:active { background: #374151; }
-  .lp-filter-btn { font-size: 11px; padding: 6px 10px; white-space: nowrap; flex: 0 0 auto; }
-  .lp-filter-btn.active { background: #2563eb; color: #fff; }
-  #list-panel .empty { padding: 20px 14px; color: #6b7280; font-size: 13px; text-align: center; }
+  .lp-icon-btn:hover { background: #232e40; }
+  .lp-icon-btn:active { transform: scale(.92); }
+  .lp-filter-btn { font-size: 11px; padding: 6px 11px; white-space: nowrap; flex: 0 0 auto; border-radius: 20px; }
+  .lp-filter-btn.active { background: var(--amber); color: var(--amber-ink); }
+  #list-panel .empty { padding: 24px 14px; color: var(--ink-faint); font-size: 13px; text-align: center; }
 
-  #overlay { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.4); z-index: 1400; display: none; }
+  #overlay { position: fixed; top: 53px; left: 0; right: 0; bottom: 0; background: rgba(4,7,12,.55); backdrop-filter: blur(1px); z-index: 1400; display: none; }
   #overlay.show { display: block; }
 
   #banner {
-    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
-    background: #1f2937; color: #fbbf24; padding: 8px 16px; border-radius: 10px;
-    font-size: 12px; z-index: 1400; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    position: fixed; top: 62px; left: 50%; transform: translateX(-50%);
+    background: #1a2230; color: #fbbf24; padding: 9px 18px; border-radius: var(--radius-md);
+    font-size: 12px; font-weight: 600; z-index: 1400; box-shadow: 0 6px 20px rgba(0,0,0,.45), inset 0 0 0 1px #37425a;
     display: none; max-width: 90vw; text-align: center;
   }
   #banner.show { display: block; }
 
   #toast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: #16a34a; color: #fff; padding: 10px 18px; border-radius: 10px;
-    font-size: 13px; font-weight: 600; z-index: 3000; opacity: 0; transition: opacity .2s;
-    pointer-events: none;
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(6px);
+    background: #16a34a; color: #fff; padding: 11px 20px; border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 600; z-index: 3000; opacity: 0; transition: opacity .25s var(--ease), transform .25s var(--ease);
+    pointer-events: none; box-shadow: 0 10px 30px rgba(0,0,0,.4);
   }
-  #toast.show { opacity: 1; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   .legend {
-    position: fixed; left: 10px; bottom: 14px; background: #111827dd; color: #d1d5db;
-    padding: 8px 10px; border-radius: 10px; font-size: 10px; z-index: 1200; line-height: 1.6;
+    position: fixed; left: 12px; bottom: 16px; background: rgba(14,16,20,.9); color: #b7bec9;
+    padding: 9px 13px 9px 11px; border-radius: 3px 10px 3px 10px; font-size: 10.5px; z-index: 1200; line-height: 1.75;
+    box-shadow: 0 6px 20px rgba(0,0,0,.45), inset 0 0 0 1px var(--panel-hair);
+    font-weight: 500; font-family: var(--font-mono); border-left: 2px solid var(--amber);
+    backdrop-filter: blur(3px);
   }
-  .legend span { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; }
+  .legend span { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 7px; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
 
   /* Mode accès chauffeur restreint : masque toute la navigation normale */
   body.driver-mode #btn-list, body.driver-mode #btn-reframe, body.driver-mode #btn-emails,
   body.driver-mode #btn-trailerdb, body.driver-mode #btn-setup, body.driver-mode #btn-history,
-  body.driver-mode #btn-gen-encode-access, body.driver-mode .legend { display: none !important; }
+  body.driver-mode #btn-gen-encode-access, body.driver-mode #btn-view-toggle, body.driver-mode .legend { display: none !important; }
 
   #driver-card {
     position: fixed; left: 50%; bottom: 0; width: 100%; max-width: 460px; transform: translateX(-50%);
-    background: #111827; color: #fff; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.4);
-    z-index: 1800; padding: 18px; display: none;
+    background: var(--panel); color: var(--ink); border-radius: 20px 20px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.5);
+    z-index: 1800; padding: 20px; display: none; border-top: 1px solid var(--panel-hair);
   }
-  #driver-card h2 { font-size: 18px; margin-bottom: 10px; }
+  #driver-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
   #driver-thankyou {
-    position: fixed; inset: 0; background: #0f172a; color: #fff; z-index: 5000;
+    position: fixed; inset: 0; background: var(--bg); color: var(--ink); z-index: 5000;
     display: none; align-items: center; justify-content: center; text-align: center; padding: 30px;
   }
 
   .anchor-marker {
     width: 22px; height: 22px; border-radius: 50%; background: #facc15;
-    border: 3px solid #111827; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+    border: 3px solid #10161f; box-shadow: 0 2px 8px rgba(0,0,0,.5);
   }
 
+  /* Panneau configuration : même traitement que la liste / l'historique (panneau
+     latéral qui glisse depuis la droite, avec en-tête et défilement interne),
+     plutôt qu'un empilement de boutons flottants qui débordait de l'écran. */
   #admin-tools {
-    position: fixed; right: 10px; bottom: 90px; z-index: 1300;
-    display: none; flex-direction: column; gap: 8px; width: 190px;
+    position: fixed; top: 53px; right: 0; bottom: 0; width: 320px; max-width: 92vw;
+    background: rgba(16,22,31,.97); backdrop-filter: blur(6px); color: var(--ink);
+    transform: translateX(100%); transition: transform .25s var(--ease); z-index: 1300;
+    border-left: 1px solid var(--panel-hair); box-shadow: -12px 0 30px rgba(0,0,0,.35);
+    display: flex; flex-direction: column;
+  }
+  #admin-tools.open { transform: translateX(0); }
+  #admin-tools .at-header {
+    padding: 13px 14px; border-bottom: 1px solid var(--panel-hair); flex-shrink: 0;
+    border-left: 3px solid var(--amber);
+  }
+  #admin-tools .at-header h3 { font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+  #admin-tools .at-body {
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+    overflow-y: auto; flex: 1;
   }
   #admin-tools button {
-    width: 100%; padding: 10px 8px; font-size: 11.5px; line-height: 1.3;
-    border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    width: 100%; padding: 11px 10px; font-size: 12px; line-height: 1.35;
+    border-radius: var(--radius-md); box-shadow: 0 4px 14px rgba(0,0,0,.45);
     white-space: normal; word-break: break-word;
   }
 
-  /* Position GPS de l'utilisateur */
+  /* Position GPS de l'utilisateur (bleu acier, distinct de l'ambre des actions) */
   .user-location-marker {
-    width: 18px; height: 18px; border-radius: 50%; background: #3b82f6;
-    border: 3px solid #fff; box-shadow: 0 0 0 4px #3b82f680;
+    width: 18px; height: 18px; border-radius: 50%; background: var(--steel);
+    border: 3px solid #fff; box-shadow: 0 0 0 5px #4d90ff4d;
   }
 
   .btn-route {
-    display: block; width: 100%; padding: 12px; margin-top: 10px; border-radius: 8px;
-    background: #2563eb; color: #fff; font-weight: 600; font-size: 14px; text-align: center;
-    border: none; cursor: pointer;
+    display: block; width: 100%; padding: 13px; margin-top: 10px; border-radius: var(--radius-sm);
+    background: var(--amber); color: var(--amber-ink); font-weight: 700; font-size: 14px; text-align: center;
+    border: none; cursor: pointer; letter-spacing: .01em;
+    transition: filter .12s var(--ease), transform .12s var(--ease);
   }
-
+  .btn-route:hover { filter: brightness(1.08); }
+  .btn-route:active { transform: scale(.98); }
 
 </style>
 </head>
@@ -259,6 +365,7 @@
     </div>
     <div class="top-actions">
       <button class="btn btn-ghost" id="btn-list">📋 Liste</button>
+      <button class="btn btn-primary" id="btn-view-toggle" title="Basculer vue Parking / Quai">🅿️ Parking</button>
       <button class="btn btn-primary" id="btn-gen-encode-access" title="Accès chauffeur (dépôt)" style="display:none; padding:8px 10px; font-size:16px;">🔑</button>
       <button class="btn btn-ghost" id="btn-history">🕓</button>
       <button class="btn btn-warn" id="btn-reframe" style="display:none;">📍 Fixer le cadrage</button>
@@ -272,11 +379,21 @@
 </div>
 
 <div id="admin-tools">
-  <button class="btn btn-warn" id="btn-row-mode">📐 Créer une rangée alignée</button>
-  <button class="btn btn-warn" id="btn-add-spots">➕ Ajouter des emplacements</button>
-  <button class="btn btn-warn" id="btn-toggle-db-access"></button>
-  <button class="btn btn-warn" id="btn-boundary-mode">📍 Définir le contour du site</button>
-  <button class="btn btn-primary" id="btn-boundary-finish" style="display:none;">✅ Terminer le contour</button>
+  <div class="at-header"><h3>🔧 Configuration</h3></div>
+  <div class="at-body">
+    <button class="btn btn-warn" id="btn-placement-type-toggle">📌 Placement (clic) : Emplacement parking</button>
+    <button class="btn btn-warn" id="btn-row-mode">📐 Créer une rangée alignée (emplacements)</button>
+    <button class="btn btn-warn" id="btn-realign-spots">🎯 Réaligner des emplacements existants</button>
+    <button class="btn btn-warn" id="btn-add-spots">➕ Ajouter des emplacements</button>
+    <button class="btn btn-warn" id="btn-row-mode-docks">📐 Créer une rangée alignée (quais)</button>
+    <button class="btn btn-warn" id="btn-add-docks">➕ Ajouter des quais</button>
+    <button class="btn btn-danger" id="btn-clear-docks">🗑️ Effacer tous les quais placés (non occupés)</button>
+    <button class="btn btn-warn" id="btn-clients-config">🏷️ Clients & contenus préencodés</button>
+    <button class="btn btn-warn" id="btn-hide-docks">🙈 Masquer des quais (portes/volets)</button>
+    <button class="btn btn-warn" id="btn-toggle-db-access"></button>
+    <button class="btn btn-warn" id="btn-boundary-mode">📍 Définir le contour du site</button>
+    <button class="btn btn-primary" id="btn-boundary-finish" style="display:none;">✅ Terminer le contour</button>
+  </div>
 </div>
 
 <div id="banner"></div>
@@ -347,7 +464,7 @@
     </div>
     <div class="field">
       <label>Client</label>
-      <input type="text" id="f-client" placeholder="Ex: Chaussea, Nike, H&M..." autocomplete="off">
+      <input type="text" id="f-client" list="client-presets-list" placeholder="Ex: Chaussea, Nike, H&M..." autocomplete="off">
     </div>
     <div class="field">
       <label>Statut</label>
@@ -359,8 +476,8 @@
       </div>
     </div>
     <div class="field">
-      <label>Notes</label>
-      <textarea id="f-notes" placeholder="Optionnel"></textarea>
+      <label>Contenu / notes</label>
+      <input type="text" id="f-notes" list="content-presets-list" placeholder="Ex: TR Orbette, Retour Trémery..." autocomplete="off">
     </div>
     <div class="sheet-actions">
       <button class="btn btn-danger" id="btn-remove">Retirer</button>
@@ -463,11 +580,112 @@
     </div>
 
     <div style="display:flex; gap:8px; margin-top:0;">
+      <button class="lp-icon-btn" id="btn-detail-edit" title="Changer le statut / la note" style="flex:1; height:44px; font-size:18px;">✏️</button>
       <button class="lp-icon-btn" id="btn-detail-route" title="Tracer l'itinéraire" style="flex:1; height:44px; font-size:18px;">🗺️</button>
       <button class="lp-icon-btn" id="btn-detail-move" title="Déplacer cette remorque" style="flex:1; height:44px; font-size:18px;">🔀</button>
       <button class="lp-icon-btn" id="btn-detail-qr" title="Accès chauffeur temporaire (reprise)" style="flex:1; height:44px; font-size:18px;">🔑</button>
       <button class="lp-icon-btn" id="btn-detail-remove" title="Retirer cette remorque" style="flex:1; height:44px; font-size:18px; background:#dc2626; border-color:#dc2626;">📤</button>
     </div>
+  </div>
+</div>
+
+<div id="edit-status-modal" class="bottom-sheet" style="z-index:2200; max-height:70vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Statut / client / note</h2>
+    <button class="btn btn-ghost" id="btn-edit-status-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <label>Statut</label>
+      <div class="status-options" id="edit-status-options">
+        <div class="status-chip" data-status="pleine">À vider</div>
+        <div class="status-chip" data-status="vide">Vide</div>
+        <div class="status-chip" data-status="fleet">Fleet</div>
+        <div class="status-chip" data-status="charge">Chargé</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Client</label>
+      <input type="text" id="edit-status-client" list="client-presets-list" placeholder="Client...">
+    </div>
+    <div class="field">
+      <label>Contenu / notes</label>
+      <input type="text" id="edit-status-notes" list="content-presets-list" placeholder="Ex: TR Orbette, Retour Trémery...">
+    </div>
+    <button class="btn btn-success" id="btn-edit-status-save" style="width:100%; padding:14px; font-size:15px;">✅ Enregistrer</button>
+  </div>
+</div>
+
+<datalist id="client-presets-list"></datalist>
+<datalist id="content-presets-list"></datalist>
+
+<div id="clients-config-modal" class="bottom-sheet" style="z-index:2200; max-height:88vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Clients & contenus préencodés</h2>
+    <button class="btn btn-ghost" id="btn-clients-config-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <label>Ajouter un client</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="cc-new-client" placeholder="Ex: Chaussea" autocomplete="off">
+        <button class="btn btn-primary" id="btn-cc-add-client" style="padding:0 16px;">➕</button>
+      </div>
+    </div>
+    <div id="cc-clients-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+  </div>
+</div>
+
+<div id="cc-content-modal" class="bottom-sheet" style="z-index:2300; max-height:85vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2 id="cc-content-title">Contenus</h2>
+    <button class="btn btn-ghost" id="btn-cc-content-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <label>Ajouter un contenu préencodé pour ce client</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="cc-new-content" placeholder="Ex: TR Orbette" autocomplete="off">
+        <button class="btn btn-primary" id="btn-cc-add-content" style="padding:0 16px;">➕</button>
+      </div>
+    </div>
+    <div id="cc-content-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+  </div>
+</div>
+
+<div id="hide-docks-modal" class="bottom-sheet" style="z-index:2200; max-height:88vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Masquer des quais</h2>
+    <button class="btn btn-ghost" id="btn-hide-docks-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div style="font-size:12px; color:var(--ink-faint,#6b7280); margin-bottom:6px;">
+      Un quai masqué (ex: porte/volet qui n'est pas une vraie mise à quai) disparaît de la vue Quai, de la liste et des recherches, mais reste enregistré si tu veux le réafficher plus tard.
+    </div>
+    <div id="hd-docks-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+  </div>
+</div>
+
+<div id="realign-spots-modal" class="bottom-sheet" style="z-index:2200; max-height:88vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Réaligner des emplacements</h2>
+    <button class="btn btn-ghost" id="btn-realign-spots-close" style="padding:6px 10px;">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div style="font-size:12px; color:var(--ink-faint,#6b7280); margin-bottom:6px;">
+      Sélectionne les emplacements à réaligner (déjà placés ou non), puis touche le point de DÉPART et le point de FIN de la rangée sur la carte : ils seront repositionnés régulièrement le long de cette ligne, dans l'ordre de leur numéro.
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <button class="btn btn-ghost" id="btn-realign-select-all" style="flex:1;">Tout sélectionner</button>
+      <button class="btn btn-ghost" id="btn-realign-select-none" style="flex:1;">Tout désélectionner</button>
+    </div>
+    <div id="realign-spots-grid" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; margin-bottom:12px;"></div>
+    <button class="btn btn-primary" id="btn-realign-spots-confirm" style="width:100%; padding:14px; font-size:15px;">📍 Placer les points de la rangée</button>
   </div>
 </div>
 
@@ -479,6 +697,7 @@
   </div>
   <div class="sheet-body">
     <button class="btn btn-primary" id="btn-move-to-spot" style="width:100%; padding:14px; margin-bottom:10px; font-size:15px;">🅿️ Un emplacement fixe</button>
+    <button class="btn btn-primary" id="btn-move-to-dock" style="width:100%; padding:14px; margin-bottom:10px; font-size:15px;">🚪 Un quai</button>
     <button class="btn btn-primary" id="btn-move-to-free" style="width:100%; padding:14px; font-size:15px;">📍 La zone libre (toucher la carte)</button>
   </div>
 </div>
@@ -703,6 +922,14 @@ const STORAGE_KEY_SPOT_COUNT = "yard:spot-count";
 const STORAGE_KEY_TRAILER_DB = "yard:trailer-db";
 const STORAGE_KEY_SPOTS_CONFIG = "yard:spots-config";
 const STORAGE_KEY_OCCUPANCY = "yard:occupancy";
+let numDocks = 10;
+const STORAGE_KEY_DOCK_COUNT = "yard:dock-count";
+const STORAGE_KEY_DOCKS_CONFIG = "yard:docks-config";
+const STORAGE_KEY_DOCK_OCCUPANCY = "yard:dock-occupancy";
+let clientPresets = []; // ["CHAUSSEA", "NIKE", ...] — liste des clients préencodés, modifiable en configuration
+let contentPresetsByClient = {}; // { "CHAUSSEA": ["TR ORBETTE", "RETOUR TRÉMERY"], ... }
+const STORAGE_KEY_CLIENT_PRESETS = "yard:client-presets";
+const STORAGE_KEY_CONTENT_PRESETS = "yard:content-presets";
 const STORAGE_KEY_FREE_TRAILERS = "yard:free-trailers";
 const STORAGE_KEY_MAP_VIEW = "yard:map-view";
 const STORAGE_KEY_EMAIL_CONFIG = "yard:email-config";
@@ -739,9 +966,16 @@ let map;
 let spotsConfig = {};      // { "1": {lat,lng}, ... } fixed spot positions
 let occupancy = {};        // { "1": {trailer, client, status, notes, time} }
 let freeTrailers = {};     // { id: {lat,lng,trailer,client,status,notes,time} }
+let dockConfig = {};       // { "1": {lat,lng}, ... } quai positions (placées manuellement par l'admin)
+let dockOccupancy = {};    // { "1": {trailer, client, status, notes, time} }
 let spotMarkers = {};
 let freeMarkers = {};
+let dockMarkers = {};
 let setupMode = false;
+let configPlacementType = 'spot'; // 'spot' ou 'dock' — détermine ce qu'un simple clic place en mode configuration
+// Vue actuelle : 'parking' (emplacements fixes + zone libre) ou 'quai' (quais uniquement).
+// Purement locale à l'appareil (préférence d'affichage), pas synchronisée entre utilisateurs.
+let viewMode = localStorage.getItem('yard:view-mode') || 'parking';
 let currentTarget = null;  // {type:'spot', id} or {type:'free', id} or {type:'new-free', lat,lng} or {type:'new-spot', num}
 let userMarker = null;
 let userPos = null;
@@ -798,6 +1032,9 @@ async function loadAll(preFetched) {
   spotsConfig = d.spotsConfig || {};
   occupancy = d.occupancy || {};
   freeTrailers = d.freeTrailers || {};
+  dockConfig = d.dockConfig || {};
+  dockOccupancy = d.dockOccupancy || {};
+  numDocks = (d.dockCount && parseInt(d.dockCount.count)) || 10;
 
   const cfg = d.emailConfig || {};
   emailRecipients = cfg.recipients || [];
@@ -813,6 +1050,8 @@ async function loadAll(preFetched) {
   siteBoundary = Array.isArray(d.siteBoundary) ? d.siteBoundary : [];
   tempAccesses = d.tempAccesses || {};
   teamUsers = d.teamUsers || {};
+  clientPresets = Array.isArray(d.clientPresets) ? d.clientPresets : [];
+  contentPresetsByClient = d.contentPresets || {};
 }
 
 async function saveSpotsConfig() {
@@ -823,9 +1062,45 @@ async function saveOccupancy() {
   try { await backendSave('saveOccupancy', STORAGE_KEY_OCCUPANCY, occupancy); }
   catch(e) { toast("Erreur sauvegarde"); }
 }
+async function saveDocksConfig() {
+  try { await backendSave('saveDocksConfig', STORAGE_KEY_DOCKS_CONFIG, dockConfig); }
+  catch(e) { toast("Erreur sauvegarde config quais"); }
+}
+async function saveDockOccupancy() {
+  try { await backendSave('saveDockOccupancy', STORAGE_KEY_DOCK_OCCUPANCY, dockOccupancy); }
+  catch(e) { toast("Erreur sauvegarde"); }
+}
+async function saveDockCount() {
+  try { await backendSave('saveDockCount', STORAGE_KEY_DOCK_COUNT, { count: numDocks }); }
+  catch(e) { toast("Erreur sauvegarde du nombre de quais"); }
+}
 async function saveFreeTrailers() {
   try { await backendSave('saveFreeTrailers', STORAGE_KEY_FREE_TRAILERS, freeTrailers); }
   catch(e) { toast("Erreur sauvegarde"); }
+}
+async function saveClientPresets() {
+  try { await backendSave('saveClientPresets', STORAGE_KEY_CLIENT_PRESETS, clientPresets); }
+  catch(e) { toast("Erreur sauvegarde des clients"); }
+}
+async function saveContentPresets() {
+  try { await backendSave('saveContentPresets', STORAGE_KEY_CONTENT_PRESETS, contentPresetsByClient); }
+  catch(e) { toast("Erreur sauvegarde des contenus"); }
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function refreshClientPresetsDatalist() {
+  const dl = document.getElementById('client-presets-list');
+  if (!dl) return;
+  dl.innerHTML = clientPresets.map(c => `<option value="${escapeHtml(c)}">`).join('');
+}
+function refreshContentPresetsDatalist(clientName) {
+  const dl = document.getElementById('content-presets-list');
+  if (!dl) return;
+  const key = (clientName || '').trim().toUpperCase();
+  const list = contentPresetsByClient[key] || [];
+  dl.innerHTML = list.map(c => `<option value="${escapeHtml(c)}">`).join('');
 }
 async function saveEmailConfig() {
   try {
@@ -890,13 +1165,19 @@ async function initMap(center, zoom, preloadedData) {
   }).addTo(map);
 
   map.on('click', onMapClick);
+  // Réaffiche les marqueurs à la bonne taille à chaque changement de zoom
+  // (les icônes rétrécissent en dézoomant, grossissent en zoomant).
+  map.on('zoomend', () => { renderSpots(); renderFreeTrailers(); renderDocks(); });
 
   await loadAll(preloadedData);
+  refreshClientPresetsDatalist();
   if (!driverMode) applyUserPermissions();
   renderSpots(center);
   renderFreeTrailers();
+  renderDocks();
   renderBoundary();
   updateHeader();
+  updateViewToggleUI();
   startGpsTracking();
   startLiveSync();
   setupRotateControls();
@@ -959,7 +1240,11 @@ async function pollForUpdates() {
     const newCount = (d.spotCount && parseInt(d.spotCount.count)) || 25;
     const newBoundary = Array.isArray(d.siteBoundary) ? d.siteBoundary : [];
     const newTrailerDB = d.trailerDB || {};
-    const snap = snapshotOf(newSpots, newOcc, newFree) + '|' + newCount + '|' + JSON.stringify(newBoundary) + '|' + JSON.stringify(newTrailerDB);
+    const newDockConfig = d.dockConfig || {};
+    const newDockOcc = d.dockOccupancy || {};
+    const newDockCount = (d.dockCount && parseInt(d.dockCount.count)) || 10;
+    const snap = snapshotOf(newSpots, newOcc, newFree) + '|' + newCount + '|' + JSON.stringify(newBoundary) + '|' + JSON.stringify(newTrailerDB)
+      + '|' + JSON.stringify(newDockConfig) + '|' + JSON.stringify(newDockOcc) + '|' + newDockCount;
 
     if (snap !== lastSyncSnapshot) {
       lastSyncSnapshot = snap;
@@ -969,8 +1254,12 @@ async function pollForUpdates() {
       numFixedSpots = newCount;
       siteBoundary = newBoundary;
       trailerDB = newTrailerDB;
+      dockConfig = newDockConfig;
+      dockOccupancy = newDockOcc;
+      numDocks = newDockCount;
       renderSpots();
       renderFreeTrailers();
+      renderDocks();
       if (!boundaryMode) renderBoundary();
       if (listPanel.classList.contains('open')) renderListPanel();
     }
@@ -982,7 +1271,8 @@ async function pollForUpdates() {
 }
 
 function startLiveSync() {
-  lastSyncSnapshot = snapshotOf(spotsConfig, occupancy, freeTrailers) + '|' + numFixedSpots + '|' + JSON.stringify(siteBoundary) + '|' + JSON.stringify(trailerDB);
+  lastSyncSnapshot = snapshotOf(spotsConfig, occupancy, freeTrailers) + '|' + numFixedSpots + '|' + JSON.stringify(siteBoundary) + '|' + JSON.stringify(trailerDB)
+    + '|' + JSON.stringify(dockConfig) + '|' + JSON.stringify(dockOccupancy) + '|' + numDocks;
   backendGetVersion().then(v => { lastKnownVersion = v; });
   setInterval(pollForUpdates, 5000);
 }
@@ -1045,11 +1335,13 @@ function drawStraightLine(from, to) {
 
 // ---------- OUTIL "RANGÉE ALIGNÉE" ----------
 let rowMode = false;
+let rowModeTarget = 'spot'; // 'spot' ou 'dock' — quel type la rangée alignée place
 let rowAnchors = []; // jusqu'à 2 points {lat,lng}
 let rowAnchorMarkers = [];
+let realignSelection = null; // Set des n° d'emplacements sélectionnés à réaligner (via le modal dédié), sinon null
 
 function toggleRowModeUI(show) {
-  document.getElementById('admin-tools').style.display = show ? 'flex' : 'none';
+  document.getElementById('admin-tools').classList.toggle('open', show);
   document.getElementById('btn-emails').style.display = show ? 'inline-block' : 'none';
   updateDbAccessToggleLabel();
 }
@@ -1078,6 +1370,27 @@ document.getElementById('btn-add-spots').onclick = async () => {
   toast(`${addCount} emplacements ajoutés (total ${numFixedSpots})`);
 };
 
+document.getElementById('btn-clear-docks').onclick = async () => {
+  const placed = Object.keys(dockConfig);
+  if (!placed.length) { toast("Aucun quai placé"); return; }
+  const occupiedCount = placed.filter(i => dockOccupancy[i]).length;
+  if (!confirm(`Supprimer le positionnement de ${placed.length - occupiedCount} quai(s) libre(s) ? Les quais occupés ne seront pas touchés.`)) return;
+  placed.forEach(i => { if (!dockOccupancy[i]) delete dockConfig[i]; });
+  await saveDocksConfig();
+  renderDocks();
+  toast("Quais libres réinitialisés — repositionne-les");
+};
+
+document.getElementById('btn-add-docks').onclick = async () => {
+  const input = prompt(`Actuellement ${numDocks} quais configurés. Combien veux-tu en ajouter ?`, 5);
+  const addCount = parseInt(input);
+  if (!addCount || addCount < 1) { toast("Nombre invalide"); return; }
+  numDocks += addCount;
+  await saveDockCount();
+  renderDocks();
+  toast(`${addCount} quais ajoutés (total ${numDocks})`);
+};
+
 function resetRowAnchors() {
   rowAnchorMarkers.forEach(m => map.removeLayer(m));
   rowAnchorMarkers = [];
@@ -1086,9 +1399,59 @@ function resetRowAnchors() {
 
 document.getElementById('btn-row-mode').onclick = () => {
   rowMode = !rowMode;
+  rowModeTarget = 'spot';
   resetRowAnchors();
   document.getElementById('btn-row-mode').style.background = rowMode ? '#2563eb' : '#d97706';
-  banner(rowMode ? "Touche le point de DÉPART de la rangée, puis le point de FIN." : '', rowMode);
+  document.getElementById('btn-row-mode-docks').style.background = '#d97706';
+  banner(rowMode ? "Touche le point de DÉPART de la rangée d'emplacements, puis le point de FIN." : '', rowMode);
+};
+
+document.getElementById('btn-row-mode-docks').onclick = () => {
+  rowMode = !rowMode;
+  rowModeTarget = 'dock';
+  resetRowAnchors();
+  document.getElementById('btn-row-mode-docks').style.background = rowMode ? '#2563eb' : '#d97706';
+  document.getElementById('btn-row-mode').style.background = '#d97706';
+  banner(rowMode ? "Touche le point de DÉPART de la rangée de quais, puis le point de FIN." : '', rowMode);
+};
+
+// ---------- RÉALIGNEMENT D'EMPLACEMENTS EXISTANTS (sélection puis 2 points) ----------
+const realignSpotsModal = document.getElementById('realign-spots-modal');
+function openRealignSpotsModal() {
+  const grid = document.getElementById('realign-spots-grid');
+  grid.innerHTML = '';
+  for (let i = 1; i <= numFixedSpots; i++) {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex; align-items:center; gap:4px; background:var(--panel-2,#1a2333); border-radius:6px; padding:8px; font-size:13px;';
+    label.innerHTML = `<input type="checkbox" class="realign-cb" value="${i}" style="width:16px; height:16px;"> P${i}`;
+    grid.appendChild(label);
+  }
+  realignSpotsModal.classList.add('open');
+  overlay.classList.add('show');
+}
+function closeRealignSpotsModal() {
+  realignSpotsModal.classList.remove('open');
+  overlay.classList.remove('show');
+}
+document.getElementById('btn-realign-spots').onclick = openRealignSpotsModal;
+document.getElementById('btn-realign-spots-close').onclick = closeRealignSpotsModal;
+document.getElementById('btn-realign-select-all').onclick = () => {
+  document.querySelectorAll('.realign-cb').forEach(cb => cb.checked = true);
+};
+document.getElementById('btn-realign-select-none').onclick = () => {
+  document.querySelectorAll('.realign-cb').forEach(cb => cb.checked = false);
+};
+document.getElementById('btn-realign-spots-confirm').onclick = () => {
+  const selected = Array.from(document.querySelectorAll('.realign-cb:checked')).map(cb => parseInt(cb.value));
+  if (selected.length < 2) { toast("Sélectionne au moins 2 emplacements"); return; }
+  realignSelection = new Set(selected);
+  closeRealignSpotsModal();
+  rowMode = true;
+  rowModeTarget = 'spot';
+  resetRowAnchors();
+  document.getElementById('btn-row-mode').style.background = '#2563eb';
+  document.getElementById('btn-row-mode-docks').style.background = '#d97706';
+  banner(`Touche le point de DÉPART de la rangée pour les ${selected.length} emplacements sélectionnés, puis le point de FIN.`, true);
 };
 
 function placeRowAnchor(latlng) {
@@ -1105,15 +1468,44 @@ function placeRowAnchor(latlng) {
 }
 
 function finalizeRow() {
-  const remaining = numFixedSpots - Object.keys(spotsConfig).length;
-  if (remaining <= 0) {
-    toast("Les 25 emplacements sont déjà placés");
+  const isDock = rowModeTarget === 'dock';
+  const config = isDock ? dockConfig : spotsConfig;
+  const total = isDock ? numDocks : numFixedSpots;
+  const noun = isDock ? 'quais' : 'emplacements';
+  const btnId = isDock ? 'btn-row-mode-docks' : 'btn-row-mode';
+
+  // Cas particulier : réalignement d'emplacements déjà choisis via le modal dédié
+  // (contrairement à la rangée normale, on écrase les positions existantes et
+  // on ne demande pas de quantité, puisqu'elle est déjà fixée par la sélection).
+  if (realignSelection && realignSelection.size >= 2) {
+    const numbers = Array.from(realignSelection).sort((a, b) => a - b);
+    const [a, b] = rowAnchors;
+    const count = numbers.length;
+    for (let i = 0; i < count; i++) {
+      const t = i / (count - 1);
+      const lat = a.lat + (b.lat - a.lat) * t;
+      const lng = a.lng + (b.lng - a.lng) * t;
+      spotsConfig[numbers[i]] = { lat, lng };
+    }
+    saveSpotsConfig();
+    renderSpots();
+    toast(`${count} emplacements réalignés`);
+    realignSelection = null;
     resetRowAnchors();
     rowMode = false;
     document.getElementById('btn-row-mode').style.background = '#d97706';
     return;
   }
-  const input = prompt(`Combien d'emplacements dans cette rangée (départ et fin inclus) ? Max ${remaining}.`, Math.min(remaining, 5));
+
+  const remaining = total - Object.keys(config).length;
+  if (remaining <= 0) {
+    toast(`Les ${total} ${noun} sont déjà placés`);
+    resetRowAnchors();
+    rowMode = false;
+    document.getElementById(btnId).style.background = '#d97706';
+    return;
+  }
+  const input = prompt(`Combien de ${noun} dans cette rangée (départ et fin inclus) ? Max ${remaining}.`, Math.min(remaining, 5));
   const count = parseInt(input);
   if (!count || count < 2) {
     toast("Nombre invalide, annulé");
@@ -1121,30 +1513,30 @@ function finalizeRow() {
     return;
   }
   if (count > remaining) {
-    toast(`Trop grand : il ne reste que ${remaining} emplacements libres`);
+    toast(`Trop grand : il ne reste que ${remaining} ${noun} libres`);
     resetRowAnchors();
     return;
   }
 
   const [a, b] = rowAnchors;
   const numbers = [];
-  for (let i = 1; i <= numFixedSpots && numbers.length < count; i++) {
-    if (!spotsConfig[i]) numbers.push(i);
+  for (let i = 1; i <= total && numbers.length < count; i++) {
+    if (!config[i]) numbers.push(i);
   }
 
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1); // 0 -> 1 le long de la ligne
     const lat = a.lat + (b.lat - a.lat) * t;
     const lng = a.lng + (b.lng - a.lng) * t;
-    spotsConfig[numbers[i]] = { lat, lng };
+    config[numbers[i]] = { lat, lng };
   }
-  saveSpotsConfig();
-  renderSpots();
-  toast(`${count} emplacements alignés et espacés régulièrement`);
+  if (isDock) { saveDocksConfig(); renderDocks(); }
+  else { saveSpotsConfig(); renderSpots(); }
+  toast(`${count} ${noun} alignés et espacés régulièrement`);
 
   resetRowAnchors();
   rowMode = false;
-  document.getElementById('btn-row-mode').style.background = '#d97706';
+  document.getElementById(btnId).style.background = '#d97706';
 }
 
 let moveMapMode = false;
@@ -1180,9 +1572,19 @@ function onMapClick(e) {
     return;
   }
   if (setupMode) {
-    // en mode setup, un clic ajoute le prochain emplacement fixe non placé
+    // en mode setup, un clic ajoute le prochain emplacement (ou quai) non placé,
+    // selon le type de placement sélectionné (bouton "Placement (clic)")
+    if (configPlacementType === 'dock') {
+      const next = getNextUnplacedDock();
+      if (!next) { toast(`Les ${numDocks} quais sont déjà placés`); return; }
+      dockConfig[next] = { lat: e.latlng.lat, lng: e.latlng.lng };
+      saveDocksConfig();
+      renderDocks();
+      toast("Quai Q" + next + " placé");
+      return;
+    }
     const next = getNextUnplacedSpot();
-    if (!next) { toast("Les 25 emplacements sont déjà placés"); return; }
+    if (!next) { toast(`Les ${numFixedSpots} emplacements sont déjà placés`); return; }
     spotsConfig[next] = { lat: e.latlng.lat, lng: e.latlng.lng };
     saveSpotsConfig();
     renderSpots();
@@ -1204,10 +1606,32 @@ function getNextUnplacedSpot() {
   return null;
 }
 
+function getNextUnplacedDock() {
+  for (let i = 1; i <= numDocks; i++) {
+    if (!dockConfig[i]) return i;
+  }
+  return null;
+}
+
+// Un admin en mode configuration voit toujours tout (pour pouvoir positionner/ajuster),
+// sinon l'affichage suit la vue choisie : "parking" (emplacements + zone libre) ou "quai".
+function showParkingLayer() { return setupMode || viewMode === 'parking'; }
+function showDockLayer() { return setupMode || viewMode === 'quai'; }
+
+// Taille des icônes selon le niveau de zoom : elles rétrécissent en dézoomant,
+// grossissent en zoomant, l'étiquette (P12, Q3, 🚛) reste toujours lisible.
+function getMarkerSize(baseSize) {
+  const zoom = map.getZoom();
+  const refZoom = 19; // à partir de ce niveau, l'icône garde sa taille normale (ne grossit plus)
+  const factor = Math.pow(1.22, Math.min(0, zoom - refZoom)); // ne rétrécit qu'en dessous de refZoom
+  return Math.round(Math.max(14, Math.min(baseSize, baseSize * factor)));
+}
+
 // ---------- RENDER SPOTS ----------
 function renderSpots(centerFallback) {
   Object.values(spotMarkers).forEach(m => map.removeLayer(m));
   spotMarkers = {};
+  if (!showParkingLayer()) { updateHeader(); return; }
 
   for (let i = 1; i <= numFixedSpots; i++) {
     const pos = spotsConfig[i];
@@ -1224,10 +1648,11 @@ function renderSpots(centerFallback) {
     } else if (occ) {
       markerColor = getVisualState(occ).color;
     }
+    const s = getMarkerSize(34);
     const icon = L.divIcon({
       className: '',
-      html: `<div class="spot-marker${selectedTargetKey === 'spot-'+i ? ' marker-selected' : ''}" style="background:${markerColor}">${labelText}</div>`,
-      iconSize: [34, 34], iconAnchor: [17, 17]
+      html: `<div class="spot-marker${selectedTargetKey === 'spot-'+i ? ' marker-selected' : ''}" style="background:${markerColor}; width:${s}px; height:${s}px; font-size:${Math.max(9, Math.round(s*0.35))}px;">${labelText}</div>`,
+      iconSize: [s, s], iconAnchor: [s/2, s/2]
     });
     const marker = L.marker([pos.lat, pos.lng], { icon, draggable: setupMode }).addTo(map);
     marker.on('click', () => {
@@ -1256,16 +1681,18 @@ function renderSpots(centerFallback) {
 function renderFreeTrailers() {
   Object.values(freeMarkers).forEach(m => map.removeLayer(m));
   freeMarkers = {};
+  if (!showParkingLayer()) { updateHeader(); return; }
   Object.entries(freeTrailers).forEach(([id, t]) => {
     if (driverMode) {
       const dt = driverMode.entry.target;
       if (!(dt && dt.type === 'free' && dt.id === id)) return;
     }
     const vs = getVisualState(t);
+    const s = getMarkerSize(30);
     const icon = L.divIcon({
       className: '',
-      html: `<div class="trailer-marker${selectedTargetKey === 'free-'+id ? ' marker-selected' : ''}" style="background:${vs.color}">🚛</div>`,
-      iconSize: [30, 30], iconAnchor: [15, 15]
+      html: `<div class="trailer-marker${selectedTargetKey === 'free-'+id ? ' marker-selected' : ''}" style="background:${vs.color}; width:${s}px; height:${s}px; font-size:${Math.max(10, Math.round(s*0.5))}px;">🚛</div>`,
+      iconSize: [s, s], iconAnchor: [s/2, s/2]
     });
     const marker = L.marker([t.lat, t.lng], { icon, draggable: false }).addTo(map);
     marker.on('click', () => { if (driverMode) { showDriverPickupCard(); return; } openSheetForFree(id); });
@@ -1274,11 +1701,74 @@ function renderFreeTrailers() {
   updateHeader();
 }
 
+function renderDocks() {
+  Object.values(dockMarkers).forEach(m => map.removeLayer(m));
+  dockMarkers = {};
+  if (!showDockLayer()) { updateHeader(); return; }
+
+  for (let i = 1; i <= numDocks; i++) {
+    const pos = dockConfig[i];
+    if (!pos) continue;
+    if (pos.hidden && !setupMode) continue; // porte/volet masqué : invisible hors config
+    if (driverMode && driverMode.entry.type === 'pickup') {
+      const t = driverMode.entry.target;
+      if (!(t && t.type === 'dock' && String(t.id) === String(i))) continue;
+    }
+    const occ = dockOccupancy[i];
+    let markerColor = '#6b7280';
+    if (setupMode) markerColor = pos.hidden ? '#6b7280' : '#d97706';
+    else if (occ) markerColor = getVisualState(occ).color;
+    const s = getMarkerSize(34);
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="dock-marker${selectedTargetKey === 'dock-'+i ? ' marker-selected' : ''}" style="background:${markerColor}; width:${s}px; height:${s}px; font-size:${Math.max(9, Math.round(s*0.35))}px; ${pos.hidden ? 'opacity:0.45; outline:2px dashed #9ca3af; outline-offset:2px;' : ''}">Q${i}</div>`,
+      iconSize: [s, s], iconAnchor: [s/2, s/2]
+    });
+    const marker = L.marker([pos.lat, pos.lng], { icon, draggable: setupMode }).addTo(map);
+    marker.on('click', () => {
+      if (setupMode) {
+        // En mode configuration, un clic sur un quai déjà placé permet de le supprimer
+        // (utile pour corriger une rangée mal positionnée) — impossible s'il est occupé.
+        if (occ) { toast("Impossible de supprimer : ce quai est occupé"); return; }
+        if (!confirm(`Supprimer le quai Q${i} ?`)) return;
+        delete dockConfig[i];
+        saveDocksConfig();
+        renderDocks();
+        toast("Quai Q" + i + " supprimé");
+        return;
+      }
+      if (driverMode && driverMode.entry.type === 'pickup') { showDriverPickupCard(); return; }
+      if (driverMode && driverMode.entry.type === 'encode') {
+        if (driverMode.entry.used) { toast("Accès déjà utilisé"); return; }
+        if (occ) { toast("Ce quai est déjà occupé"); return; }
+        openEditSheetForDock(i);
+        return;
+      }
+      openSheetForDock(i);
+    });
+    if (setupMode) {
+      marker.on('dragend', (ev) => {
+        const p = ev.target.getLatLng();
+        dockConfig[i] = { lat: p.lat, lng: p.lng };
+        saveDocksConfig();
+      });
+    }
+    dockMarkers[i] = marker;
+  }
+  updateHeader();
+}
+
 function updateHeader() {
   const occupiedSpots = Object.keys(occupancy).length;
   const freeCount = Object.keys(freeTrailers).length;
-  document.getElementById('header-sub').textContent =
-    `${occupiedSpots}/${numFixedSpots} emplacements occupés · ${freeCount} en zone libre`;
+  // On ne compte que les quais réellement affichés (placés et non masqués),
+  // pour que le compteur corresponde à ce qui est visible sur la carte/la liste.
+  const visibleDockIds = Object.keys(dockConfig).filter(i => dockConfig[i] && !dockConfig[i].hidden);
+  const visibleDockCount = visibleDockIds.length;
+  const occupiedDocks = visibleDockIds.filter(i => dockOccupancy[i]).length;
+  document.getElementById('header-sub').textContent = viewMode === 'quai'
+    ? `${occupiedDocks}/${visibleDockCount} quais occupés`
+    : `${occupiedSpots}/${numFixedSpots} emplacements occupés · ${freeCount} en zone libre`;
 }
 
 // ---------- SHEET (formulaire) ----------
@@ -1299,6 +1789,8 @@ function fillForm(data) {
   document.getElementById('f-trailer').value = data?.trailer || '';
   document.getElementById('f-client').value = data?.client || '';
   document.getElementById('f-notes').value = data?.notes || '';
+  refreshContentPresetsDatalist(data?.client || '');
+  if (typeof checkTrailerAlreadyOnSiteLive === 'function') checkTrailerAlreadyOnSiteLive();
   document.querySelectorAll('.status-chip').forEach(c => c.classList.remove('active'));
   const status = data?.status || 'pleine';
   const chip = document.querySelector(`.status-chip[data-status="${status}"]`);
@@ -1358,7 +1850,19 @@ function openEditSheetForFree(id) {
 
 // Points d'entrée publics (clic sur un marqueur carte) : si la remorque est déjà
 // encodée, on affiche la fiche détail propre ; sinon (emplacement vide) le formulaire d'encodage.
+function clearSelectedTargetHighlight(newKey) {
+  // Efface le surlignage d'une remorque précédemment ciblée via la recherche
+  // dès qu'on interagit directement avec une autre remorque sur la carte.
+  if (selectedTargetKey && selectedTargetKey !== newKey) {
+    selectedTargetKey = null;
+    renderSpots();
+    renderFreeTrailers();
+    renderDocks();
+  }
+}
+
 function openSheetForSpot(num) {
+  clearSelectedTargetHighlight('spot-' + num);
   const occ = occupancy[num];
   if (occ) {
     const pos = spotsConfig[num] || {};
@@ -1369,11 +1873,33 @@ function openSheetForSpot(num) {
 }
 
 function openSheetForFree(id) {
+  clearSelectedTargetHighlight('free-' + id);
   const data = freeTrailers[id];
   if (data) {
     openDetailView({ label: 'Zone libre', ...data, _target: { type: 'free', id }, open: () => openEditSheetForFree(id) });
   } else {
     openEditSheetForFree(id);
+  }
+}
+
+function openEditSheetForDock(num) {
+  currentTarget = { type: 'dock', id: num };
+  const occ = dockOccupancy[num];
+  document.getElementById('sheet-title').textContent = 'Quai Q' + num;
+  document.getElementById('btn-remove').style.display = occ ? 'block' : 'none';
+  fillForm(occ);
+  setSheetReadOnly(!!occ && occ.status !== 'fleet');
+  openSheet();
+}
+
+function openSheetForDock(num) {
+  clearSelectedTargetHighlight('dock-' + num);
+  const occ = dockOccupancy[num];
+  if (occ) {
+    const pos = dockConfig[num] || {};
+    openDetailView({ label: 'Quai Q' + num, lat: pos.lat, lng: pos.lng, ...occ, _target: { type: 'dock', id: num }, open: () => openEditSheetForDock(num) });
+  } else {
+    openEditSheetForDock(num);
   }
 }
 
@@ -1386,7 +1912,7 @@ function openSheetForNewFree(lat, lng) {
   openSheet();
 }
 
-['f-trailer', 'f-client', 'f-notes'].forEach(id => {
+['f-trailer', 'f-client', 'f-notes', 'edit-status-client', 'edit-status-notes'].forEach(id => {
   const el = document.getElementById(id);
   el.addEventListener('input', () => {
     const pos = el.selectionStart;
@@ -1394,8 +1920,29 @@ function openSheetForNewFree(lat, lng) {
     el.setSelectionRange(pos, pos);
   });
 });
+['f-client', 'edit-status-client'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => refreshContentPresetsDatalist(el.value));
+});
 
 document.getElementById('f-trailer').addEventListener('input', updateCtIndicator);
+
+function checkTrailerAlreadyOnSiteLive() {
+  const val = document.getElementById('f-trailer').value.trim().toUpperCase();
+  let warnEl = document.getElementById('f-trailer-dup-warning');
+  if (!warnEl) {
+    warnEl = document.createElement('div');
+    warnEl.id = 'f-trailer-dup-warning';
+    warnEl.style.cssText = 'margin-top:6px; font-size:12px; color:#fb923c; font-weight:600;';
+    document.getElementById('f-trailer').insertAdjacentElement('afterend', warnEl);
+  }
+  if (val && isTrailerAlreadyOnSite(val, currentTarget)) {
+    warnEl.textContent = '⚠ Cette remorque est déjà encodée sur le site (parking ou quai)';
+  } else {
+    warnEl.textContent = '';
+  }
+}
+document.getElementById('f-trailer').addEventListener('input', checkTrailerAlreadyOnSiteLive);
 
 // Permet d'encoder en tapant le n° de plaque : si ça correspond à une plaque connue
 // dans la base CT, remplace automatiquement par le vrai n° de remorque.
@@ -1455,6 +2002,13 @@ overlay.onclick = () => {
   document.getElementById('move-spot-picker-modal').classList.remove('open');
   document.getElementById('move-confirm-modal').classList.remove('open');
   moveSource = null; movePending = null;
+  document.getElementById('edit-status-modal').classList.remove('open');
+  editStatusTarget = null;
+  document.getElementById('clients-config-modal').classList.remove('open');
+  document.getElementById('cc-content-modal').classList.remove('open');
+  ccEditingClient = null;
+  document.getElementById('hide-docks-modal').classList.remove('open');
+  document.getElementById('realign-spots-modal').classList.remove('open');
 };
 
 document.getElementById('btn-route').onclick = () => {
@@ -1491,6 +2045,10 @@ function isTrailerAlreadyOnSite(trailerNum, excludeTarget) {
     if (excludeTarget && excludeTarget.type === 'free' && excludeTarget.id === id) continue;
     if (d.trailer === trailerNum) return true;
   }
+  for (const [num, d] of Object.entries(dockOccupancy)) {
+    if (excludeTarget && excludeTarget.type === 'dock' && String(excludeTarget.id) === String(num)) continue;
+    if (d.trailer === trailerNum) return true;
+  }
   return false;
 }
 
@@ -1510,6 +2068,7 @@ document.getElementById('btn-save').onclick = async () => {
   let existingEncodedBy = null;
   if (currentTarget.type === 'spot') { existingTime = occupancy[currentTarget.id]?.time; existingEncodedBy = occupancy[currentTarget.id]?.encodedBy; }
   else if (currentTarget.type === 'free') { existingTime = freeTrailers[currentTarget.id]?.time; existingEncodedBy = freeTrailers[currentTarget.id]?.encodedBy; }
+  else if (currentTarget.type === 'dock') { existingTime = dockOccupancy[currentTarget.id]?.time; existingEncodedBy = dockOccupancy[currentTarget.id]?.encodedBy; }
   const data = {
     trailer, client, status, notes,
     time: existingTime || new Date().toISOString(),
@@ -1520,6 +2079,16 @@ document.getElementById('btn-save').onclick = async () => {
     occupancy[currentTarget.id] = { ...occupancy[currentTarget.id], ...data };
     renderSpots();
     saveOccupancy().catch(() => toast("Erreur de synchronisation"));
+    if (driverMode && driverMode.entry.type === 'encode') {
+      markAccessUsed().catch(() => {});
+      closeSheet();
+      showDriverThankYou("Remorque déposée avec succès. Merci !");
+      return;
+    }
+  } else if (currentTarget.type === 'dock') {
+    dockOccupancy[currentTarget.id] = { ...dockOccupancy[currentTarget.id], ...data };
+    renderDocks();
+    saveDockOccupancy().catch(() => toast("Erreur de synchronisation"));
     if (driverMode && driverMode.entry.type === 'encode') {
       markAccessUsed().catch(() => {});
       closeSheet();
@@ -1554,6 +2123,7 @@ let movePending = null; // { type:'spot', id } ou { type:'free', lat, lng }
 function getRecordFor(target) {
   if (target.type === 'spot') return occupancy[target.id];
   if (target.type === 'free') return freeTrailers[target.id];
+  if (target.type === 'dock') return dockOccupancy[target.id];
   return null;
 }
 
@@ -1607,6 +2177,31 @@ document.getElementById('btn-move-spot-picker-close').onclick = () => {
   moveSource = null;
 };
 
+document.getElementById('btn-move-to-dock').onclick = () => {
+  document.getElementById('move-choice-modal').classList.remove('open');
+  const list = document.getElementById('move-spot-picker-list');
+  list.innerHTML = '';
+  let anyFree = false;
+  for (let i = 1; i <= numDocks; i++) {
+    if (!dockConfig[i] || dockConfig[i].hidden) continue;
+    if (dockOccupancy[i]) continue; // seulement les quais libres
+    if (moveSource.target.type === 'dock' && String(moveSource.target.id) === String(i)) continue;
+    anyFree = true;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-warn';
+    btn.style.cssText = 'padding:12px 16px; font-weight:700;';
+    btn.textContent = 'Q' + i;
+    btn.onclick = () => {
+      document.getElementById('move-spot-picker-modal').classList.remove('open');
+      movePending = { type: 'dock', id: i };
+      showMoveConfirm(`Déplacer vers le quai Q${i} ?`);
+    };
+    list.appendChild(btn);
+  }
+  if (!anyFree) list.innerHTML = '<div class="empty">Aucun quai libre</div>';
+  document.getElementById('move-spot-picker-modal').classList.add('open');
+};
+
 document.getElementById('btn-move-to-free').onclick = () => {
   document.getElementById('move-choice-modal').classList.remove('open');
   overlay.classList.remove('show');
@@ -1633,11 +2228,14 @@ document.getElementById('btn-move-confirm-yes').onclick = async () => {
 
   // Retire de l'ancien emplacement
   if (moveSource.target.type === 'spot') delete occupancy[moveSource.target.id];
+  else if (moveSource.target.type === 'dock') delete dockOccupancy[moveSource.target.id];
   else delete freeTrailers[moveSource.target.id];
 
   // Place dans le nouveau
   if (movePending.type === 'spot') {
     occupancy[movePending.id] = data;
+  } else if (movePending.type === 'dock') {
+    dockOccupancy[movePending.id] = data;
   } else {
     const id = genId();
     freeTrailers[id] = { ...data, lat: movePending.lat, lng: movePending.lng };
@@ -1645,8 +2243,10 @@ document.getElementById('btn-move-confirm-yes').onclick = async () => {
 
   renderSpots();
   renderFreeTrailers();
+  renderDocks();
   saveOccupancy().catch(() => toast("Erreur de synchronisation"));
   saveFreeTrailers().catch(() => toast("Erreur de synchronisation"));
+  saveDockOccupancy().catch(() => toast("Erreur de synchronisation"));
 
   toast("Remorque déplacée");
   document.getElementById('move-confirm-modal').classList.remove('open');
@@ -1665,6 +2265,12 @@ async function performRemove(target) {
     delete occupancy[target.id];
     renderSpots();
     saveOccupancy().catch(() => toast("Erreur de synchronisation (retrait)"));
+  } else if (target.type === 'dock') {
+    removedData = dockOccupancy[target.id];
+    label = 'Quai Q' + target.id;
+    delete dockOccupancy[target.id];
+    renderDocks();
+    saveDockOccupancy().catch(() => toast("Erreur de synchronisation (retrait)"));
   } else if (target.type === 'free') {
     removedData = freeTrailers[target.id];
     label = 'Zone libre';
@@ -1753,7 +2359,17 @@ function renderListPanel() {
   Object.entries(freeTrailers).forEach(([id, d]) => {
     items.push({ label: 'Zone libre', sub: d.client || '', ...d, _target: { type: 'free', id }, open: () => openEditSheetForFree(id) });
   });
-  let filtered = items;
+  Object.entries(dockOccupancy).forEach(([num, d]) => {
+    const pos = dockConfig[num] || {};
+    if (pos.hidden) return; // porte/volet masqué : n'apparaît pas dans la liste/recherche
+    items.push({ label: 'Quai Q' + num, sub: d.client || '', lat: pos.lat, lng: pos.lng, ...d, _target: { type: 'dock', id: num }, open: () => openEditSheetForDock(parseInt(num)) });
+  });
+  // Recherche générale : quand on tape quelque chose, on cherche sur TOUT le site
+  // (parking + quais + zones libres), peu importe la vue active, pour toujours
+  // savoir où se trouve une remorque même si elle est dans l'autre vue.
+  const searching = !!q;
+  const viewItems = searching ? items : items.filter(it => viewMode === 'quai' ? it._target.type === 'dock' : it._target.type !== 'dock');
+  let filtered = viewItems;
   if (lpActiveFilters.size > 0) filtered = filtered.filter(it => lpActiveFilters.has(it.status));
   if (lpFixedOnly) filtered = filtered.filter(it => it._target.type === 'spot');
   filtered = q ? filtered.filter(it => {
@@ -1775,7 +2391,7 @@ function renderListPanel() {
     });
   }
 
-  document.getElementById('lp-count').textContent = filtered.length === items.length ? items.length : `${filtered.length} / ${items.length}`;
+  document.getElementById('lp-count').textContent = filtered.length === viewItems.length ? viewItems.length : `${filtered.length} / ${viewItems.length}`;
   const container = document.getElementById('lp-items');
   if (!filtered.length) {
     container.innerHTML = '<div class="empty">Aucune remorque sur site</div>';
@@ -1801,7 +2417,7 @@ function renderListPanel() {
     div.style.flexDirection = 'column';
     div.style.alignItems = 'stretch';
     div.style.gap = '4px';
-    const compactLabel = it._target.type === 'spot' ? 'P' + it._target.id : '';
+    const compactLabel = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-num">${it.trailer || '(sans n°)'}</div>
@@ -1820,13 +2436,26 @@ function renderListPanel() {
       </div>
       ${(it.comments && it.comments.length) ? `<div class="lp-meta">💬 ${it.comments[it.comments.length-1].text}</div>` : ''}
     `;
-    const targetKey = it._target.type === 'spot' ? 'spot-' + it._target.id : 'free-' + it._target.id;
+    const targetKey = it._target.type === 'spot' ? 'spot-' + it._target.id : (it._target.type === 'dock' ? 'dock-' + it._target.id : 'free-' + it._target.id);
+    const switchViewIfNeeded = () => {
+      // Si la remorque est d'un autre type que la vue active (parking/quai), on
+      // bascule automatiquement la vue pour qu'elle soit visible sur la carte.
+      const neededView = it._target.type === 'dock' ? 'quai' : 'parking';
+      if (viewMode !== neededView) {
+        viewMode = neededView;
+        localStorage.setItem('yard:view-mode', viewMode);
+        updateViewToggleUI();
+        toast(neededView === 'quai' ? "🚪 Bascule en vue Quai" : "🅿️ Bascule en vue Parking");
+      }
+    };
     div.querySelector('[data-action="locate"]').onclick = (ev) => {
       ev.stopPropagation();
       closeListPanel();
       selectedTargetKey = targetKey;
+      switchViewIfNeeded();
       renderSpots();
       renderFreeTrailers();
+      renderDocks();
       if (it.lat != null && it.lng != null) {
         map.flyTo([it.lat, it.lng], Math.max(map.getZoom(), 19), { duration: 0.6 });
       }
@@ -1835,8 +2464,10 @@ function renderListPanel() {
       ev.stopPropagation();
       closeListPanel();
       selectedTargetKey = targetKey;
+      switchViewIfNeeded();
       renderSpots();
       renderFreeTrailers();
+      renderDocks();
       if (it.lat != null && it.lng != null) {
         map.flyTo([it.lat, it.lng], Math.max(map.getZoom(), 19), { duration: 0.6 });
       }
@@ -2061,9 +2692,258 @@ function openDetailView(item) {
     await performRemove(item._target);
     closeDetailView();
   };
+  document.getElementById('btn-detail-edit').onclick = () => openEditStatusModal(item);
 
   detailSheet.classList.add('open');
   overlay.classList.add('show');
+}
+
+// Récupère/écrit l'enregistrement d'une remorque déjà encodée, quel que soit son type
+// (emplacement fixe, quai ou zone libre) — utilisé pour les commentaires et l'édition statut/note.
+function getRecordByTarget(target) {
+  if (!target) return null;
+  if (target.type === 'spot') return occupancy[target.id];
+  if (target.type === 'dock') return dockOccupancy[target.id];
+  if (target.type === 'free') return freeTrailers[target.id];
+  return null;
+}
+function saveByTargetType(type) {
+  if (type === 'spot') return saveOccupancy();
+  if (type === 'dock') return saveDockOccupancy();
+  return saveFreeTrailers();
+}
+function rerenderMapLayersFor(type) {
+  if (type === 'spot') renderSpots();
+  else if (type === 'dock') renderDocks();
+  else renderFreeTrailers();
+}
+
+// ---------- ÉDITION STATUT / NOTE (remorque déjà encodée) ----------
+const editStatusModal = document.getElementById('edit-status-modal');
+let editStatusTarget = null;
+
+function openEditStatusModal(item) {
+  if (!item._target) return;
+  editStatusTarget = item._target;
+  document.querySelectorAll('#edit-status-options .status-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.status === item.status);
+  });
+  document.getElementById('edit-status-client').value = item.client || '';
+  document.getElementById('edit-status-notes').value = item.notes || '';
+  refreshContentPresetsDatalist(item.client || '');
+  editStatusModal.classList.add('open');
+  overlay.classList.add('show');
+}
+function closeEditStatusModal() {
+  editStatusModal.classList.remove('open');
+  overlay.classList.remove('show');
+  editStatusTarget = null;
+}
+document.getElementById('btn-edit-status-close').onclick = closeEditStatusModal;
+document.querySelectorAll('#edit-status-options .status-chip').forEach(chip => {
+  chip.onclick = () => {
+    document.querySelectorAll('#edit-status-options .status-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+  };
+});
+document.getElementById('btn-edit-status-save').onclick = async () => {
+  if (!editStatusTarget) return;
+  const activeChip = document.querySelector('#edit-status-options .status-chip.active');
+  const status = activeChip ? activeChip.dataset.status : 'pleine';
+  const client = document.getElementById('edit-status-client').value.trim().toUpperCase();
+  const notes = document.getElementById('edit-status-notes').value.trim().toUpperCase();
+
+  const record = getRecordByTarget(editStatusTarget);
+  if (!record) { toast("Introuvable"); closeEditStatusModal(); return; }
+  record.status = status;
+  record.client = client;
+  record.notes = notes;
+
+  rerenderMapLayersFor(editStatusTarget.type);
+  if (listPanel.classList.contains('open')) renderListPanel();
+  if (detailTarget && detailTarget._target && detailTarget._target.type === editStatusTarget.type
+      && String(detailTarget._target.id) === String(editStatusTarget.id)) {
+    openDetailView({ ...detailTarget, ...record, _target: editStatusTarget, open: detailTarget.open });
+  }
+
+  toast("Statut / note mis à jour");
+  closeEditStatusModal();
+  saveByTargetType(editStatusTarget.type).catch(() => toast("Erreur de synchronisation"));
+};
+
+// ---------- CONFIGURATION : CLIENTS & CONTENUS PRÉENCODÉS ----------
+const clientsConfigModal = document.getElementById('clients-config-modal');
+const ccContentModal = document.getElementById('cc-content-modal');
+let ccEditingClient = null;
+
+function openClientsConfigModal() {
+  renderClientsConfigList();
+  clientsConfigModal.classList.add('open');
+  overlay.classList.add('show');
+}
+function closeClientsConfigModal() {
+  clientsConfigModal.classList.remove('open');
+  overlay.classList.remove('show');
+}
+document.getElementById('btn-clients-config').onclick = openClientsConfigModal;
+document.getElementById('btn-clients-config-close').onclick = closeClientsConfigModal;
+
+function renderClientsConfigList() {
+  const list = document.getElementById('cc-clients-list');
+  if (!clientPresets.length) {
+    list.innerHTML = '<div style="font-size:12px; color:var(--ink-faint,#6b7280);">Aucun client préencodé</div>';
+    return;
+  }
+  list.innerHTML = clientPresets.map(c => {
+    const count = (contentPresetsByClient[c] || []).length;
+    return `<div style="display:flex; align-items:center; gap:8px; background:var(--panel-2,#1a2333); border-radius:8px; padding:10px 12px;">
+      <div style="flex:1; font-weight:600;">${escapeHtml(c)}<span style="font-weight:400; color:var(--ink-faint,#6b7280); font-size:12px;"> · ${count} contenu(s)</span></div>
+      <button class="btn btn-ghost cc-manage-content" data-client="${escapeHtml(c)}" style="padding:6px 10px;">📄 Contenus</button>
+      <button class="btn btn-danger cc-delete-client" data-client="${escapeHtml(c)}" style="padding:6px 10px;">🗑️</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.cc-manage-content').forEach(btn => {
+    btn.onclick = () => openCcContentModal(btn.dataset.client);
+  });
+  list.querySelectorAll('.cc-delete-client').forEach(btn => {
+    btn.onclick = () => {
+      const c = btn.dataset.client;
+      if (!confirm(`Supprimer le client "${c}" et tous ses contenus préencodés ?`)) return;
+      clientPresets = clientPresets.filter(x => x !== c);
+      delete contentPresetsByClient[c];
+      renderClientsConfigList();
+      refreshClientPresetsDatalist();
+      saveClientPresets().catch(() => {});
+      saveContentPresets().catch(() => {});
+      toast("Client supprimé");
+    };
+  });
+}
+
+document.getElementById('btn-cc-add-client').onclick = () => {
+  const input = document.getElementById('cc-new-client');
+  const val = input.value.trim().toUpperCase();
+  if (!val) return;
+  if (clientPresets.includes(val)) { toast("Ce client existe déjà"); return; }
+  clientPresets.push(val);
+  input.value = '';
+  renderClientsConfigList();
+  refreshClientPresetsDatalist();
+  saveClientPresets().catch(() => toast("Erreur sauvegarde des clients"));
+  toast("Client ajouté");
+};
+document.getElementById('cc-new-client').addEventListener('input', function() {
+  const pos = this.selectionStart;
+  this.value = this.value.toUpperCase();
+  this.setSelectionRange(pos, pos);
+});
+
+function openCcContentModal(clientName) {
+  ccEditingClient = clientName;
+  document.getElementById('cc-content-title').textContent = `Contenus · ${clientName}`;
+  renderContentPresetsList(clientName);
+  ccContentModal.classList.add('open');
+  overlay.classList.add('show');
+}
+function closeCcContentModal() {
+  ccContentModal.classList.remove('open');
+  overlay.classList.remove('show');
+  ccEditingClient = null;
+}
+document.getElementById('btn-cc-content-close').onclick = closeCcContentModal;
+
+function renderContentPresetsList(clientName) {
+  const list = document.getElementById('cc-content-list');
+  const contents = contentPresetsByClient[clientName] || [];
+  if (!contents.length) {
+    list.innerHTML = '<div style="font-size:12px; color:var(--ink-faint,#6b7280);">Aucun contenu préencodé pour ce client</div>';
+    return;
+  }
+  list.innerHTML = contents.map(c => {
+    return `<div style="display:flex; align-items:center; gap:8px; background:var(--panel-2,#1a2333); border-radius:8px; padding:10px 12px;">
+      <div style="flex:1;">${escapeHtml(c)}</div>
+      <button class="btn btn-danger cc-delete-content" data-content="${escapeHtml(c)}" style="padding:6px 10px;">🗑️</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.cc-delete-content').forEach(btn => {
+    btn.onclick = () => {
+      const c = btn.dataset.content;
+      contentPresetsByClient[ccEditingClient] = (contentPresetsByClient[ccEditingClient] || []).filter(x => x !== c);
+      renderContentPresetsList(ccEditingClient);
+      renderClientsConfigList();
+      if (document.getElementById('f-client').value.trim().toUpperCase() === ccEditingClient) refreshContentPresetsDatalist(ccEditingClient);
+      if (document.getElementById('edit-status-client').value.trim().toUpperCase() === ccEditingClient) refreshContentPresetsDatalist(ccEditingClient);
+      saveContentPresets().catch(() => toast("Erreur sauvegarde des contenus"));
+    };
+  });
+}
+
+document.getElementById('btn-cc-add-content').onclick = () => {
+  if (!ccEditingClient) return;
+  const input = document.getElementById('cc-new-content');
+  const val = input.value.trim().toUpperCase();
+  if (!val) return;
+  const arr = contentPresetsByClient[ccEditingClient] || (contentPresetsByClient[ccEditingClient] = []);
+  if (arr.includes(val)) { toast("Ce contenu existe déjà"); return; }
+  arr.push(val);
+  input.value = '';
+  renderContentPresetsList(ccEditingClient);
+  renderClientsConfigList();
+  if (document.getElementById('f-client').value.trim().toUpperCase() === ccEditingClient) refreshContentPresetsDatalist(ccEditingClient);
+  if (document.getElementById('edit-status-client').value.trim().toUpperCase() === ccEditingClient) refreshContentPresetsDatalist(ccEditingClient);
+  saveContentPresets().catch(() => toast("Erreur sauvegarde des contenus"));
+  toast("Contenu ajouté");
+};
+document.getElementById('cc-new-content').addEventListener('input', function() {
+  const pos = this.selectionStart;
+  this.value = this.value.toUpperCase();
+  this.setSelectionRange(pos, pos);
+});
+
+// ---------- CONFIGURATION : MASQUER DES QUAIS (portes/volets) ----------
+const hideDocksModal = document.getElementById('hide-docks-modal');
+function openHideDocksModal() {
+  renderHideDocksList();
+  hideDocksModal.classList.add('open');
+  overlay.classList.add('show');
+}
+function closeHideDocksModal() {
+  hideDocksModal.classList.remove('open');
+  overlay.classList.remove('show');
+}
+document.getElementById('btn-hide-docks').onclick = openHideDocksModal;
+document.getElementById('btn-hide-docks-close').onclick = closeHideDocksModal;
+
+function renderHideDocksList() {
+  const list = document.getElementById('hd-docks-list');
+  const placed = Object.keys(dockConfig).map(n => parseInt(n)).sort((a, b) => a - b);
+  if (!placed.length) {
+    list.innerHTML = '<div style="font-size:12px; color:var(--ink-faint,#6b7280);">Aucun quai placé</div>';
+    return;
+  }
+  list.innerHTML = placed.map(i => {
+    const pos = dockConfig[i];
+    const hidden = !!pos.hidden;
+    const occ = dockOccupancy[i];
+    return `<div style="display:flex; align-items:center; gap:8px; background:var(--panel-2,#1a2333); border-radius:8px; padding:10px 12px;">
+      <div style="flex:1; font-weight:600;">Q${i}${hidden ? '<span style="font-weight:400; color:var(--ink-faint,#6b7280); font-size:12px;"> · masqué</span>' : ''}${occ ? '<span style="font-weight:400; color:var(--ink-faint,#6b7280); font-size:12px;"> · occupé</span>' : ''}</div>
+      <button class="btn ${hidden ? 'btn-success' : 'btn-ghost'} hd-toggle" data-dock="${i}" style="padding:6px 10px;">${hidden ? '👁️ Réafficher' : '🙈 Masquer'}</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.hd-toggle').forEach(btn => {
+    btn.onclick = () => {
+      const i = parseInt(btn.dataset.dock);
+      const pos = dockConfig[i];
+      if (!pos) return;
+      if (!pos.hidden && dockOccupancy[i]) { toast("Impossible de masquer : ce quai est occupé"); return; }
+      pos.hidden = !pos.hidden;
+      saveDocksConfig();
+      renderDocks();
+      if (listPanel.classList.contains('open')) renderListPanel();
+      renderHideDocksList();
+      toast(pos.hidden ? `Quai Q${i} masqué` : `Quai Q${i} réaffiché`);
+    };
+  });
 }
 
 function renderDetailComments(item) {
@@ -2091,9 +2971,7 @@ document.getElementById('btn-detail-add-comment').onclick = async () => {
   const comment = { text, author: who, date: new Date().toISOString() };
 
   const target = detailTarget._target;
-  let record = null;
-  if (target.type === 'spot') record = occupancy[target.id];
-  else if (target.type === 'free') record = freeTrailers[target.id];
+  const record = getRecordByTarget(target);
   if (!record) return;
 
   record.comments = record.comments || [];
@@ -2105,8 +2983,7 @@ document.getElementById('btn-detail-add-comment').onclick = async () => {
   toast("Commentaire ajouté");
   if (listPanel.classList.contains('open')) renderListPanel();
 
-  if (target.type === 'spot') saveOccupancy().catch(() => toast("Erreur de synchronisation"));
-  else saveFreeTrailers().catch(() => toast("Erreur de synchronisation"));
+  saveByTargetType(target.type).catch(() => toast("Erreur de synchronisation"));
 };
 
 function closeDetailView() {
@@ -2369,6 +3246,7 @@ function renderDbPanel() {
       </div>
       <div class="lp-meta">${entry.plate ? '🔖 ' + entry.plate + ' · ' : ''}${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de date'}</div>
       ${entry.notes ? `<div class="lp-meta">📝 ${entry.notes}</div>` : ''}
+      ${entry.modifiedAt ? `<div class="lp-meta">🕓 Mis à jour le ${formatDateTime(entry.modifiedAt)}</div>` : ''}
     `;
     div.onclick = () => openDbSheet(num);
     container.appendChild(div);
@@ -2394,6 +3272,49 @@ document.getElementById('btn-db-export').onclick = () => {
   toast(`${lastFilteredDbEntries.length} remorque(s) exportée(s)`);
 };
 
+// Convertit une cellule "échéance CT" quel que soit son format en AAAA-MM-JJ, ou null si illisible.
+function parseCtDate(raw) {
+  if (raw == null || raw === '') return null;
+
+  // Vrai objet Date (cellule Excel typée date)
+  if (raw instanceof Date && !isNaN(raw.getTime())) {
+    const y = raw.getFullYear(), m = String(raw.getMonth()+1).padStart(2,'0'), d = String(raw.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // Numéro de série Excel (cellule numérique non typée comme date, ex: 46762)
+  if (typeof raw === 'number' && isFinite(raw)) {
+    const dt = XLSX.SSF.parse_date_code(raw);
+    if (dt && dt.y) return `${dt.y}-${String(dt.m).padStart(2,'0')}-${String(dt.d).padStart(2,'0')}`;
+    return null;
+  }
+
+  if (typeof raw !== 'string') return null;
+  let s = raw.trim();
+  if (!s) return null;
+  s = s.split(/[T ]/)[0]; // retire une éventuelle partie horaire
+
+  // AAAA-MM-JJ ou AAAA/MM/JJ (déjà au bon ordre)
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+
+  // JJ/MM/AAAA, JJ-MM-AAAA ou JJ.MM.AAAA
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  if (m) {
+    let [, d, mo, y] = m;
+    if (y.length === 2) y = (parseInt(y, 10) < 70 ? '20' : '19') + y;
+    return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+
+  // Dernier recours : laisser le moteur JS interpréter (ex: "12 Jan 2027")
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear(), mo = String(parsed.getMonth()+1).padStart(2,'0'), d = String(parsed.getDate()).padStart(2,'0');
+    return `${y}-${mo}-${d}`;
+  }
+  return null;
+}
+
 document.getElementById('db-import-file-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -2406,7 +3327,10 @@ document.getElementById('db-import-file-input').addEventListener('change', async
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+    // raw:true (et non 'false') pour que les cellules de type date restent de vrais objets Date
+    // (avec raw:false, Excel réutilise parfois le texte affiché d'origine — ex: format américain
+    // ou nombre brut — que dateNF ne parvient pas toujours à reformater, d'où les dates "illisibles").
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
 
     if (!rows.length) { toast("Fichier vide"); e.target.value = ''; return; }
 
@@ -2434,16 +3358,7 @@ document.getElementById('db-import-file-input').addEventListener('change', async
       if (!row || !row[colTrailer]) continue;
       const trailerNum = String(row[colTrailer]).trim().toUpperCase();
       const plate = colPlate !== -1 ? String(row[colPlate] || '').trim().toUpperCase() : '';
-      let ctExpiryDate = row[colDate];
-      if (ctExpiryDate instanceof Date) {
-        ctExpiryDate = ctExpiryDate.toISOString().slice(0, 10);
-      } else if (typeof ctExpiryDate === 'string' && ctExpiryDate.includes('/')) {
-        // Format JJ/MM/AAAA -> AAAA-MM-JJ
-        const parts = ctExpiryDate.trim().split('/');
-        if (parts.length === 3) ctExpiryDate = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-      } else if (typeof ctExpiryDate === 'string') {
-        ctExpiryDate = ctExpiryDate.trim();
-      }
+      const ctExpiryDate = parseCtDate(row[colDate]);
       const isValidDate = typeof ctExpiryDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ctExpiryDate) && !isNaN(new Date(ctExpiryDate).getTime());
       if (!trailerNum || !isValidDate) { skipped++; continue; }
 
@@ -2794,6 +3709,7 @@ document.getElementById('btn-save-alert-settings').onclick = async () => {
   await saveEmailConfig();
   renderSpots();
   renderFreeTrailers();
+  renderDocks();
   renderListPanel();
   toast("Réglages enregistrés");
 };
@@ -2824,6 +3740,7 @@ document.getElementById('btn-setup').onclick = () => {
   } else {
     setupMode = false;
     rowMode = false;
+    realignSelection = null;
     resetRowAnchors();
     if (boundaryMode) {
       boundaryMode = false;
@@ -2841,6 +3758,33 @@ document.getElementById('btn-setup').onclick = () => {
   toggleRowModeUI(setupMode);
   renderSpots();
   renderFreeTrailers();
+  renderDocks();
+};
+
+function updatePlacementTypeLabel() {
+  document.getElementById('btn-placement-type-toggle').textContent =
+    configPlacementType === 'dock' ? '📌 Placement (clic) : Quai' : '📌 Placement (clic) : Emplacement parking';
+}
+document.getElementById('btn-placement-type-toggle').onclick = () => {
+  configPlacementType = configPlacementType === 'dock' ? 'spot' : 'dock';
+  updatePlacementTypeLabel();
+  toast(configPlacementType === 'dock' ? "Un clic sur la carte placera un quai" : "Un clic sur la carte placera un emplacement parking");
+};
+updatePlacementTypeLabel();
+
+function updateViewToggleUI() {
+  const btn = document.getElementById('btn-view-toggle');
+  btn.textContent = viewMode === 'quai' ? '🚪 Quai' : '🅿️ Parking';
+}
+document.getElementById('btn-view-toggle').onclick = () => {
+  viewMode = viewMode === 'quai' ? 'parking' : 'quai';
+  localStorage.setItem('yard:view-mode', viewMode);
+  updateViewToggleUI();
+  renderSpots();
+  renderFreeTrailers();
+  renderDocks();
+  if (listPanel.classList.contains('open')) renderListPanel();
+  toast(viewMode === 'quai' ? "Vue Quai : seules les remorques à quai sont affichées" : "Vue Parking : seules les remorques sur parking / zone libre sont affichées");
 };
 
 document.getElementById('btn-reframe').onclick = async () => {
