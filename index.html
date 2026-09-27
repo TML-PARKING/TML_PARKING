@@ -3837,7 +3837,12 @@ if ('serviceWorker' in navigator) {
   try {
     const swBlob = new Blob([swCode], { type: 'application/javascript' });
     const swUrl = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl).catch((e) => console.warn("Service worker non enregistré:", e));
+    // scope explicite requis : sans lui, un service worker enregistré depuis une
+    // URL "blob:" ne contrôle pas correctement la page et Chrome ne considère
+    // jamais le site comme installable.
+    navigator.serviceWorker.register(swUrl, { scope: './' })
+      .then(() => console.log("Service worker enregistré (scope ./)"))
+      .catch((e) => console.warn("Service worker non enregistré:", e));
   } catch (e) {
     console.warn("Impossible d'enregistrer le service worker:", e);
   }
