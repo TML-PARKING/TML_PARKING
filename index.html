@@ -295,7 +295,8 @@
   /* Mode accès chauffeur restreint : masque toute la navigation normale */
   body.driver-mode #btn-list, body.driver-mode #btn-reframe, body.driver-mode #btn-emails,
   body.driver-mode #btn-trailerdb, body.driver-mode #btn-setup, body.driver-mode #btn-history,
-  body.driver-mode #btn-gen-encode-access, body.driver-mode #btn-view-toggle, body.driver-mode .legend { display: none !important; }
+  body.driver-mode #btn-gen-encode-access, body.driver-mode #btn-view-toggle, body.driver-mode .legend,
+  body.driver-mode #btn-map-calibration { display: none !important; }
 
   #driver-card {
     position: fixed; left: 50%; bottom: 0; width: 100%; max-width: 460px; transform: translateX(-50%);
@@ -3243,6 +3244,12 @@ document.getElementById('btn-add-user').onclick = async () => {
     if (!hasPermission('usersEdit')) { toast("Accès non autorisé pour modifier un profil"); return; }
     teamUsers[editingUserPin] = { name, permissions };
     toast("Utilisateur modifié");
+    // Si on vient de modifier son propre profil, on applique les nouveaux
+    // droits tout de suite (sinon ils ne prendraient effet qu'au rechargement).
+    if (currentUser && currentUser.pin === editingUserPin) {
+      currentUser.permissions = permissions;
+      applyUserPermissions();
+    }
   } else {
     if (!hasPermission('users')) { toast("Accès non autorisé pour créer un utilisateur"); return; }
     const code = generateUniqueCode();
@@ -4039,6 +4046,7 @@ function applyUserPermissions() {
   document.getElementById('btn-setup').style.display = hasPermission('setup') ? 'inline-block' : 'none';
   document.getElementById('btn-gen-encode-access').style.display = hasPermission('tempAccess') ? 'inline-block' : 'none';
   document.getElementById('btn-manage-users').style.display = hasPermission('users') ? 'inline-block' : 'none';
+  document.getElementById('btn-map-calibration').style.display = hasPermission('mapCalibration') ? 'inline-block' : 'none';
 }
 
 // ---------- IDENTIFICATION UTILISATEUR (une fois par appareil) ----------
