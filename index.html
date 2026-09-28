@@ -372,6 +372,7 @@
       <button class="btn btn-ghost" id="btn-emails" style="display:none;">✉️</button>
       <button class="btn btn-ghost" id="btn-trailerdb">🗄️</button>
       <button class="btn btn-ghost" id="btn-manage-users" style="display:none;">👤</button>
+      <button class="btn btn-ghost" id="btn-map-calibration" title="Calibrer l'alignement de l'image satellite (cet appareil uniquement)">🛰️</button>
       <button class="btn btn-ghost" id="btn-setup">⚙️</button>
     </div>
   </header>
@@ -394,6 +395,34 @@
     <button class="btn btn-warn" id="btn-boundary-mode">📍 Définir le contour du site</button>
     <button class="btn btn-primary" id="btn-boundary-finish" style="display:none;">✅ Terminer le contour</button>
   </div>
+</div>
+
+<div id="calibration-panel" style="display:none; position:fixed; z-index:5000; left:50%; top:50%; transform:translate(-50%,-50%); background:#1e293b; border:1px solid #475569; border-radius:12px; padding:20px; box-shadow:0 10px 40px rgba(0,0,0,.5); text-align:center; color:#e5e7eb; width:300px; max-width:90vw;">
+  <h3 style="margin:0 0 6px; font-size:16px;">🛰️ Calibration image</h3>
+  <p style="font-size:12px; color:#94a3b8; margin:0 0 14px;">Corrige l'affichage pour tous les <b>PC</b> ou pour tous les <b>téléphones/tablettes</b> (détecté automatiquement). Clique sur les boutons en observant les emplacements sur la carte, jusqu'à ce qu'ils tombent bien sur les bons endroits. Les données réelles ne sont jamais modifiées.</p>
+
+  <div style="font-size:11px; color:#64748b; margin-bottom:4px;">Déplacer</div>
+  <div style="display:grid; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,44px); gap:4px; justify-content:center; margin-bottom:12px;">
+    <div></div><button class="btn btn-ghost" id="cal-up" style="padding:0;">⬆️</button><div></div>
+    <button class="btn btn-ghost" id="cal-left" style="padding:0;">⬅️</button><div style="display:flex;align-items:center;justify-content:center;font-size:13px;color:#64748b;">📍</div><button class="btn btn-ghost" id="cal-right" style="padding:0;">➡️</button>
+    <div></div><button class="btn btn-ghost" id="cal-down" style="padding:0;">⬇️</button><div></div>
+  </div>
+
+  <div style="font-size:11px; color:#64748b; margin-bottom:4px;">Rotation</div>
+  <div style="display:flex; gap:8px; justify-content:center; margin-bottom:12px;">
+    <button class="btn btn-ghost" id="cal-rot-left" style="width:70px;">⟲</button>
+    <button class="btn btn-ghost" id="cal-rot-right" style="width:70px;">⟳</button>
+  </div>
+
+  <div style="font-size:11px; color:#64748b; margin-bottom:4px;">Échelle</div>
+  <div style="display:flex; gap:8px; justify-content:center; margin-bottom:14px;">
+    <button class="btn btn-ghost" id="cal-scale-down" style="width:70px;">➖</button>
+    <button class="btn btn-ghost" id="cal-scale-up" style="width:70px;">➕</button>
+  </div>
+
+  <div id="cal-offset-readout" style="font-size:12px; color:#94a3b8; margin-bottom:14px;"></div>
+  <button class="btn btn-danger" id="cal-reset" style="width:100%; margin-bottom:8px;">↺ Réinitialiser (position réelle)</button>
+  <button class="btn btn-primary" id="cal-close" style="width:100%;">Fermer</button>
 </div>
 
 <div id="banner"></div>
@@ -1052,6 +1081,9 @@ async function loadAll(preFetched) {
   teamUsers = d.teamUsers || {};
   clientPresets = Array.isArray(d.clientPresets) ? d.clientPresets : [];
   contentPresetsByClient = d.contentPresets || {};
+  const rawCal = d.mapCalibration || {};
+  mapCalibrationProfiles = { pc: sanitizeTransform(rawCal.pc), mobile: sanitizeTransform(rawCal.mobile) };
+  mapCalibrationTransform = mapCalibrationProfiles[getDeviceProfileKey()];
 }
 
 async function saveSpotsConfig() {
@@ -1141,6 +1173,133 @@ async function saveTempAccesses() {
 async function saveTeamUsers() {
   try { await backendSave('saveTeamUsers', 'yard:team-users', teamUsers); }
   catch(e) { toast("Erreur sauvegarde des utilisateurs"); }
+}
+
+// ---------- CALIBRATION IMAGE SATELLITE (partagée, par type d'appareil) ----------
+// Certains appareils (PC) affichent une image satellite Google plus récente que
+// d'autres (téléphone), avec un angle de prise de vue différent — un simple
+// décalage ne suffit pas à tout réaligner (rotation/échelle différentes aussi).
+// On utilise donc une transformation de similitude (translation + rotation +
+// échelle) calculée à partir de 2 repères que l'utilisateur fait glisser sur
+// 2 endroits reconnaissables de l'image. Un profil "pc" et un profil "mobile",
+// enregistrés côté serveur (partagés par tout le monde) : calibrer depuis un PC
+// corrige l'affichage de TOUS les PC, et pareil pour les téléphones. Les
+// coordonnées réelles enregistrées (emplacements, quais, remorques) ne sont
+// jamais modifiées — seul l'affichage change.
+const CAL_IDENTITY = { a: 1, b: 0, tx: 0, ty: 0 };
+// Origine locale fixe (proche du centre du site) pour projeter lat/lng en mètres
+// à plat le temps du calcul — un site de cette taille est assez petit pour que
+// l'approximation soit largement suffisante.
+const CAL_ORIGIN = { lat: 50.478, lng: 3.862 };
+const CAL_M_PER_DEG_LAT = 111320;
+const CAL_M_PER_DEG_LNG = 111320 * Math.cos(CAL_ORIGIN.lat * Math.PI / 180);
+
+function calProjectToLocal(lat, lng) {
+  return { x: (lng - CAL_ORIGIN.lng) * CAL_M_PER_DEG_LNG, y: (lat - CAL_ORIGIN.lat) * CAL_M_PER_DEG_LAT };
+}
+function calUnprojectFromLocal(x, y) {
+  return { lat: CAL_ORIGIN.lat + y / CAL_M_PER_DEG_LAT, lng: CAL_ORIGIN.lng + x / CAL_M_PER_DEG_LNG };
+}
+function sanitizeTransform(t) {
+  if (t && typeof t.a === 'number' && typeof t.b === 'number' && typeof t.tx === 'number' && typeof t.ty === 'number') return t;
+  return { ...CAL_IDENTITY };
+}
+
+let mapCalibrationProfiles = { pc: { ...CAL_IDENTITY }, mobile: { ...CAL_IDENTITY } };
+let mapCalibrationTransform = { ...CAL_IDENTITY };
+
+// Détection simple PC / téléphone-tablette (largeur d'écran + user agent tactile).
+function getDeviceProfileKey() {
+  const ua = navigator.userAgent || '';
+  const isTouchLike = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  return (isTouchLike || window.innerWidth < 900) ? 'mobile' : 'pc';
+}
+
+let calSaveTimer = null;
+function saveMapCalibrationDebounced() {
+  mapCalibrationProfiles[getDeviceProfileKey()] = mapCalibrationTransform;
+  clearTimeout(calSaveTimer);
+  calSaveTimer = setTimeout(async () => {
+    try { await backendSave('saveMapCalibration', 'yard:map-calibration', mapCalibrationProfiles); }
+    catch (e) { toast("Erreur sauvegarde de la calibration"); }
+  }, 600);
+}
+
+// Position réelle -> position affichée sur la carte (utilisé pour poser les marqueurs)
+function toDisplayLatLng(lat, lng) {
+  const p = calProjectToLocal(lat, lng);
+  const t = mapCalibrationTransform;
+  const dx = t.a * p.x - t.b * p.y + t.tx;
+  const dy = t.b * p.x + t.a * p.y + t.ty;
+  return calUnprojectFromLocal(dx, dy);
+}
+// Position affichée (clic, glisser-déposer) -> position réelle (utilisé avant d'enregistrer)
+function fromDisplayLatLng(lat, lng) {
+  const p = calProjectToLocal(lat, lng);
+  const t = mapCalibrationTransform;
+  const det = (t.a * t.a + t.b * t.b) || 1;
+  const rx = p.x - t.tx, ry = p.y - t.ty;
+  const x = (t.a * rx + t.b * ry) / det;
+  const y = (-t.b * rx + t.a * ry) / det;
+  return calUnprojectFromLocal(x, y);
+}
+
+function calRefresh() {
+  saveMapCalibrationDebounced();
+  updateCalReadout();
+  renderSpots(); renderFreeTrailers(); renderDocks();
+}
+
+const CAL_TRANSLATE_STEP = 0.5; // mètres par clic
+const CAL_ROTATE_STEP = 0.15;   // degrés par clic
+const CAL_SCALE_STEP = 1.002;   // facteur d'échelle par clic
+
+function calTranslate(dx, dy) {
+  const t = mapCalibrationTransform;
+  mapCalibrationTransform = { a: t.a, b: t.b, tx: t.tx + dx, ty: t.ty + dy };
+  calRefresh();
+}
+function calRotate(deltaDeg) {
+  const rad = deltaDeg * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const t = mapCalibrationTransform;
+  mapCalibrationTransform = { a: t.a * cos - t.b * sin, b: t.a * sin + t.b * cos, tx: t.tx, ty: t.ty };
+  calRefresh();
+}
+function calScale(factor) {
+  const t = mapCalibrationTransform;
+  mapCalibrationTransform = { a: t.a * factor, b: t.b * factor, tx: t.tx, ty: t.ty };
+  calRefresh();
+}
+
+function updateCalReadout() {
+  const el = document.getElementById('cal-offset-readout');
+  if (!el) return;
+  const profileLabel = getDeviceProfileKey() === 'pc' ? 'PC / ordinateur' : 'Téléphone / tablette';
+  const t = mapCalibrationTransform;
+  const isIdentity = t.a === 1 && t.b === 0 && t.tx === 0 && t.ty === 0;
+  el.innerHTML = `Profil détecté : <b>${profileLabel}</b><br>${isIdentity ? 'Aucune calibration appliquée' : 'Calibration personnalisée active'}`;
+}
+
+function initCalibrationUI() {
+  const btn = document.getElementById('btn-map-calibration');
+  const panel = document.getElementById('calibration-panel');
+  if (!btn || !panel) return;
+  btn.onclick = () => { updateCalReadout(); panel.style.display = 'block'; };
+  document.getElementById('cal-close').onclick = () => { panel.style.display = 'none'; };
+  document.getElementById('cal-up').onclick = () => calTranslate(0, CAL_TRANSLATE_STEP);
+  document.getElementById('cal-down').onclick = () => calTranslate(0, -CAL_TRANSLATE_STEP);
+  document.getElementById('cal-left').onclick = () => calTranslate(-CAL_TRANSLATE_STEP, 0);
+  document.getElementById('cal-right').onclick = () => calTranslate(CAL_TRANSLATE_STEP, 0);
+  document.getElementById('cal-rot-left').onclick = () => calRotate(-CAL_ROTATE_STEP);
+  document.getElementById('cal-rot-right').onclick = () => calRotate(CAL_ROTATE_STEP);
+  document.getElementById('cal-scale-down').onclick = () => calScale(1 / CAL_SCALE_STEP);
+  document.getElementById('cal-scale-up').onclick = () => calScale(CAL_SCALE_STEP);
+  document.getElementById('cal-reset').onclick = () => {
+    mapCalibrationTransform = { ...CAL_IDENTITY };
+    calRefresh();
+    toast("Calibration réinitialisée pour ce type d'appareil");
+  };
 }
 
 
@@ -1283,11 +1442,12 @@ function startGpsTracking() {
   navigator.geolocation.watchPosition(
     (pos) => {
       userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const dUser = toDisplayLatLng(userPos.lat, userPos.lng);
       if (!userMarker) {
         const icon = L.divIcon({ className: '', html: '<div class="user-location-marker"></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
-        userMarker = L.marker([userPos.lat, userPos.lng], { icon, zIndexOffset: 1000 }).addTo(map);
+        userMarker = L.marker([dUser.lat, dUser.lng], { icon, zIndexOffset: 1000 }).addTo(map);
       } else {
-        userMarker.setLatLng([userPos.lat, userPos.lng]);
+        userMarker.setLatLng([dUser.lat, dUser.lng]);
       }
     },
     (err) => { console.warn("GPS indisponible:", err.message); },
@@ -1542,13 +1702,17 @@ function finalizeRow() {
 let moveMapMode = false;
 
 function onMapClick(e) {
+  // On convertit tout de suite le point cliqué (position affichée, potentiellement
+  // décalée par la calibration locale de cet appareil) vers la position réelle,
+  // qui est ce qu'on enregistre/compare partout.
+  const real = fromDisplayLatLng(e.latlng.lat, e.latlng.lng);
   if (moveMapMode) {
     moveMapMode = false;
-    if (!isPointInBoundary(e.latlng.lat, e.latlng.lng)) {
+    if (!isPointInBoundary(real.lat, real.lng)) {
       toast("Hors de la zone autorisée du site");
       return;
     }
-    movePending = { type: 'free', lat: e.latlng.lat, lng: e.latlng.lng };
+    movePending = { type: 'free', lat: real.lat, lng: real.lng };
     showMoveConfirm("Déplacer la remorque à cet endroit ?");
     return;
   }
@@ -1556,19 +1720,19 @@ function onMapClick(e) {
   if (driverMode) {
     if (driverMode.entry.type !== 'encode') return; // rien d'autre autorisé en mode reprise
     if (driverMode.entry.used) { toast("Accès déjà utilisé"); return; }
-    if (!isPointInBoundary(e.latlng.lat, e.latlng.lng)) {
+    if (!isPointInBoundary(real.lat, real.lng)) {
       toast("Hors de la zone autorisée du site — dépose impossible ici");
       return;
     }
-    openSheetForNewFree(e.latlng.lat, e.latlng.lng);
+    openSheetForNewFree(real.lat, real.lng);
     return;
   }
   if (boundaryMode) {
-    addBoundaryPoint(e.latlng);
+    addBoundaryPoint(real);
     return;
   }
   if (rowMode) {
-    placeRowAnchor(e.latlng);
+    placeRowAnchor(real);
     return;
   }
   if (setupMode) {
@@ -1577,7 +1741,7 @@ function onMapClick(e) {
     if (configPlacementType === 'dock') {
       const next = getNextUnplacedDock();
       if (!next) { toast(`Les ${numDocks} quais sont déjà placés`); return; }
-      dockConfig[next] = { lat: e.latlng.lat, lng: e.latlng.lng };
+      dockConfig[next] = { lat: real.lat, lng: real.lng };
       saveDocksConfig();
       renderDocks();
       toast("Quai Q" + next + " placé");
@@ -1585,18 +1749,18 @@ function onMapClick(e) {
     }
     const next = getNextUnplacedSpot();
     if (!next) { toast(`Les ${numFixedSpots} emplacements sont déjà placés`); return; }
-    spotsConfig[next] = { lat: e.latlng.lat, lng: e.latlng.lng };
+    spotsConfig[next] = { lat: real.lat, lng: real.lng };
     saveSpotsConfig();
     renderSpots();
     toast("Emplacement " + next + " placé");
     return;
   }
   // clic normal en dehors d'un marqueur = nouvelle remorque en zone libre
-  if (!isPointInBoundary(e.latlng.lat, e.latlng.lng)) {
+  if (!isPointInBoundary(real.lat, real.lng)) {
     toast("Hors de la zone autorisée du site — encodage impossible ici");
     return;
   }
-  openSheetForNewFree(e.latlng.lat, e.latlng.lng);
+  openSheetForNewFree(real.lat, real.lng);
 }
 
 function getNextUnplacedSpot() {
@@ -1654,7 +1818,8 @@ function renderSpots(centerFallback) {
       html: `<div class="spot-marker${selectedTargetKey === 'spot-'+i ? ' marker-selected' : ''}" style="background:${markerColor}; width:${s}px; height:${s}px; font-size:${Math.max(9, Math.round(s*0.35))}px;">${labelText}</div>`,
       iconSize: [s, s], iconAnchor: [s/2, s/2]
     });
-    const marker = L.marker([pos.lat, pos.lng], { icon, draggable: setupMode }).addTo(map);
+    const d = toDisplayLatLng(pos.lat, pos.lng);
+    const marker = L.marker([d.lat, d.lng], { icon, draggable: setupMode }).addTo(map);
     marker.on('click', () => {
       if (setupMode) return;
       if (driverMode && driverMode.entry.type === 'pickup') { showDriverPickupCard(); return; }
@@ -1669,7 +1834,8 @@ function renderSpots(centerFallback) {
     if (setupMode) {
       marker.on('dragend', (ev) => {
         const p = ev.target.getLatLng();
-        spotsConfig[i] = { lat: p.lat, lng: p.lng };
+        const real = fromDisplayLatLng(p.lat, p.lng);
+        spotsConfig[i] = { lat: real.lat, lng: real.lng };
         saveSpotsConfig();
       });
     }
@@ -1694,7 +1860,8 @@ function renderFreeTrailers() {
       html: `<div class="trailer-marker${selectedTargetKey === 'free-'+id ? ' marker-selected' : ''}" style="background:${vs.color}; width:${s}px; height:${s}px; font-size:${Math.max(10, Math.round(s*0.5))}px;">🚛</div>`,
       iconSize: [s, s], iconAnchor: [s/2, s/2]
     });
-    const marker = L.marker([t.lat, t.lng], { icon, draggable: false }).addTo(map);
+    const d = toDisplayLatLng(t.lat, t.lng);
+    const marker = L.marker([d.lat, d.lng], { icon, draggable: false }).addTo(map);
     marker.on('click', () => { if (driverMode) { showDriverPickupCard(); return; } openSheetForFree(id); });
     freeMarkers[id] = marker;
   });
@@ -1724,7 +1891,8 @@ function renderDocks() {
       html: `<div class="dock-marker${selectedTargetKey === 'dock-'+i ? ' marker-selected' : ''}" style="background:${markerColor}; width:${s}px; height:${s}px; font-size:${Math.max(9, Math.round(s*0.35))}px; ${pos.hidden ? 'opacity:0.45; outline:2px dashed #9ca3af; outline-offset:2px;' : ''}">Q${i}</div>`,
       iconSize: [s, s], iconAnchor: [s/2, s/2]
     });
-    const marker = L.marker([pos.lat, pos.lng], { icon, draggable: setupMode }).addTo(map);
+    const d = toDisplayLatLng(pos.lat, pos.lng);
+    const marker = L.marker([d.lat, d.lng], { icon, draggable: setupMode }).addTo(map);
     marker.on('click', () => {
       if (setupMode) {
         // En mode configuration, un clic sur un quai déjà placé permet de le supprimer
@@ -1749,7 +1917,8 @@ function renderDocks() {
     if (setupMode) {
       marker.on('dragend', (ev) => {
         const p = ev.target.getLatLng();
-        dockConfig[i] = { lat: p.lat, lng: p.lng };
+        const real = fromDisplayLatLng(p.lat, p.lng);
+        dockConfig[i] = { ...dockConfig[i], lat: real.lat, lng: real.lng };
         saveDocksConfig();
       });
     }
@@ -4028,6 +4197,7 @@ async function bootDriverMode(token) {
 }
 
 async function boot() {
+  initCalibrationUI();
   const params = new URLSearchParams(location.search);
   const token = params.get('access');
   if (token) {
