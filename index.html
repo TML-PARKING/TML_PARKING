@@ -1435,6 +1435,7 @@ async function pollForUpdates() {
 
 let realtimeSocket = null;
 let realtimeConnected = false;
+let realtimeFailures = 0;
 let fallbackPollTimer = null;
 
 function connectRealtime() {
@@ -1445,6 +1446,7 @@ function connectRealtime() {
 
   ws.onopen = () => {
     realtimeConnected = true;
+    realtimeFailures = 0;
     stopFallbackPolling();
   };
   ws.onmessage = (event) => {
@@ -1456,6 +1458,9 @@ function connectRealtime() {
   ws.onclose = () => {
     realtimeConnected = false;
     startFallbackPolling();
+    // Sans Durable Object (plan gratuit) ça échoue toujours : après 3 échecs
+    // d'affilée on arrête de réessayer (évite de gaspiller des requêtes Worker).
+    if (++realtimeFailures >= 3) return;
     setTimeout(connectRealtime, 3000); // tentative de reconnexion
   };
   ws.onerror = () => { ws.close(); };
