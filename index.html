@@ -2441,7 +2441,17 @@ document.getElementById('btn-move-confirm-close').onclick = () => {
 document.getElementById('btn-move-confirm-yes').onclick = async () => {
   if (!moveSource || !movePending) return;
   const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu');
-  const data = { ...moveSource.data, movedBy: who, movedAt: new Date().toISOString() };
+  const destLabel = movePending.type === 'spot' ? 'Emplacement ' + movePending.id
+    : movePending.type === 'dock' ? 'Quai Q' + movePending.id : 'Zone libre';
+  const fromLabel = moveSource.label
+    || (moveSource.target.type === 'spot' ? 'Emplacement ' + moveSource.target.id
+      : moveSource.target.type === 'dock' ? 'Quai Q' + moveSource.target.id : 'Zone libre');
+  const data = {
+    ...moveSource.data, movedBy: who, movedAt: new Date().toISOString(),
+    // Trace du déplacement (qui / quand / d'où → vers où) dans les commentaires
+    comments: [...(moveSource.data.comments || []),
+      { text: `🚚 Déplacée — ${fromLabel} → ${destLabel}`, author: who, date: new Date().toISOString(), auto: true }]
+  };
 
   // Retire de l'ancien emplacement
   if (moveSource.target.type === 'spot') delete occupancy[moveSource.target.id];
@@ -2972,6 +2982,16 @@ document.getElementById('btn-edit-status-save').onclick = async () => {
 
   const record = getRecordByTarget(editStatusTarget);
   if (!record) { toast("Introuvable"); closeEditStatusModal(); return; }
+  // Trace de la modification (qui / quand / quoi) ajoutée automatiquement aux commentaires
+  const changes = [];
+  if ((record.status || '') !== status) changes.push(`statut : ${record.status || '—'} → ${status}`);
+  if ((record.client || '') !== client) changes.push(`client : ${record.client || '—'} → ${client || '—'}`);
+  if ((record.notes || '') !== notes) changes.push(`note : ${record.notes || '—'} → ${notes || '—'}`);
+  if (changes.length) {
+    const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu');
+    record.comments = record.comments || [];
+    record.comments.push({ text: '✏️ Modifié — ' + changes.join(' ; '), author: who, date: new Date().toISOString(), auto: true });
+  }
   record.status = status;
   record.client = client;
   record.notes = notes;
