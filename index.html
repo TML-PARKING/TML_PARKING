@@ -585,9 +585,15 @@
     header .sub { order: 3; flex-basis: 100%; overflow-x: auto; scrollbar-width: none; }
     header .sub::-webkit-scrollbar { display: none; }
     .chip em { display: inline; }
+    header { align-items: stretch; overflow: hidden; }
+    .hd-top, .hd-bar { width: 100%; max-width: 100%; }
     .hd-bar { gap: 8px; flex-wrap: wrap; }
-    .hd-tabs { flex: 1 1 100%; order: 2; }
-    .top-actions { order: 1; width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+    .hd-tabs { flex: 1 1 100%; order: 2; width: 100%; box-sizing: border-box; }
+    .tab { padding: 7px 12px; font-size: 12px; }
+    .top-actions { order: 1; width: 100%; }
+    .view-seg { width: 100%; box-sizing: border-box; }
+    .view-seg button { flex: 1; justify-content: center; padding: 0 6px; }
+    .chip { height: 30px; font-size: 11.5px; }
     .top-actions .btn { padding: 0 14px; font-size: 12px; }
     #rail {
       left: 50%; right: auto; top: auto; bottom: 10px; transform: translateX(-50%); width: auto; max-width: calc(100vw - 16px);
