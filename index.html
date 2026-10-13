@@ -2984,8 +2984,9 @@ document.getElementById('btn-edit-status-save').onclick = async () => {
   }
 
   toast("Statut / note mis à jour");
+  const savedType = editStatusTarget.type; // à lire AVANT la fermeture, qui remet la cible à null
   closeEditStatusModal();
-  saveByTargetType(editStatusTarget.type).catch(() => toast("Erreur de synchronisation"));
+  saveByTargetType(savedType).catch(() => toast("Erreur de synchronisation"));
 };
 
 // ---------- CONFIGURATION : CLIENTS & CONTENUS PRÉENCODÉS ----------
