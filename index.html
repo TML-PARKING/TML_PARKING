@@ -366,7 +366,7 @@
     </div>
     <div class="top-actions">
       <button class="btn btn-ghost" id="btn-list">📋 Liste</button>
-      <button class="btn btn-primary" id="btn-view-toggle" title="Basculer vue Parking / Quai">🅿️ Parking</button>
+      <button class="btn btn-primary" id="btn-view-toggle" title="Basculer vue Parking / Quai / Tout">🅿️ Parking</button>
       <button class="btn btn-primary" id="btn-gen-encode-access" title="Accès chauffeur (dépôt)" style="display:none; padding:8px 10px; font-size:16px;">🔑</button>
       <button class="btn btn-ghost" id="btn-history">🕓</button>
       <button class="btn btn-warn" id="btn-reframe" style="display:none;">📍 Fixer le cadrage</button>
@@ -1007,6 +1007,7 @@ let configPlacementType = 'spot'; // 'spot' ou 'dock' — détermine ce qu'un si
 // Vue actuelle : 'parking' (emplacements fixes + zone libre) ou 'quai' (quais uniquement).
 // Purement locale à l'appareil (préférence d'affichage), pas synchronisée entre utilisateurs.
 let viewMode = localStorage.getItem('yard:view-mode') || 'parking';
+if (!['parking', 'quai', 'all'].includes(viewMode)) viewMode = 'parking';
 let currentTarget = null;  // {type:'spot', id} or {type:'free', id} or {type:'new-free', lat,lng} or {type:'new-spot', num}
 let userMarker = null;
 let userPos = null;
@@ -1827,8 +1828,8 @@ function getNextUnplacedDock() {
 
 // Un admin en mode configuration voit toujours tout (pour pouvoir positionner/ajuster),
 // sinon l'affichage suit la vue choisie : "parking" (emplacements + zone libre) ou "quai".
-function showParkingLayer() { return setupMode || viewMode === 'parking'; }
-function showDockLayer() { return setupMode || viewMode === 'quai'; }
+function showParkingLayer() { return setupMode || viewMode === 'parking' || viewMode === 'all'; }
+function showDockLayer() { return setupMode || viewMode === 'quai' || viewMode === 'all'; }
 
 // Taille des icônes selon le niveau de zoom : elles rétrécissent en dézoomant,
 // grossissent en zoomant, l'étiquette (P12, Q3, 🚛) reste toujours lisible.
@@ -1985,7 +1986,9 @@ function updateHeader() {
   const occupiedDocks = visibleDockIds.filter(i => dockOccupancy[i]).length;
   document.getElementById('header-sub').textContent = viewMode === 'quai'
     ? `${occupiedDocks}/${visibleDockCount} quais occupés`
-    : `${occupiedSpots}/${numFixedSpots} emplacements occupés · ${freeCount} en zone libre`;
+    : viewMode === 'all'
+      ? `${occupiedSpots}/${numFixedSpots} emplacements · ${freeCount} zone libre · ${occupiedDocks}/${visibleDockCount} quais`
+      : `${occupiedSpots}/${numFixedSpots} emplacements occupés · ${freeCount} en zone libre`;
 }
 
 // ---------- SHEET (formulaire) ----------
@@ -2595,7 +2598,7 @@ function renderListPanel() {
   // (parking + quais + zones libres), peu importe la vue active, pour toujours
   // savoir où se trouve une remorque même si elle est dans l'autre vue.
   const searching = !!q;
-  const viewItems = searching ? items : items.filter(it => viewMode === 'quai' ? it._target.type === 'dock' : it._target.type !== 'dock');
+  const viewItems = searching ? items : items.filter(it => viewMode === 'all' ? true : viewMode === 'quai' ? it._target.type === 'dock' : it._target.type !== 'dock');
   let filtered = viewItems;
   if (lpActiveFilters.size > 0) filtered = filtered.filter(it => lpActiveFilters.has(it.status));
   if (lpFixedOnly) filtered = filtered.filter(it => it._target.type === 'spot');
@@ -2668,7 +2671,7 @@ function renderListPanel() {
       // Si la remorque est d'un autre type que la vue active (parking/quai), on
       // bascule automatiquement la vue pour qu'elle soit visible sur la carte.
       const neededView = it._target.type === 'dock' ? 'quai' : 'parking';
-      if (viewMode !== neededView) {
+      if (viewMode !== 'all' && viewMode !== neededView) {
         viewMode = neededView;
         localStorage.setItem('yard:view-mode', viewMode);
         updateViewToggleUI();
@@ -4019,17 +4022,17 @@ updatePlacementTypeLabel();
 
 function updateViewToggleUI() {
   const btn = document.getElementById('btn-view-toggle');
-  btn.textContent = viewMode === 'quai' ? '🚪 Quai' : '🅿️ Parking';
+  btn.textContent = viewMode === 'quai' ? '🚪 Quai' : viewMode === 'all' ? '🗺️ Tout' : '🅿️ Parking';
 }
 document.getElementById('btn-view-toggle').onclick = () => {
-  viewMode = viewMode === 'quai' ? 'parking' : 'quai';
+  viewMode = viewMode === 'parking' ? 'quai' : viewMode === 'quai' ? 'all' : 'parking';
   localStorage.setItem('yard:view-mode', viewMode);
   updateViewToggleUI();
   renderSpots();
   renderFreeTrailers();
   renderDocks();
   if (listPanel.classList.contains('open')) renderListPanel();
-  toast(viewMode === 'quai' ? "Vue Quai : seules les remorques à quai sont affichées" : "Vue Parking : seules les remorques sur parking / zone libre sont affichées");
+  toast(viewMode === 'all' ? "Vue Tout : parking, zone libre et quais affichés" : viewMode === 'quai' ? "Vue Quai : seules les remorques à quai sont affichées" : "Vue Parking : seules les remorques sur parking / zone libre sont affichées");
 };
 
 document.getElementById('btn-reframe').onclick = async () => {
