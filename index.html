@@ -2984,7 +2984,8 @@ document.getElementById('btn-edit-status-save').onclick = async () => {
   if (!record) { toast("Introuvable"); closeEditStatusModal(); return; }
   // Trace de la modification (qui / quand / quoi) ajoutée automatiquement aux commentaires
   const changes = [];
-  if ((record.status || '') !== status) changes.push(`statut : ${record.status || '—'} → ${status}`);
+  const statusName = st => st === 'fleet' ? 'Fleet — Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st ? 'À vider' : '—';
+  if ((record.status || '') !== status) changes.push(`statut : ${statusName(record.status)} → ${statusName(status)}`);
   if ((record.client || '') !== client) changes.push(`client : ${record.client || '—'} → ${client || '—'}`);
   if ((record.notes || '') !== notes) changes.push(`note : ${record.notes || '—'} → ${notes || '—'}`);
   if (changes.length) {
