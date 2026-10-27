@@ -1269,15 +1269,43 @@ async function backendGetHistory(fromISO, toISO) {
   return Array.isArray(d.history) ? d.history : [];
 }
 
+// ---- Sécurité des données : on n'envoie au serveur QUE ce que CET appareil a modifié / supprimé ----
+const SYNC_MAP = { saveOccupancy: 'occupancy', saveFreeTrailers: 'freeTrailers', saveDockOccupancy: 'dockOccupancy', saveDocksConfig: 'dockConfig', saveTrailerDB: 'trailerDB', saveTeamUsers: 'teamUsers', saveTempAccesses: 'tempAccesses' };
+const syncedSnap = {}; // action -> { clé: JSON } = dernier état connu du serveur
+function markSynced(d) {
+  if (!d || typeof d !== 'object') return;
+  Object.entries(SYNC_MAP).forEach(([act, prop]) => {
+    const o = d[prop];
+    if (o && typeof o === 'object' && !Array.isArray(o)) {
+      const m = {};
+      Object.keys(o).forEach(k => { m[k] = JSON.stringify(o[k]); });
+      syncedSnap[act] = m;
+    }
+  });
+}
 async function backendSave(action, storageKey, data) {
   if (!APPS_SCRIPT_URL) {
     showBackendMissingWarning();
     return;
   }
+  let patch = null, afterSnap = null;
+  if (SYNC_MAP[action]) {
+    const base = syncedSnap[action];
+    if (!base) {
+      toast("Données pas encore chargées depuis le serveur — sauvegarde annulée pour ne rien perdre. Recharge la page.");
+      throw new Error('état serveur inconnu : ' + action);
+    }
+    const upserts = {}, deleted = [], cur = {};
+    Object.entries(data || {}).forEach(([k, v]) => { const sv = JSON.stringify(v); cur[k] = sv; if (base[k] !== sv) upserts[k] = v; });
+    Object.keys(base).forEach(k => { if (!(k in cur)) deleted.push(k); });
+    if (!Object.keys(upserts).length && !deleted.length) return; // rien à écrire
+    patch = { upserts, deleted };
+    afterSnap = cur;
+  }
   const resp = await fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, data })
+    body: JSON.stringify({ action, data, patch })
   });
   let result;
   try { result = await resp.json(); } catch(e) {
@@ -1288,7 +1316,9 @@ async function backendSave(action, storageKey, data) {
   if (!result || result.ok === false) {
     console.error("Échec backend pour", action, result);
     toast("Échec de sauvegarde (" + action + ") : " + (result && result.error ? result.error : "erreur inconnue"));
+    return;
   }
+  if (afterSnap) syncedSnap[action] = afterSnap;
 }
 
 let backendWarningShown = false;
@@ -1414,6 +1444,7 @@ async function loadAll(preFetched) {
     try { d = await backendGetAll(); } catch(e) { console.warn("Erreur chargement des données:", e); d = {}; }
   }
 
+  markSynced(d);
   spotsConfig = d.spotsConfig || {};
   occupancy = d.occupancy || {};
   freeTrailers = d.freeTrailers || {};
@@ -1741,6 +1772,18 @@ function snapshotOf(spots, occ, free) {
 }
 
 function applyFreshState(d) {
+  // Garde TOUTES les listes à jour (sinon une liste périmée écrase celle des autres à la prochaine sauvegarde)
+  try {
+    markSynced(d);
+    if (d.teamUsers && typeof d.teamUsers === 'object') {
+      teamUsers = d.teamUsers;
+      if (currentUser && teamUsers[currentUser.pin]) currentUser.permissions = teamUsers[currentUser.pin].permissions || {};
+    }
+    if (d.tempAccesses && typeof d.tempAccesses === 'object') tempAccesses = d.tempAccesses;
+    if (Array.isArray(d.clientPresets)) clientPresets = d.clientPresets;
+    if (d.contentPresets && typeof d.contentPresets === 'object') contentPresetsByClient = d.contentPresets;
+    if (d.filtersConfig && typeof d.filtersConfig === 'object') { filtersConfig = d.filtersConfig; renderFilterBars(); }
+  } catch (e) { console.warn('refresh listes', e); }
   const newOcc = d.occupancy || {};
   const newFree = d.freeTrailers || {};
   const newSpots = d.spotsConfig || {};
@@ -4831,9 +4874,25 @@ function showIdentifyScreen() {
 }
 
 async function ensureIdentified() {
-  let d = {};
-  try { d = await backendGetAll(); } catch(e) { d = {}; }
-  teamUsers = d.teamUsers || {};
+  // On ne continue JAMAIS sans avoir réellement lu la liste des utilisateurs sur le serveur :
+  // un chargement raté ne doit pas être pris pour "aucun utilisateur" (ça effaçait les comptes).
+  let d = null;
+  for (let i = 0; i < 4 && !d; i++) {
+    try {
+      const r = await backendGetAll();
+      if (r && typeof r === 'object' && !r.error && r.teamUsers && typeof r.teamUsers === 'object') d = r;
+    } catch (e) { /* on réessaie */ }
+    if (!d) await new Promise(res => setTimeout(res, 1500));
+  }
+  if (!d) {
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg,#0b0b0b);color:var(--ink,#fff);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;font-family:inherit;';
+    box.innerHTML = '<div style="font-size:18px;font-weight:800;">Connexion au serveur impossible</div><div style="font-size:13px;opacity:.7;max-width:320px;">Aucune donnée n\'a été modifiée. Vérifie ta connexion puis réessaie.</div><button class="btn btn-primary" style="padding:12px 24px;" onclick="location.reload()">Réessayer</button>';
+    document.body.appendChild(box);
+    await new Promise(() => {}); // on s'arrête ici : rien n'est écrit
+  }
+  teamUsers = d.teamUsers;
+  markSynced(d);
 
   if (!Object.keys(teamUsers).length) {
     const allPerms = {};
