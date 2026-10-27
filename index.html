@@ -455,6 +455,7 @@
   .fc-row button { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--surface-3); color: var(--ink); cursor: pointer; font-size: 12px; flex-shrink: 0; }
   .fc-row input, .fc-add input, .fc-add select { background: var(--surface-3); color: var(--ink); border: none; border-radius: 12px; padding: 0 12px; font: 600 13px var(--font-display); outline: none; }
   .fc-add { display: flex; flex-wrap: wrap; gap: 6px; }
+  #btn-lp-date.active { background: var(--amber); color: var(--amber-ink); }
   .fc-add select, .fc-add input { flex: 1 1 140px; min-width: 0; height: 38px; }
   .view-seg { display: flex; gap: 4px; padding: 4px; background: var(--panel-2); border-radius: 999px; box-shadow: inset 0 0 0 1px var(--panel-hair); flex-shrink: 0; }
   .view-seg button { border: none; background: transparent; color: var(--ink-dim); font: 700 12.5px var(--font-display); height: 32px; padding: 0 14px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
@@ -774,7 +775,10 @@
   </div>
   <div class="lp-search"><input type="text" id="lp-search-input" placeholder="Rechercher n°, client..."></div>
   <div id="lp-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; align-items:center;">
-    <button class="lp-icon-btn" id="btn-lp-sort" title="Trier A-Z">⬇️</button>
+    <span style="margin-left:auto; display:flex; gap:6px; flex-shrink:0;">
+      <button class="lp-icon-btn" id="btn-lp-date" title="Trier par date de dépose" style="width:auto; padding:0 10px;">📅</button>
+      <button class="lp-icon-btn" id="btn-lp-sort" title="Trier A-Z">⬇️</button>
+    </span>
   </div>
   <div id="lp-items"></div>
 </div>
@@ -1021,6 +1025,8 @@
       <select id="fc-kind-list"></select>
       <input type="text" id="fc-label-list" placeholder="Nom du filtre">
       <input type="text" id="fc-value-list" list="client-presets-list" placeholder="Client / texte" style="display:none;">
+      <input type="number" id="fc-min-list" min="0" placeholder="Depuis (jours) min" style="display:none;">
+      <input type="number" id="fc-max-list" min="0" placeholder="Jusqu'à (jours) max" style="display:none;">
       <button class="btn btn-primary" id="fc-add-list">Ajouter</button>
     </div>
     <h3 style="font-size:13px; margin:18px 0 6px;">Base remorques</h3>
@@ -1047,18 +1053,17 @@
     <div style="display:flex; flex-wrap:wrap; gap:14px; margin:4px 0 10px; font-size:12.5px;">
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-loc" checked>Emplacement</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-status" checked>Statut</label>
-      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-days" checked>Jours sur site</label>
+      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-days" checked>Date de dépose / jours</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-notes" checked>Notes</label>
     </div>
     <div style="font-size:12px; color:var(--ink-faint); margin-bottom:8px;" id="ex-count"></div>
     <div id="ex-preview" style="overflow:auto; max-height:34vh; border-radius:14px; background:#ffffff; padding:14px; color:#111827;"></div>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;">
-      <button class="btn btn-primary" id="ex-mail">✉️ Envoyer par mail</button>
+      <button class="btn btn-primary" id="ex-mail-eml">✉️ Mail</button>
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
-      <button class="btn btn-ghost" id="ex-csv">📄 Excel (CSV)</button>
     </div>
-    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). Pour un beau tableau dans le mail : « Copier le tableau », puis colle-le dans ton message.</div>
+    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Mail » télécharge un message prêt à envoyer : ouvre-le (double-clic) et Outlook affiche le tableau mis en forme.</div>
   </div>
 </div>
 
@@ -2516,7 +2521,7 @@ document.querySelector('.search-pill svg').addEventListener('click', () => { if 
 // ---------- CONFIG DES FILTRES ----------
 const filtersConfigModal = document.getElementById('filters-config-modal');
 const FC_KINDS = {
-  list: [['status:pleine', 'Statut : À vider'], ['status:vide', 'Statut : Vide'], ['status:charge', 'Statut : Chargé'], ['status:fleet', 'Statut : Fleet'], ['fixed:', 'Emplacements fixes (P)'], ['client:', 'Client…'], ['text:', 'Texte (n°, notes, client)…']],
+  list: [['status:pleine', 'Statut : À vider'], ['status:vide', 'Statut : Vide'], ['status:charge', 'Statut : Chargé'], ['status:fleet', 'Statut : Fleet'], ['fixed:', 'Emplacements fixes (P)'], ['client:', 'Client…'], ['text:', 'Texte (n°, notes, client)…'], ['age:', 'Date de dépose (jours sur site)…']],
   db: [['ct:ok', 'Contrôle technique : OK'], ['ct:soon', 'Contrôle technique : < 2 mois'], ['ct:nok', 'Contrôle technique : Non OK'], ['text:', 'Texte (n°, plaque, notes)…']]
 };
 function fcEditable() {
@@ -2531,8 +2536,14 @@ function fcRefresh(save) {
   renderFiltersConfig();
   if (save) saveFiltersConfig();
 }
+function fcAgeText(f) {
+  if (f.min != null && f.max != null) return f.min === f.max ? (f.min === 0 ? "aujourd'hui" : 'il y a ' + f.min + ' j') : f.min + ' à ' + f.max + ' j';
+  if (f.min != null) return '≥ ' + f.min + ' j';
+  if (f.max != null) return '≤ ' + f.max + ' j';
+  return 'toutes';
+}
 function fcKindLabel(f) {
-  return f.type === 'all' ? 'toujours présent' : f.type === 'status' ? 'statut' : f.type === 'fixed' ? 'fixes' : f.type === 'ct' ? 'CT' : f.type === 'client' ? 'client : ' + f.value : 'texte : ' + f.value;
+  return f.type === 'all' ? 'toujours présent' : f.type === 'status' ? 'statut' : f.type === 'fixed' ? 'fixes' : f.type === 'ct' ? 'CT' : f.type === 'client' ? 'client : ' + f.value : f.type === 'age' ? 'dépose : ' + fcAgeText(f) : 'texte : ' + f.value;
 }
 function renderFiltersConfig() {
   const cfg = fcEditable();
@@ -2554,13 +2565,20 @@ function renderFiltersConfig() {
 function fcSetupAdd(g) {
   const kind = document.getElementById('fc-kind-' + g), label = document.getElementById('fc-label-' + g), val = document.getElementById('fc-value-' + g);
   kind.innerHTML = FC_KINDS[g].map(k => `<option value="${k[0]}">${k[1]}</option>`).join('');
-  const sync = () => { const t = kind.value.split(':')[0]; val.style.display = (t === 'client' || t === 'text') ? '' : 'none'; };
+  const mn = document.getElementById('fc-min-' + g), mx = document.getElementById('fc-max-' + g);
+  const sync = () => { const t = kind.value.split(':')[0]; val.style.display = (t === 'client' || t === 'text') ? '' : 'none'; if (mn) { mn.style.display = mx.style.display = t === 'age' ? '' : 'none'; } };
   kind.onchange = sync; sync();
   document.getElementById('fc-add-' + g).onclick = () => {
     const [type, value] = kind.value.split(':');
     const text = kind.options[kind.selectedIndex].textContent.replace(/^[^:]*:\s*/, '').replace('…', '');
     let f = { type };
-    if (type === 'client' || type === 'text') {
+    if (type === 'age') {
+      const a = mn.value === '' ? null : Math.max(0, parseInt(mn.value)), b = mx.value === '' ? null : Math.max(0, parseInt(mx.value));
+      if (a == null && b == null) { toast('Indique au moins un nombre de jours'); return; }
+      f.min = a; f.max = b;
+      f.label = label.value.trim() || ('Posée ' + fcAgeText(f));
+      mn.value = ''; mx.value = '';
+    } else if (type === 'client' || type === 'text') {
       const v = val.value.trim();
       if (!v) { toast('Saisis le client ou le texte à filtrer'); return; }
       f.value = v; f.label = label.value.trim() || v;
@@ -2591,12 +2609,12 @@ const exportModal = document.getElementById('export-modal');
 function exRows() {
   const cols = { loc: document.getElementById('ex-col-loc').checked, status: document.getElementById('ex-col-status').checked, days: document.getElementById('ex-col-days').checked, notes: document.getElementById('ex-col-notes').checked };
   const head = ['N° remorque', 'Client'];
-  if (cols.loc) head.push('Emplacement'); if (cols.status) head.push('Statut'); if (cols.days) head.push('Jours sur site'); if (cols.notes) head.push('Notes');
+  if (cols.loc) head.push('Emplacement'); if (cols.status) head.push('Statut'); if (cols.days) head.push('Déposée le', 'Jours sur site'); if (cols.notes) head.push('Notes');
   const stLabel = st => st === 'fleet' ? 'Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : 'À vider';
   const rows = lastListExport.map(it => {
     const loc = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     const r = [it.trailer || '(sans n°)', it.client || ''];
-    if (cols.loc) r.push(loc); if (cols.status) r.push(stLabel(it.status)); if (cols.days) r.push(daysSince(it.time) + ' j'); if (cols.notes) r.push(it.notes || '');
+    if (cols.loc) r.push(loc); if (cols.status) r.push(stLabel(it.status)); if (cols.days) r.push(it.time ? new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '', daysSince(it.time) + ' j'); if (cols.notes) r.push(it.notes || '');
     return r;
   });
   return { head, rows };
@@ -2633,18 +2651,20 @@ function closeExportModal() { exportModal.classList.remove('open'); overlay.clas
 document.getElementById('btn-lp-export').onclick = openExportModal;
 document.getElementById('btn-export-close').onclick = closeExportModal;
 ['ex-title', 'ex-col-loc', 'ex-col-status', 'ex-col-days', 'ex-col-notes'].forEach(id => document.getElementById(id).addEventListener('input', renderExportPreview));
-document.getElementById('ex-mail').onclick = async () => {
+// Fichier .eml en brouillon (X-Unsent) : s'ouvre dans Outlook installé sur le PC par simple double-clic,
+// avec le tableau mis en forme directement dans le message — sans dépendre du lien mailto.
+document.getElementById('ex-mail-eml').onclick = () => {
   if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
-  // Le tableau mis en forme est copié dans le presse-papiers (à coller dans le mail) ;
-  // le mail s'ouvre avec la liste en texte (limité par les clients mail à ~1800 caractères).
-  try { await copyRich(); } catch (e) {}
-  let body = exText();
-  const max = 1700;
-  let note = '';
-  if (body.length > max) { body = body.slice(0, body.lastIndexOf('\n', max)); note = '\n… (liste complète : colle le tableau copié ici)'; }
-  const to = document.getElementById('ex-to').value.trim().replace(/\s+/g, '');
-  location.href = 'mailto:' + encodeURIComponent(to).replace(/%2C/g, ',').replace(/%40/g, '@') + '?subject=' + encodeURIComponent(exTitle()) + '&body=' + encodeURIComponent(body + note);
-  toast('Mail ouvert — le tableau mis en forme est aussi copié (Ctrl+V pour le coller)');
+  const to = document.getElementById('ex-to').value.trim().replace(/\s+/g, '').replace(/;/g, ',');
+  const b64 = str => btoa(unescape(encodeURIComponent(str)));
+  const wrap = str => str.replace(/.{1,76}/g, '$&\r\n');
+  const html = '<html><body>' + exHtmlTable() + '</body></html>';
+  const eml = (to ? 'To: ' + to + '\r\n' : '') + 'Subject: =?UTF-8?B?' + b64(exTitle()) + '?=\r\nX-Unsent: 1\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' + wrap(b64(html));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([eml], { type: 'message/rfc822' }));
+  a.download = 'remorques-' + new Date().toISOString().slice(0, 10) + '.eml';
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('Fichier téléchargé : ouvre-le (double-clic) pour qu\'Outlook crée le mail');
 };
 async function copyRich() {
   const html = exHtmlTable();
@@ -2664,15 +2684,6 @@ document.getElementById('ex-print').onclick = () => {
   if (!w) { toast('Autorise les fenêtres pop-up pour imprimer'); return; }
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHtml(exTitle()) + '</title><style>body{margin:28px;font-family:Arial,sans-serif}@media print{th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>' + exHtmlTable() + '<script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
   w.document.close();
-};
-document.getElementById('ex-csv').onclick = () => {
-  const { head, rows } = exRows();
-  const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
-  const csv = '﻿' + [head, ...rows].map(r => r.map(esc).join(';')).join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = 'remorques-' + new Date().toISOString().slice(0, 10) + '.csv';
-  document.body.appendChild(a); a.click(); a.remove();
 };
 
 // ---------- THÈME CLAIR / SOMBRE (au choix de chacun) ----------
@@ -3317,8 +3328,10 @@ document.getElementById('lp-search-input').oninput = renderListPanel;
 
 let lpActiveFilters = new Set(); // statuts sélectionnés (pleine/vide/fleet/charge), vide = tous
 let lpFixedOnly = false; // filtre "P" (emplacements fixes uniquement)
+let lpDateSort = null; // null | 'old' (plus ancienne d'abord) | 'new' (plus récente d'abord)
 let lpSortAsc = null; // null = pas trié (ordre naturel), true = A-Z, false = Z-A
 document.getElementById('btn-lp-sort').onclick = () => {
+  lpDateSort = null; document.getElementById('btn-lp-date').classList.remove('active'); document.getElementById('btn-lp-date').textContent = '📅';
   lpSortAsc = lpSortAsc === true ? false : true;
   document.getElementById('btn-lp-sort').textContent = lpSortAsc ? '⬇️' : '⬆️';
   renderListPanel();
@@ -3351,6 +3364,11 @@ function itemMatchesFilter(f, d) {
   if (f.type === 'status') return (d.status || 'pleine') === f.value;
   if (f.type === 'client') return (d.client || '').trim().toLowerCase() === String(f.value || '').trim().toLowerCase();
   if (f.type === 'text') return filterHaystack(d).includes(String(f.value || '').toLowerCase());
+  if (f.type === 'age') {
+    if (!d.time) return false;
+    const dd = daysSince(d.time);
+    return (f.min == null || dd >= f.min) && (f.max == null || dd <= f.max);
+  }
   return true;
 }
 function matchesActiveListFilters(d) {
@@ -3370,7 +3388,7 @@ function renderFilterBars() {
   // liste
   const lp = document.getElementById('lp-filters');
   lp.querySelectorAll('.lp-filter-btn').forEach(b => b.remove());
-  const sortBtn = document.getElementById('btn-lp-sort');
+  const sortBtn = document.getElementById('btn-lp-sort').parentElement;
   lf.forEach(f => sortBtn.insertAdjacentHTML('beforebegin', filterBtnHtml(f, '', 'data-filter')));
   lp.querySelectorAll('.lp-filter-btn').forEach(b => b.onclick = () => toggleListFilter(b.dataset.filter));
   // en-tête
@@ -3419,6 +3437,14 @@ function toggleDbFilter(id) {
 try { renderFilterBars(); } catch (e) { console.warn('renderFilterBars différé', e); }
 
 let lastListExport = [];
+document.getElementById('btn-lp-date').onclick = () => {
+  lpDateSort = lpDateSort === 'old' ? 'new' : 'old';
+  const b = document.getElementById('btn-lp-date');
+  b.classList.add('active');
+  b.textContent = lpDateSort === 'old' ? '📅⬆️' : '📅⬇️';
+  b.title = lpDateSort === 'old' ? 'Plus anciennes déposées en premier' : 'Plus récentes déposées en premier';
+  renderListPanel();
+};
 function renderListPanel() {
   const q = document.getElementById('lp-search-input').value.trim().toLowerCase();
   const items = [];
@@ -3449,7 +3475,12 @@ function renderListPanel() {
       .filter(Boolean).join(' ').toLowerCase();
     return haystack.includes(q);
   }) : filtered;
-  if (lpSortAsc !== null) {
+  if (lpDateSort) {
+    filtered = filtered.slice().sort((a, b) => {
+      const ta = a.time ? new Date(a.time).getTime() : Infinity, tb = b.time ? new Date(b.time).getTime() : Infinity;
+      return lpDateSort === 'old' ? ta - tb : tb - ta;
+    });
+  } else if (lpSortAsc !== null) {
     filtered = filtered.slice().sort((a, b) => {
       let cmp;
       if (lpFixedOnly) {
@@ -3499,7 +3530,7 @@ function renderListPanel() {
       </div>
       <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}</div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-meta">🔄 <span style="${isOverThreshold ? 'color:#f87171; font-weight:700;' : ''}">${days}j</span>${it.notes ? ' · 📝 ' + it.notes : ''}</div>
+        <div class="lp-meta">🔄 <span style="${isOverThreshold ? 'color:#f87171; font-weight:700;' : ''}">${days}j</span>${it.time ? ' · déposée le ' + new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' }) : ''}${it.notes ? ' · 📝 ' + it.notes : ''}</div>
         <div style="display:flex; gap:4px; flex-shrink:0;">
           <button class="lp-icon-btn" data-action="locate" title="Localiser sur la carte">📍</button>
           <button class="lp-icon-btn" data-action="detail" title="Voir le détail">👁️</button>
