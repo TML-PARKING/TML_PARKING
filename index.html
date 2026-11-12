@@ -1070,6 +1070,23 @@
   </div>
 </div>
 
+<div id="plate-scanner" style="display:none; position:fixed; inset:0; z-index:5000; background:#000;">
+  <video id="ps-video" playsinline muted autoplay style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;"></video>
+  <div style="position:absolute; inset:0; background:radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.55) 100%); pointer-events:none;"></div>
+  <div id="ps-frame" style="position:absolute; left:6%; width:88%; top:50%; height:17%; transform:translateY(-50%); border:3px solid #e4f26a; border-radius:18px; box-shadow:0 0 0 9999px rgba(0,0,0,.45); pointer-events:none;"></div>
+  <div style="position:absolute; top:0; left:0; right:0; padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 10px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+    <div style="color:#fff; font-weight:800; font-size:15px;">Scanner la plaque</div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-ghost" id="ps-torch" style="display:none; background:rgba(255,255,255,.16); color:#fff;">🔦</button>
+      <button class="btn btn-ghost" id="ps-close" style="background:rgba(255,255,255,.16); color:#fff;">✕</button>
+    </div>
+  </div>
+  <div style="position:absolute; left:0; right:0; bottom:0; padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 22px); text-align:center; color:#fff;">
+    <div id="ps-msg" style="font-weight:700; font-size:15px; margin-bottom:6px;">Place la plaque dans le cadre</div>
+    <div id="ps-read" style="font:12px monospace; opacity:.7; min-height:16px;"></div>
+  </div>
+</div>
+
 <div id="hide-docks-modal" class="bottom-sheet" style="z-index:2200; max-height:88vh;">
   <div class="handle"></div>
   <div class="sheet-header">
@@ -2719,17 +2736,17 @@ function matchPlates(tokens) {
   Object.entries(trailerDB).forEach(([num, e]) => {
     if (e && e.plate) {
       const pf = plateFold(e.plate);
-      if (pf.length < 4) return;
+      if (pf.length < 5) return;
       ftokens.forEach(({ f }) => {
-        if (f.length >= pf.length - 1 && f.includes(pf)) { consider(num, 0, e.plate); return; }
-        if (Math.abs(f.length - pf.length) > 1) return;
-        const d = lev(pf, f);
-        if (d === 0 || (d === 1 && pf.length >= 6)) consider(num, d, e.plate);
+        if (f === pf) { consider(num, 0, e.plate); return; }
+        if (f.length === pf.length + 1 && (f.startsWith(pf) || f.endsWith(pf))) { consider(num, 0, e.plate); return; } // caractère parasite autour
+        // une seule substitution acceptée, et seulement sur des plaques assez longues
+        if (f.length === pf.length && pf.length >= 7) { let diff = 0; for (let i = 0; i < pf.length && diff < 2; i++) if (pf[i] !== f[i]) diff++; if (diff === 1) consider(num, 1, e.plate); }
       });
     }
     // le n° de remorque lui-même peut aussi apparaître sur la photo
     const nf = plateFold(num);
-    if (nf.length >= 5) ftokens.forEach(({ f }) => { if (f === nf || (f.includes(nf) && f.length <= nf.length + 1)) consider(num, 0.5, e && e.plate ? e.plate : ''); });
+    if (nf.length >= 5) ftokens.forEach(({ f }) => { if (f === nf) consider(num, 0.5, e && e.plate ? e.plate : ''); });
   });
   return [...found.values()].sort((a, b) => a.d - b.d);
 }
@@ -2775,7 +2792,92 @@ function applyScannedTrailer(num, plate) {
   showScanStatus('✅ ' + (plate ? 'Plaque <b>' + escapeHtml(plate) + '</b> → ' : '') + 'remorque <b>' + escapeHtml(num) + '</b>');
   toast('Remorque trouvée : ' + num);
 }
-document.getElementById('btn-scan-plate').onclick = () => document.getElementById('scan-plate-input').click();
+// ---- Scanner en direct (comme un lecteur de code-barres) ----
+const psOv = document.getElementById('plate-scanner'), psVideo = document.getElementById('ps-video'), psFrame = document.getElementById('ps-frame');
+let psStream = null, psRunning = false, psVotes = [], psTorch = false;
+function psMsg(t) { document.getElementById('ps-msg').textContent = t; }
+function psStop() {
+  psRunning = false;
+  if (psStream) { psStream.getTracks().forEach(t => t.stop()); psStream = null; }
+  psVideo.srcObject = null; psOv.style.display = 'none'; psTorch = false;
+}
+function psCropCanvas() {
+  // zone du cadre à l'écran -> zone correspondante dans l'image de la caméra (object-fit: cover)
+  const vr = psVideo.getBoundingClientRect(), fr = psFrame.getBoundingClientRect();
+  const vw = psVideo.videoWidth, vh = psVideo.videoHeight;
+  if (!vw || !vh) return null;
+  const scale = Math.max(vr.width / vw, vr.height / vh);
+  const ox = (vw * scale - vr.width) / 2, oy = (vh * scale - vr.height) / 2;
+  const sx = Math.max(0, (fr.left - vr.left + ox) / scale), sy = Math.max(0, (fr.top - vr.top + oy) / scale);
+  const sw = Math.min(vw - sx, fr.width / scale), sh = Math.min(vh - sy, fr.height / scale);
+  const W = 720, H = Math.max(40, Math.round(W * sh / sw));
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(psVideo, sx, sy, sw, sh, 0, 0, W, H);
+  const img = ctx.getImageData(0, 0, W, H), d = img.data;
+  let lo = 255, hi = 0;
+  for (let i = 0; i < d.length; i += 4) { const g = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) | 0; d[i] = g; if (g < lo) lo = g; if (g > hi) hi = g; }
+  const span = Math.max(1, hi - lo);
+  for (let i = 0; i < d.length; i += 4) { const g = ((d[i] - lo) * 255 / span) | 0; d[i] = d[i + 1] = d[i + 2] = g; }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+async function psLoop(worker) {
+  const t0 = Date.now();
+  await worker.setParameters({ tessedit_pageseg_mode: '7' });
+  while (psRunning) {
+    const c = psCropCanvas();
+    if (!c) { await new Promise(r => setTimeout(r, 120)); continue; }
+    let text = '';
+    try { text = (await worker.recognize(c)).data.text || ''; } catch (e) { console.warn('ocr', e); }
+    if (!psRunning) return;
+    const clean = text.replace(/\s+/g, ' ').trim();
+    document.getElementById('ps-read').textContent = clean;
+    const matches = matchPlates(plateTokensFromText(text));
+    let pick = null;
+    if (matches.length && (matches.length === 1 || matches[0].d < matches[1].d)) pick = matches[0];
+    psVotes.push(pick ? pick.num : null); if (psVotes.length > 5) psVotes.shift();
+    if (pick) {
+      const n = psVotes.filter(v => v === pick.num).length;
+      if (n >= (pick.d <= 0.5 ? 2 : 3)) {
+        try { navigator.vibrate && navigator.vibrate(70); } catch (e) {}
+        psStop();
+        applyScannedTrailer(pick.num, pick.label);
+        return;
+      }
+      psMsg('Plaque détectée, ne bouge pas…');
+    } else if (Date.now() - t0 > 9000) psMsg('Rapproche-toi, évite les reflets, cadre uniquement la plaque');
+    await new Promise(r => setTimeout(r, 30));
+  }
+}
+async function openPlateScanner() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { document.getElementById('scan-plate-input').click(); return; }
+  try {
+    psStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+  } catch (e) { toast("Caméra refusée ou indisponible : autorise-la dans le navigateur"); document.getElementById('scan-plate-input').click(); return; }
+  psVideo.srcObject = psStream; psOv.style.display = 'block';
+  try { await psVideo.play(); } catch (e) {}
+  psVotes = []; psRunning = true; psMsg('Place la plaque dans le cadre'); document.getElementById('ps-read').textContent = '';
+  try {
+    const tr = psStream.getVideoTracks()[0], caps = (tr.getCapabilities && tr.getCapabilities()) || {};
+    if (caps.focusMode && caps.focusMode.includes('continuous')) await tr.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+    document.getElementById('ps-torch').style.display = caps.torch ? '' : 'none';
+  } catch (e) {}
+  try {
+    const worker = await getOcrWorker(m => psMsg(m));
+    if (!psRunning) return;
+    psMsg('Place la plaque dans le cadre');
+    psLoop(worker);
+  } catch (e) {
+    console.error(e); psStop(); showScanStatus('⚠️ Lecteur indisponible (' + escapeHtml(e.message || 'erreur') + '). Vérifie ta connexion internet.');
+  }
+}
+document.getElementById('ps-close').onclick = psStop;
+document.getElementById('ps-torch').onclick = async () => {
+  try { psTorch = !psTorch; await psStream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: psTorch }] }); } catch (e) {}
+};
+document.getElementById('btn-scan-plate').onclick = () => { openPlateScanner(); };
+
 document.getElementById('scan-plate-input').onchange = async (ev) => {
   const file = ev.target.files && ev.target.files[0];
   ev.target.value = '';
@@ -2940,6 +3042,7 @@ function fillForm(data) {
 function setSheetReadOnly(readOnly) {
   document.getElementById('f-trailer').disabled = readOnly;
   document.getElementById('btn-scan-plate').style.display = readOnly ? 'none' : 'flex';
+  if (!readOnly) { try { setTimeout(() => getOcrWorker(() => {}).catch(() => {}), 400); } catch (e) {} }
   document.getElementById('scan-plate-status').style.display = 'none';
   document.getElementById('f-client').disabled = readOnly;
   document.getElementById('f-notes').disabled = readOnly;
