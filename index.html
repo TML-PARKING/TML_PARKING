@@ -811,6 +811,9 @@
     <div class="field">
       <label>N° Remorque</label>
       <input type="text" id="f-trailer" placeholder="Ex: TR-4521" autocomplete="off">
+      <button type="button" class="btn btn-ghost" id="btn-scan-plate" style="margin-top:8px; width:100%; justify-content:center; gap:8px; display:flex; align-items:center;">📷 Scanner la plaque</button>
+      <input type="file" id="scan-plate-input" accept="image/*" capture="environment" style="display:none;">
+      <div id="scan-plate-status" style="display:none; margin-top:8px; font-size:12.5px; padding:9px 11px; border-radius:12px; background:var(--surface-1);"></div>
       <div id="ct-indicator" style="margin-top:6px; font-size:13px; font-weight:600; display:none; padding:8px 10px; border-radius:8px;"></div>
     </div>
     <div class="field">
@@ -2480,7 +2483,9 @@ function applyMapFilters() {
 }
 var mapSearchQ = '';
 function mapSearchMatch(d, q) {
-  return [d.trailer, d.client, d.notes].some(v => v && String(v).toLowerCase().includes(q));
+  if ([d.trailer, d.client, d.notes].some(v => v && String(v).toLowerCase().includes(q))) return true;
+  const e = d.trailer ? trailerDB[d.trailer] : null, nq = normPlate(q);
+  return !!(e && e.plate && nq.length >= 3 && normPlate(e.plate).includes(nq));
 }
 function mapSearchResults(q) {
   const out = [];
@@ -2686,6 +2691,128 @@ document.getElementById('ex-print').onclick = () => {
   w.document.close();
 };
 
+
+// ---------- SCAN DE PLAQUE (appareil photo + OCR) ----------
+function normPlate(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+// Les confusions classiques de l'OCR (O/0, I/1, S/5, B/8…) sont neutralisées des deux côtés avant comparaison
+function plateFold(s) { return normPlate(s).replace(/[OQD]/g, '0').replace(/[IL]/g, '1').replace(/S/g, '5').replace(/B/g, '8').replace(/Z/g, '2'); }
+function lev(a, b) {
+  const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+  return prev[n];
+}
+function plateTokensFromText(text) {
+  const lines = String(text || '').toUpperCase().split(/\n+/).map(l => l.trim()).filter(Boolean);
+  const set = new Set();
+  lines.forEach(l => {
+    const words = l.split(/[\s|]+/).map(normPlate).filter(w => w.length >= 2);
+    const whole = normPlate(l); if (whole.length >= 4 && whole.length <= 12) set.add(whole);
+    words.forEach((w, i) => { if (w.length >= 4 && w.length <= 12) set.add(w); if (words[i + 1]) { const j = w + words[i + 1]; if (j.length >= 5 && j.length <= 12) set.add(j); } });
+  });
+  return [...set];
+}
+function matchPlates(tokens) {
+  const found = new Map();
+  const consider = (num, d, label) => { const cur = found.get(num); if (!cur || d < cur.d) found.set(num, { num, d, label }); };
+  const ftokens = tokens.map(t => ({ t, f: plateFold(t) }));
+  Object.entries(trailerDB).forEach(([num, e]) => {
+    if (e && e.plate) {
+      const pf = plateFold(e.plate);
+      if (pf.length < 4) return;
+      ftokens.forEach(({ f }) => {
+        if (f.length >= pf.length - 1 && f.includes(pf)) { consider(num, 0, e.plate); return; }
+        if (Math.abs(f.length - pf.length) > 1) return;
+        const d = lev(pf, f);
+        if (d === 0 || (d === 1 && pf.length >= 6)) consider(num, d, e.plate);
+      });
+    }
+    // le n° de remorque lui-même peut aussi apparaître sur la photo
+    const nf = plateFold(num);
+    if (nf.length >= 5) ftokens.forEach(({ f }) => { if (f === nf || (f.includes(nf) && f.length <= nf.length + 1)) consider(num, 0.5, e && e.plate ? e.plate : ''); });
+  });
+  return [...found.values()].sort((a, b) => a.d - b.d);
+}
+let ocrWorkerPromise = null;
+function loadScript(src) {
+  return new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error('chargement impossible : ' + src)); document.head.appendChild(el); });
+}
+async function getOcrWorker(onStatus) {
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = (async () => {
+      onStatus('Premier lancement : chargement du lecteur (quelques secondes)…');
+      if (!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+      const w = await Tesseract.createWorker('eng', 1, { langPath: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int' });
+      await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ', tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
+      return w;
+    })().catch(e => { ocrWorkerPromise = null; throw e; });
+  }
+  return ocrWorkerPromise;
+}
+async function photoToCanvas(file, rotate) {
+  const bmp = await createImageBitmap(file);
+  const max = 1800, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+  const c = document.createElement('canvas');
+  const swap = rotate === 90 || rotate === 270;
+  c.width = swap ? h : w; c.height = swap ? w : h;
+  const ctx = c.getContext('2d');
+  ctx.translate(c.width / 2, c.height / 2); ctx.rotate(rotate * Math.PI / 180); ctx.drawImage(bmp, -w / 2, -h / 2, w, h);
+  // niveaux de gris + étirement du contraste
+  const img = ctx.getImageData(0, 0, c.width, c.height), d = img.data;
+  let lo = 255, hi = 0;
+  for (let i = 0; i < d.length; i += 4) { const g = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) | 0; d[i] = g; if (g < lo) lo = g; if (g > hi) hi = g; }
+  const span = Math.max(1, hi - lo);
+  for (let i = 0; i < d.length; i += 4) { const g = Math.max(0, Math.min(255, ((d[i] - lo) * 255 / span) | 0)); d[i] = d[i + 1] = d[i + 2] = g; }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+function showScanStatus(html) { const el = document.getElementById('scan-plate-status'); el.style.display = html ? 'block' : 'none'; el.innerHTML = html || ''; }
+function applyScannedTrailer(num, plate) {
+  const inp = document.getElementById('f-trailer');
+  inp.value = num; inp.dispatchEvent(new Event('input', { bubbles: true }));
+  updateCtIndicator();
+  showScanStatus('✅ ' + (plate ? 'Plaque <b>' + escapeHtml(plate) + '</b> → ' : '') + 'remorque <b>' + escapeHtml(num) + '</b>');
+  toast('Remorque trouvée : ' + num);
+}
+document.getElementById('btn-scan-plate').onclick = () => document.getElementById('scan-plate-input').click();
+document.getElementById('scan-plate-input').onchange = async (ev) => {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  try {
+    showScanStatus('⏳ Lecture de la plaque…');
+    const worker = await getOcrWorker(m => showScanStatus('⏳ ' + m));
+    showScanStatus('⏳ Lecture de la plaque…');
+    let tokens = [], matches = [];
+    // Plusieurs tentatives (modes de lecture et rotations) jusqu'à trouver une remorque de la base
+    const attempts = [[0, '6'], [0, '3'], [90, '6'], [270, '6'], [0, '11']];
+    let canvasCache = {};
+    for (const [rot, psm] of attempts) {
+      canvasCache[rot] = canvasCache[rot] || await photoToCanvas(file, rot);
+      await worker.setParameters({ tessedit_pageseg_mode: psm });
+      const { data } = await worker.recognize(canvasCache[rot]);
+      tokens = tokens.concat(plateTokensFromText(data.text));
+      matches = matchPlates(tokens);
+      if (matches.length && matches[0].d <= 0.5) break;
+    }
+    if (matches.length === 1 || (matches.length > 1 && matches[0].d < matches[1].d)) {
+      applyScannedTrailer(matches[0].num, matches[0].label);
+    } else if (matches.length > 1) {
+      showScanStatus('Plusieurs remorques possibles, choisis la bonne :<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' +
+        matches.slice(0, 5).map(m => `<button type="button" class="btn btn-ghost" data-scan-num="${escapeHtml(m.num)}" data-scan-plate="${escapeHtml(m.label)}" style="padding:6px 12px;">${escapeHtml(m.num)}${m.label ? ' · ' + escapeHtml(m.label) : ''}</button>`).join('') + '</div>');
+      document.querySelectorAll('#scan-plate-status [data-scan-num]').forEach(b => b.onclick = () => applyScannedTrailer(b.dataset.scanNum, b.dataset.scanPlate));
+    } else {
+      const guess = tokens.filter(t => t.length >= 5 && t.length <= 10 && /[A-Z]/.test(t) && /[0-9]/.test(t)).slice(0, 4);
+      showScanStatus('Aucune remorque ne correspond à cette plaque dans la base.' + (guess.length ? '<br>Texte lu (touche pour l\'utiliser) :<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + guess.map(g => `<button type="button" class="btn btn-ghost" data-scan-raw="${escapeHtml(g)}" style="padding:6px 12px;">${escapeHtml(g)}</button>`).join('') + '</div>' : '<br>Rien de lisible : rapproche-toi, évite les reflets et réessaie.'));
+      document.querySelectorAll('#scan-plate-status [data-scan-raw]').forEach(b => b.onclick = () => { const i = document.getElementById('f-trailer'); i.value = b.dataset.scanRaw; i.dispatchEvent(new Event('input', { bubbles: true })); showScanStatus(''); });
+    }
+  } catch (e) {
+    console.error('scan plaque', e);
+    showScanStatus('⚠️ Lecture impossible (' + escapeHtml(e.message || 'erreur') + '). Vérifie ta connexion internet puis réessaie.');
+  }
+};
+
 // ---------- THÈME CLAIR / SOMBRE (au choix de chacun) ----------
 function themeKey() { return 'yard:theme:' + ((currentUser && currentUser.pin) ? currentUser.pin : 'guest'); }
 function applyTheme(t) {
@@ -2812,6 +2939,8 @@ function fillForm(data) {
 
 function setSheetReadOnly(readOnly) {
   document.getElementById('f-trailer').disabled = readOnly;
+  document.getElementById('btn-scan-plate').style.display = readOnly ? 'none' : 'flex';
+  document.getElementById('scan-plate-status').style.display = 'none';
   document.getElementById('f-client').disabled = readOnly;
   document.getElementById('f-notes').disabled = readOnly;
   document.querySelectorAll('.status-chip').forEach(c => {
@@ -2943,7 +3072,7 @@ document.getElementById('f-trailer').addEventListener('input', checkTrailerAlrea
 document.getElementById('f-trailer').addEventListener('blur', () => {
   const val = document.getElementById('f-trailer').value.trim();
   if (!val || trailerDB[val]) return; // déjà un n° de remorque valide, rien à faire
-  const match = Object.entries(trailerDB).find(([num, entry]) => entry.plate && entry.plate === val);
+  const match = Object.entries(trailerDB).find(([num, entry]) => entry.plate && normPlate(entry.plate) === normPlate(val));
   if (match) {
     document.getElementById('f-trailer').value = match[0];
     toast(`Remorque trouvée via la plaque : ${match[0]}`);
@@ -3473,7 +3602,10 @@ function renderListPanel() {
     const commentsText = (it.comments || []).map(c => c.text).join(' ');
     const haystack = [it.trailer, it.client, it.label, it.notes, commentsText, ctEntry && ctEntry.plate]
       .filter(Boolean).join(' ').toLowerCase();
-    return haystack.includes(q);
+    if (haystack.includes(q)) return true;
+    // recherche de plaque tolérante : "qamx 398", "QAMX-398" et "qamx398" sont équivalents
+    const nq = normPlate(q);
+    return nq.length >= 3 && !!(ctEntry && ctEntry.plate) && normPlate(ctEntry.plate).includes(nq);
   }) : filtered;
   if (lpDateSort) {
     filtered = filtered.slice().sort((a, b) => {
