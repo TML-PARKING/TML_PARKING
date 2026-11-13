@@ -238,6 +238,7 @@
   .status-chip[data-status="vide"].active { background: #6b7280; color: #fff; }
   .status-chip[data-status="fleet"].active { background: #7c3aed; color: #fff; }
   .status-chip[data-status="charge"].active { background: #0891b2; color: #fff; }
+  .status-chip[data-status="achar"].active { background: #eab308; color: #1a1a1a; }
   #db-ct-ok.active { background: #16a34a; color: #fff; border-color: transparent; }
   #db-ct-nok.active { background: #dc2626; color: #fff; border-color: transparent; }
 
@@ -277,6 +278,7 @@
   .lp-badge.vide { background: #16a34a33; color: #4ade80; }
   .lp-badge.fleet { background: #7c3aed33; color: #c4b5fd; }
   .lp-badge.charge { background: #0891b233; color: #67e8f9; }
+  .lp-badge.achar { background: #eab30833; color: #fde047; }
   .lp-badge.rouge15 { background: #dc262633; color: #f87171; }
   .lp-badge.ctsoon { background: #f9731633; color: #fb923c; }
   .lp-badge.ctok { background: #16a34a33; color: #4ade80; }
@@ -757,6 +759,7 @@
   <div><span style="background:#16a34a"></span>Vide</div>
   <div><span style="background:#dc2626"></span>À vider</div>
   <div><span style="background:#0891b2"></span>Chargé</div>
+  <div><span style="background:#eab308"></span>À charger</div>
   <div><span style="background:#7c3aed"></span>Fleet (bloqué)</div>
 </div>
 
@@ -830,6 +833,7 @@
         <div class="status-chip" data-status="vide">Vide</div>
         <div class="status-chip" data-status="fleet">Fleet</div>
         <div class="status-chip" data-status="charge">Chargé</div>
+        <div class="status-chip" data-status="achar">À charger</div>
       </div>
     </div>
     <div class="field">
@@ -964,6 +968,7 @@
         <div class="status-chip" data-status="vide">Vide</div>
         <div class="status-chip" data-status="fleet">Fleet</div>
         <div class="status-chip" data-status="charge">Chargé</div>
+        <div class="status-chip" data-status="achar">À charger</div>
       </div>
     </div>
     <div class="field">
@@ -1494,6 +1499,7 @@ function getVisualState(data) {
   if (data.status === 'fleet') return { color: '#7c3aed', label: 'Bloqué' };
   if (data.status === 'vide') return { color: '#16a34a', label: '' };
   if (data.status === 'charge') return { color: '#0891b2', label: '' };
+  if (data.status === 'achar') return { color: '#eab308', label: '' };
   return { color: '#dc2626', label: '' }; // à vider (pleine) = rouge
 }
 
@@ -2546,7 +2552,7 @@ document.querySelector('.search-pill svg').addEventListener('click', () => { if 
 // ---------- CONFIG DES FILTRES ----------
 const filtersConfigModal = document.getElementById('filters-config-modal');
 const FC_KINDS = {
-  list: [['status:pleine', 'Statut : À vider'], ['status:vide', 'Statut : Vide'], ['status:charge', 'Statut : Chargé'], ['status:fleet', 'Statut : Fleet'], ['fixed:', 'Emplacements fixes (P)'], ['client:', 'Client…'], ['text:', 'Texte (n°, notes, client)…'], ['age:', 'Date de dépose (jours sur site)…']],
+  list: [['status:pleine', 'Statut : À vider'], ['status:vide', 'Statut : Vide'], ['status:charge', 'Statut : Chargé'], ['status:achar', 'Statut : À charger'], ['status:fleet', 'Statut : Fleet'], ['fixed:', 'Emplacements fixes (P)'], ['client:', 'Client…'], ['text:', 'Texte (n°, notes, client)…'], ['age:', 'Date de dépose (jours sur site)…']],
   db: [['ct:ok', 'Contrôle technique : OK'], ['ct:soon', 'Contrôle technique : < 2 mois'], ['ct:nok', 'Contrôle technique : Non OK'], ['text:', 'Texte (n°, plaque, notes)…']]
 };
 function fcEditable() {
@@ -2635,7 +2641,7 @@ function exRows() {
   const cols = { loc: document.getElementById('ex-col-loc').checked, status: document.getElementById('ex-col-status').checked, days: document.getElementById('ex-col-days').checked, notes: document.getElementById('ex-col-notes').checked };
   const head = ['N° remorque', 'Client'];
   if (cols.loc) head.push('Emplacement'); if (cols.status) head.push('Statut'); if (cols.days) head.push('Déposée le', 'Jours sur site'); if (cols.notes) head.push('Notes');
-  const stLabel = st => st === 'fleet' ? 'Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : 'À vider';
+  const stLabel = st => st === 'fleet' ? 'Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'À charger' : 'À vider';
   const rows = lastListExport.map(it => {
     const loc = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     const r = [it.trailer || '(sans n°)', it.client || ''];
@@ -3597,6 +3603,7 @@ const DEFAULT_FILTERS = {
     { id: 'pleine', label: 'À vider', type: 'status', value: 'pleine' },
     { id: 'vide', label: 'Vide', type: 'status', value: 'vide' },
     { id: 'charge', label: 'Chargé', type: 'status', value: 'charge' },
+    { id: 'achar', label: 'À charger', type: 'status', value: 'achar' },
     { id: 'fleet', label: 'Fleet', type: 'status', value: 'fleet' },
     { id: 'fixed', label: 'P', type: 'fixed' }
   ],
@@ -3763,7 +3770,7 @@ function renderListPanel() {
     const relevantThreshold = it.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
     const isOverThreshold = (it.status === 'pleine' || it.status === 'charge') && days > relevantThreshold;
     const badgeClass = it.status;
-    const badgeText = it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : it.status)));
+    const badgeText = it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : (it.status === 'achar' ? 'À charger' : it.status))));
 
     const ctEntry = it.trailer ? trailerDB[it.trailer] : null;
     const ctStatus = ctEntry ? getCtStatus(ctEntry.ctExpiryDate) : null;
@@ -3950,7 +3957,7 @@ function renderHistoryPanel() {
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-num">${h.trailer || '(sans n°)'}</div>
-        <div class="lp-badge ${h.status || 'pleine'}">${h.status === 'fleet' ? 'Fleet' : (h.status === 'vide' ? 'Vide' : (h.status === 'pleine' ? 'À vider' : (h.status === 'charge' ? 'Chargé' : (h.status || ''))))}</div>
+        <div class="lp-badge ${h.status || 'pleine'}">${h.status === 'fleet' ? 'Fleet' : (h.status === 'vide' ? 'Vide' : (h.status === 'pleine' ? 'À vider' : (h.status === 'charge' ? 'Chargé' : (h.status === 'achar' ? 'À charger' : (h.status || '')))))}</div>
       </div>
       <div class="lp-meta">${h.label}${h.client ? ' · ' + h.client : ''}</div>
       <div class="lp-meta">📥 Déposé : ${formatDateTime(h.dropTime)}${(h.encodedBy && hasPermission('viewAuthors')) ? ' par ' + h.encodedBy : ''}</div>
@@ -3993,7 +4000,7 @@ function openDetailView(item) {
   const badges = document.getElementById('detail-badges');
   badges.innerHTML = '';
   const vs = getVisualState(item);
-  const statusLabel = item.status === 'fleet' ? 'Fleet — Bloqué' : (item.status === 'vide' ? 'Vide' : (item.status === 'charge' ? 'Chargé' : 'À vider'));
+  const statusLabel = item.status === 'fleet' ? 'Fleet — Bloqué' : (item.status === 'vide' ? 'Vide' : (item.status === 'charge' ? 'Chargé' : (item.status === 'achar' ? 'À charger' : 'À vider')));
   badges.innerHTML += `<span class="detail-pill" style="background:${vs.color}22; color:${vs.color};">${statusLabel}</span>`;
   const relevantThreshold = item.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
   if (days > relevantThreshold && (item.status === 'pleine' || item.status === 'charge')) {
@@ -4116,7 +4123,7 @@ document.getElementById('btn-edit-status-save').onclick = async () => {
   if (!record) { toast("Introuvable"); closeEditStatusModal(); return; }
   // Trace de la modification (qui / quand / quoi) ajoutée automatiquement aux commentaires
   const changes = [];
-  const statusName = st => st === 'fleet' ? 'Fleet — Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st ? 'À vider' : '—';
+  const statusName = st => st === 'fleet' ? 'Fleet — Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'À charger' : st ? 'À vider' : '—';
   if ((record.status || '') !== status) changes.push(`statut : ${statusName(record.status)} → ${statusName(status)}`);
   if ((record.client || '') !== client) changes.push(`client : ${record.client || '—'} → ${client || '—'}`);
   if ((record.notes || '') !== notes) changes.push(`note : ${record.notes || '—'} → ${notes || '—'}`);
