@@ -3127,8 +3127,11 @@ document.getElementById('ex-mail-gmail').onclick = () => {
         try { await navigator.share({ files: [file], title: exTitle(), text }); return; }
         catch (e) { if (e && e.name === 'AbortError') return; }
       }
-      const mailto = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q(cut(7000));
-      location.href = mailto;
+      // Partage indisponible : on télécharge l'image du tableau et on ouvre un mail court (à joindre).
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('Image du tableau enregistrée : joins-la au mail (trombone)');
+      setTimeout(() => { location.href = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q('Tableau en pièce jointe (image).'); }, 1200);
     });
     return;
   }
