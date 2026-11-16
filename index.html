@@ -1081,11 +1081,12 @@
     <div id="ex-preview" style="overflow:auto; max-height:34vh; border-radius:14px; background:#ffffff; padding:14px; color:#111827;"></div>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;">
       <button class="btn btn-primary" id="ex-mail-eml">✉️ Mail Outlook</button>
+      <button class="btn" id="ex-send-now">📨 Envoyer directement</button>
       <button class="btn btn-ghost" id="ex-mail-pdf">📎 PDF seul</button>
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
     </div>
-    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;"><span id="ex-ver"></span>La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Mail Outlook » : crée un message prêt à envoyer (destinataires + tableau en PDF joint) à ouvrir ; « PDF seul » partage juste le PDF.</div>
+    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;"><span id="ex-ver"></span>La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Envoyer directement » (et « Mail Outlook » sur téléphone) envoie le mail avec le tableau en PDF joint, aux adresses du carnet. Sur PC, « Mail Outlook » télécharge un message à ouvrir.</div>
   </div>
 </div>
 
@@ -2684,7 +2685,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-16-eml-1";
+const APP_VERSION = "2026-11-16-send-1";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2795,26 +2796,7 @@ document.getElementById('btn-export-close').onclick = closeExportModal;
 document.getElementById('ex-mail-eml').onclick = () => {
   if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
   const to = exEmails().join(',');
-  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) {
-    // Téléphone : fichier .eml = brouillon avec destinataires + objet + PDF du tableau EN PIÈCE JOINTE.
-    exTablePdfBlob().then(async pdf => {
-      const bytes = new Uint8Array(await pdf.arrayBuffer());
-      let bin = ''; for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
-      const wrap = t => t.replace(/.{1,76}/g, '$&\r\n'), b64s = str => btoa(unescape(encodeURIComponent(str)));
-      const bd = '=_TML_' + Date.now(), day = new Date().toISOString().slice(0, 10);
-      const eml = (to ? 'To: ' + to + '\r\n' : '') + 'Subject: =?UTF-8?B?' + b64s(exTitle()) + '?=\r\nX-Unsent: 1\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="' + bd + '"\r\n\r\n'
-        + '--' + bd + '\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' + wrap(b64s('Bonjour,\n\nVeuillez trouver ci-joint la liste des remorques (' + lastListExport.length + ').\n\nCordialement')) + '\r\n'
-        + '--' + bd + '\r\nContent-Type: application/pdf; name="remorques-' + day + '.pdf"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="remorques-' + day + '.pdf"\r\n\r\n' + wrap(btoa(bin)) + '\r\n--' + bd + '--\r\n';
-      const file = new File([eml], 'remorques-' + day + '.eml', { type: 'message/rfc822' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: exTitle() }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
-      }
-      const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name;
-      document.body.appendChild(a); a.click(); a.remove();
-      toast('Fichier enregistré : ouvre-le pour créer le mail');
-    });
-    return;
-  }
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) { exSendNow(); return; }
   const b64 = str => btoa(unescape(encodeURIComponent(str)));
   const wrap = str => str.replace(/.{1,76}/g, '$&\r\n');
   const html = '<html><body>' + exHtmlTable() + '</body></html>';
@@ -2837,6 +2819,25 @@ document.getElementById('ex-mail-pdf').onclick = async () => {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
   document.body.appendChild(a); a.click(); a.remove(); toast('PDF enregistré');
 };
+// Envoi direct par le Worker (Brevo) : destinataires + tableau PDF en pièce jointe, sans ouvrir d'application mail.
+async function exSendNow() {
+  if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
+  const to = exEmails();
+  if (!to.length) { toast('Choisis au moins un destinataire'); return; }
+  if (!confirm('Envoyer « ' + exTitle() + ' » (tableau en PDF joint) à :\n' + to.join('\n') + ' ?')) return;
+  toast('Envoi en cours…');
+  try {
+    const blob = await exTablePdfBlob(), bytes = new Uint8Array(await blob.arrayBuffer());
+    let bin = ''; for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    const resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sendMail', data: { to, subject: exTitle(), count: lastListExport.length, filename: 'remorques-' + new Date().toISOString().slice(0, 10) + '.pdf', pdfBase64: btoa(bin) } }) });
+    const r = await resp.json();
+    if (r.ok) toast('✅ Mail envoyé à ' + r.sent + ' destinataire(s)');
+    else if (r.error === 'mail_not_configured') toast('Envoi non configuré côté serveur (clé Brevo manquante)');
+    else toast('Envoi refusé : ' + r.error);
+  } catch (e) { toast('Envoi impossible : ' + e.message); }
+}
+document.getElementById('ex-send-now').onclick = exSendNow;
 async function copyRich() {
   const html = exHtmlTable();
   if (navigator.clipboard && window.ClipboardItem) {
