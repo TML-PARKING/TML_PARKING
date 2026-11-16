@@ -1084,7 +1084,7 @@
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
     </div>
-    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Mail Outlook » : sur PC, télécharge un message prêt à envoyer à ouvrir par double-clic ; sur téléphone, envoie le tableau en PDF (pièce jointe) via le partage : choisis Outlook ; les adresses sont copiées pour « À ».</div>
+    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;"><span id="ex-ver"></span>La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Mail Outlook » : sur PC, télécharge un message prêt à envoyer à ouvrir par double-clic ; sur téléphone, envoie le tableau en PDF (pièce jointe) via le partage : choisis Outlook ; les adresses sont copiées pour « À ».</div>
   </div>
 </div>
 
@@ -2682,6 +2682,18 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
+// Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
+const APP_VERSION = "2026-11-16-pdf-1";
+(function () {
+  try {
+    fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
+      const m = t.match(/const APP_VERSION = "([^"]+)"/);
+      if (m && m[1] !== APP_VERSION && !sessionStorage.getItem('reloadedFor' + m[1])) {
+        sessionStorage.setItem('reloadedFor' + m[1], '1'); location.reload();
+      }
+    }).catch(() => {});
+  } catch (e) {}
+})();
 function exRows() {
   const cols = { loc: document.getElementById('ex-col-loc').checked, status: document.getElementById('ex-col-status').checked, days: document.getElementById('ex-col-days').checked, notes: document.getElementById('ex-col-notes').checked };
   const head = ['N° remorque', 'Client'];
@@ -2767,6 +2779,7 @@ function renderExportPreview() {
   document.getElementById('ex-preview').innerHTML = rows.length ? exHtmlTable() : '<div class="empty">Aucune remorque dans la liste actuelle</div>';
 }
 function openExportModal() {
+  { const v = document.getElementById('ex-ver'); if (v) v.textContent = 'Version ' + APP_VERSION + ' — '; }
   if (!lastListExport.length) renderListPanel();
   renderRecipientChips();
   renderExportPreview();
