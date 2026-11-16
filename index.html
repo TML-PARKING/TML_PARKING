@@ -1084,7 +1084,7 @@
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
     </div>
-    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Mail Outlook » : sur PC, télécharge un message prêt à envoyer à ouvrir par double-clic ; sur téléphone, ouvre l'application Outlook avec le message prêt.</div>
+    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Mail Outlook » : sur PC, télécharge un message prêt à envoyer à ouvrir par double-clic ; sur téléphone, envoie le tableau en PDF (pièce jointe) via le partage : choisis Outlook ; les adresses sont copiées pour « À ».</div>
   </div>
 </div>
 
@@ -2731,6 +2731,28 @@ function exTableCanvas() {
   });
   return c;
 }
+// PDF d'une page (image JPEG du tableau) — pièce jointe propre, sans bibliothèque.
+async function exTablePdfBlob() {
+  const c = exTableCanvas();
+  const jpg = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
+  const data = new Uint8Array(await jpg.arrayBuffer());
+  const pw = 595, ph = Math.max(Math.round(pw * c.height / c.width), 120);
+  const enc = new TextEncoder(), parts = [], offs = []; let len = 0;
+  const push = x => { const u = typeof x === 'string' ? enc.encode(x) : x; parts.push(u); len += u.length; };
+  const obj = (n, body) => { offs[n] = len; push(n + ' 0 obj\n' + body + '\nendobj\n'); };
+  push('%PDF-1.4\n');
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  obj(3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pw + ' ' + ph + '] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>');
+  const cs = 'q ' + pw + ' 0 0 ' + ph + ' 0 0 cm /Im0 Do Q';
+  obj(4, '<< /Length ' + cs.length + ' >>\nstream\n' + cs + '\nendstream');
+  offs[5] = len; push('5 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + c.width + ' /Height ' + c.height + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + data.length + ' >>\nstream\n'); push(data); push('\nendstream\nendobj\n');
+  const xr = len; push('xref\n0 6\n0000000000 65535 f \n');
+  for (let i = 1; i <= 5; i++) push(String(offs[i]).padStart(10, '0') + ' 00000 n \n');
+  push('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xr + '\n%%EOF');
+  return new Blob(parts, { type: 'application/pdf' });
+}
+
 function exTableBlob() { return new Promise(res => exTableCanvas().toBlob(res, 'image/png')); }
 
 function exText() {
@@ -2760,16 +2782,19 @@ document.getElementById('ex-mail-eml').onclick = () => {
   if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
   const to = exEmails().join(',');
   if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) {
-    // Téléphone : application Outlook, message prêt (destinataires + objet + liste).
-    const q = encodeURIComponent, { head, rows } = exRows();
-    const ico = { 'À vider': '🔴', 'Vide': '🟢', 'Chargé': '🔵', 'À charger': '🟡', 'Bloqué': '⚫' }, iSt = head.indexOf('Statut');
-    let acc = exTitle() + '\n' + exDateStr() + ' — ' + rows.length + ' remorque' + (rows.length > 1 ? 's' : '') + '\n\n', n = 0;
-    const lines = rows.map(r => (iSt >= 0 ? (ico[r[iSt]] || '▪️') + ' ' : '▪️ ') + r[0] + ' | ' + r.slice(1).filter(Boolean).join(' | '));
-    for (const l of lines) { if ((acc + l + '\n\n').length > 7000) break; acc += l + '\n\n'; n++; }
-    if (n < lines.length) acc += '… (' + (lines.length - n) + ' autres remorques non affichées)';
-    const mailto = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q(acc);
-    location.href = 'ms-outlook://compose?to=' + q(to) + '&subject=' + q(exTitle()) + '&body=' + q(acc);
-    setTimeout(() => { if (!document.hidden) location.href = mailto; }, 1500);
+    // Téléphone : tableau en PDF (pièce jointe) via le partage → choisir Outlook. Adresses copiées pour le champ « À ».
+    if (to && navigator.clipboard) navigator.clipboard.writeText(to.replace(/,/g, '; ')).catch(() => {});
+    exTablePdfBlob().then(async blob => {
+      const file = new File([blob], 'remorques-' + new Date().toISOString().slice(0, 10) + '.pdf', { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { toast(to ? 'Adresses copiées : colle-les dans « À »' : 'Choisis Outlook'); await navigator.share({ files: [file], title: exTitle() }); return; }
+        catch (e) { if (e && e.name === 'AbortError') return; }
+      }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('PDF enregistré : joins-le au mail');
+      setTimeout(() => { location.href = 'mailto:' + to + '?subject=' + encodeURIComponent(exTitle()) + '&body=' + encodeURIComponent('Tableau en pièce jointe.'); }, 1200);
+    });
     return;
   }
   const b64 = str => btoa(unescape(encodeURIComponent(str)));
