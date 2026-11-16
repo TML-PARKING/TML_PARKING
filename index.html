@@ -455,7 +455,13 @@
   .fc-row input { flex: 1; min-width: 0; height: 34px; }
   .fc-row small { color: var(--ink-faint); font-size: 10.5px; white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
   .fc-row button { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--surface-3); color: var(--ink); cursor: pointer; font-size: 12px; flex-shrink: 0; }
+  #md-group-name { height: 38px; background: var(--surface-3); color: var(--ink); border: none; border-radius: 12px; padding: 0 12px; font: 600 13px var(--font-display); outline: none; }
   .fc-row input, .fc-add input, .fc-add select { background: var(--surface-3); color: var(--ink); border: none; border-radius: 12px; padding: 0 12px; font: 600 13px var(--font-display); outline: none; }
+  .fc-row .ml { flex: 1; min-width: 0; font-size: 13px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fc-row .ml small { display: block; max-width: none; }
+  .rc-chip { border: none; cursor: pointer; border-radius: 999px; padding: 6px 12px; font: 600 12px var(--font-display); background: var(--surface-3); color: var(--ink); }
+  .rc-chip.active { background: var(--amber); color: var(--amber-ink); }
+  .rc-chip.group { box-shadow: inset 0 0 0 1.5px var(--amber); }
   .fc-add { display: flex; flex-wrap: wrap; gap: 6px; }
   #btn-lp-date.active { background: var(--amber); color: var(--amber-ink); }
   .fc-add select, .fc-add input { flex: 1 1 140px; min-width: 0; height: 38px; }
@@ -1060,7 +1066,11 @@
   </div>
   <div class="sheet-body">
     <div class="field"><label>Titre</label><input type="text" id="ex-title" value="Remorques disponibles — Site TML Ghlin"></div>
-    <div class="field"><label>Destinataire(s) (optionnel)</label><input type="text" id="ex-to" list="ex-to-list" placeholder="nom@exemple.com, ..." autocomplete="off"><datalist id="ex-to-list"></datalist></div>
+    <div class="field"><label>Destinataire(s)</label><input type="text" id="ex-to" placeholder="nom@exemple.com, ..." autocomplete="off">
+      <div id="ex-groups" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+      <div id="ex-contacts" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;"></div>
+      <button type="button" class="btn btn-ghost" id="ex-manage" style="margin-top:8px; padding:6px 12px; font-size:12px;">⚙️ Gérer les adresses et groupes</button>
+    </div>
     <div style="display:flex; flex-wrap:wrap; gap:14px; margin:4px 0 10px; font-size:12.5px;">
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-loc" checked>Emplacement</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-status" checked>Statut</label>
@@ -1070,11 +1080,40 @@
     <div style="font-size:12px; color:var(--ink-faint); margin-bottom:8px;" id="ex-count"></div>
     <div id="ex-preview" style="overflow:auto; max-height:34vh; border-radius:14px; background:#ffffff; padding:14px; color:#111827;"></div>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;">
-      <button class="btn btn-primary" id="ex-mail-eml">✉️ Mail</button>
+      <button class="btn btn-primary" id="ex-mail-gmail">✉️ Gmail</button>
+      <button class="btn btn-ghost" id="ex-mail-eml">✉️ Outlook (fichier)</button>
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
     </div>
-    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Mail » télécharge un message prêt à envoyer : ouvre-le (double-clic) et Outlook affiche le tableau mis en forme.</div>
+    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Gmail » ouvre un nouveau message avec la liste et copie le tableau mis en forme (colle-le avec Ctrl+V). « Outlook (fichier) » télécharge un message prêt à envoyer à ouvrir par double-clic.</div>
+  </div>
+</div>
+
+<div id="mail-dir-modal" class="bottom-sheet" style="z-index:2300; max-height:92vh;">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <h2>Adresses & groupes mail</h2>
+    <button class="btn btn-ghost" id="md-close" style="padding:6px 10px;"><svg class="i"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="sheet-body">
+    <h3 style="font-size:13px; margin:4px 0 6px;">Adresses</h3>
+    <div id="md-contacts" class="fc-rows"></div>
+    <div class="fc-add">
+      <input type="text" id="md-name" placeholder="Nom (ex : Jean — Transport)">
+      <input type="email" id="md-email" placeholder="adresse@exemple.com">
+      <button class="btn btn-primary" id="md-add-contact">Ajouter</button>
+    </div>
+    <h3 style="font-size:13px; margin:20px 0 6px;">Groupes</h3>
+    <div id="md-groups" class="fc-rows"></div>
+    <div style="background:var(--surface-1); border-radius:16px; padding:12px;">
+      <div style="font-size:12px; font-weight:700; margin-bottom:8px;" id="md-group-title">Nouveau groupe</div>
+      <input type="text" id="md-group-name" placeholder="Nom du groupe (ex : Transporteurs)" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+      <div id="md-group-members" style="display:flex; flex-direction:column; gap:6px; max-height:24vh; overflow:auto; font-size:13px;"></div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="btn btn-primary" id="md-group-save">Enregistrer le groupe</button>
+        <button class="btn btn-ghost" id="md-group-cancel" style="display:none;">Annuler</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1401,6 +1440,7 @@ const STORAGE_KEY_DOCK_COUNT = "yard:dock-count";
 const STORAGE_KEY_DOCKS_CONFIG = "yard:docks-config";
 const STORAGE_KEY_DOCK_OCCUPANCY = "yard:dock-occupancy";
 let dbActiveFilters = new Set(); // vide = "Tous"
+let mailDirectory = { contacts: [], groups: [] }; // carnet d'adresses mail (contacts + groupes)
 let filtersConfig = null; // {list:[...], db:[...]} — filtres modifiables via Configuration
 let clientPresets = []; // ["CHAUSSEA", "NIKE", ...] — liste des clients préencodés, modifiable en configuration
 let contentPresetsByClient = {}; // { "CHAUSSEA": ["TR ORBETTE", "RETOUR TRÉMERY"], ... }
@@ -1533,6 +1573,7 @@ async function loadAll(preFetched) {
   teamUsers = d.teamUsers || {};
   clientPresets = Array.isArray(d.clientPresets) ? d.clientPresets : [];
   filtersConfig = (d.filtersConfig && typeof d.filtersConfig === 'object') ? d.filtersConfig : null;
+  if (d.mailDirectory && Array.isArray(d.mailDirectory.contacts)) mailDirectory = { contacts: d.mailDirectory.contacts, groups: Array.isArray(d.mailDirectory.groups) ? d.mailDirectory.groups : [] };
   try { renderFilterBars(); } catch (e) {}
   contentPresetsByClient = d.contentPresets || {};
   const rawCal = d.mapCalibration || {};
@@ -1563,6 +1604,10 @@ async function saveDockCount() {
 async function saveFreeTrailers() {
   try { await backendSave('saveFreeTrailers', STORAGE_KEY_FREE_TRAILERS, freeTrailers); }
   catch(e) { toast("Erreur sauvegarde"); }
+}
+async function saveMailDirectory() {
+  try { await backendSave('saveMailDirectory', 'yard:mail-directory', mailDirectory); }
+  catch(e) { toast("Erreur sauvegarde du carnet d'adresses"); }
 }
 async function saveFiltersConfig() {
   try { await backendSave('saveFiltersConfig', 'yard:filters-config', filtersConfig); }
@@ -1848,6 +1893,7 @@ function applyFreshState(d) {
     if (Array.isArray(d.clientPresets)) clientPresets = d.clientPresets;
     if (d.contentPresets && typeof d.contentPresets === 'object') contentPresetsByClient = d.contentPresets;
     if (d.filtersConfig && typeof d.filtersConfig === 'object') { filtersConfig = d.filtersConfig; renderFilterBars(); }
+    if (d.mailDirectory && Array.isArray(d.mailDirectory.contacts) && typeof mdModalOpen !== 'undefined' && !mdModalOpen) mailDirectory = { contacts: d.mailDirectory.contacts, groups: Array.isArray(d.mailDirectory.groups) ? d.mailDirectory.groups : [] };
   } catch (e) { console.warn('refresh listes', e); }
   const newOcc = d.occupancy || {};
   const newFree = d.freeTrailers || {};
@@ -2674,7 +2720,7 @@ function renderExportPreview() {
 }
 function openExportModal() {
   if (!lastListExport.length) renderListPanel();
-  document.getElementById('ex-to-list').innerHTML = (emailRecipients || []).map(e => `<option value="${escapeHtml(e)}">`).join('');
+  renderRecipientChips();
   renderExportPreview();
   exportModal.classList.add('open'); overlay.classList.add('show');
 }
@@ -2686,7 +2732,7 @@ document.getElementById('btn-export-close').onclick = closeExportModal;
 // avec le tableau mis en forme directement dans le message — sans dépendre du lien mailto.
 document.getElementById('ex-mail-eml').onclick = () => {
   if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
-  const to = document.getElementById('ex-to').value.trim().replace(/\s+/g, '').replace(/;/g, ',');
+  const to = exEmails().join(',');
   const b64 = str => btoa(unescape(encodeURIComponent(str)));
   const wrap = str => str.replace(/.{1,76}/g, '$&\r\n');
   const html = '<html><body>' + exHtmlTable() + '</body></html>';
@@ -2941,6 +2987,112 @@ document.getElementById('scan-plate-input').onchange = async (ev) => {
     console.error('scan plaque', e);
     showScanStatus('⚠️ Lecture impossible (' + escapeHtml(e.message || 'erreur') + '). Vérifie ta connexion internet puis réessaie.');
   }
+};
+
+
+// ---------- CARNET D'ADRESSES MAIL (contacts + groupes) ----------
+let mdModalOpen = false, mdEditingGroup = null;
+const mdModal = document.getElementById('mail-dir-modal');
+function mdNewId(p) { return p + Date.now().toString(36) + Math.floor(Math.random() * 999); }
+function exEmails() { return document.getElementById('ex-to').value.split(/[;,\s]+/).map(x => x.trim()).filter(Boolean); }
+function exSetEmails(list) {
+  const seen = new Set(), out = [];
+  list.forEach(e => { const k = e.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(e); } });
+  document.getElementById('ex-to').value = out.join(', ');
+  renderRecipientChips();
+}
+function groupEmails(g) { return (g.members || []).map(id => mailDirectory.contacts.find(c => c.id === id)).filter(Boolean).map(c => c.email); }
+function renderRecipientChips() {
+  const cur = new Set(exEmails().map(e => e.toLowerCase()));
+  const gBox = document.getElementById('ex-groups'), cBox = document.getElementById('ex-contacts');
+  gBox.innerHTML = mailDirectory.groups.map(g => {
+    const em = groupEmails(g);
+    const on = em.length && em.every(e => cur.has(e.toLowerCase()));
+    return `<button type="button" class="rc-chip group ${on ? 'active' : ''}" data-g="${escapeHtml(g.id)}">👥 ${escapeHtml(g.name)} (${em.length})</button>`;
+  }).join('');
+  cBox.innerHTML = mailDirectory.contacts.map(c => `<button type="button" class="rc-chip ${cur.has(c.email.toLowerCase()) ? 'active' : ''}" data-c="${escapeHtml(c.id)}" title="${escapeHtml(c.email)}">${escapeHtml(c.name || c.email)}</button>`).join('');
+  if (!mailDirectory.contacts.length) cBox.innerHTML = '<span style="font-size:12px;color:var(--ink-faint);">Aucune adresse enregistrée : ajoute-en avec « Gérer ».</span>';
+  gBox.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
+    const g = mailDirectory.groups.find(x => x.id === b.dataset.g); if (!g) return;
+    const em = groupEmails(g), have = new Set(exEmails().map(e => e.toLowerCase()));
+    if (em.length && em.every(e => have.has(e.toLowerCase()))) { const rm = new Set(em.map(e => e.toLowerCase())); exSetEmails(exEmails().filter(e => !rm.has(e.toLowerCase()))); }
+    else exSetEmails(exEmails().concat(em));
+  });
+  cBox.querySelectorAll('[data-c]').forEach(b => b.onclick = () => {
+    const c = mailDirectory.contacts.find(x => x.id === b.dataset.c); if (!c) return;
+    const k = c.email.toLowerCase(), have = exEmails();
+    exSetEmails(have.some(e => e.toLowerCase() === k) ? have.filter(e => e.toLowerCase() !== k) : have.concat(c.email));
+  });
+}
+document.getElementById('ex-to').addEventListener('input', renderRecipientChips);
+
+function renderMailDir() {
+  const cBox = document.getElementById('md-contacts');
+  cBox.innerHTML = mailDirectory.contacts.length ? mailDirectory.contacts.map(c => `<div class="fc-row" data-id="${escapeHtml(c.id)}"><div class="ml"><b>${escapeHtml(c.name || c.email)}</b><small>${escapeHtml(c.email)}</small></div><button data-act="del" title="Supprimer">✕</button></div>`).join('') : '<div style="font-size:12px;color:var(--ink-faint);">Aucune adresse.</div>';
+  cBox.querySelectorAll('[data-act="del"]').forEach(b => b.onclick = () => {
+    const id = b.closest('.fc-row').dataset.id, c = mailDirectory.contacts.find(x => x.id === id);
+    if (!confirm('Supprimer ' + (c ? (c.name || c.email) : 'cette adresse') + ' (et la retirer des groupes) ?')) return;
+    mailDirectory.contacts = mailDirectory.contacts.filter(x => x.id !== id);
+    mailDirectory.groups.forEach(g => { g.members = (g.members || []).filter(m => m !== id); });
+    saveMailDirectory(); renderMailDir(); renderRecipientChips();
+  });
+  const gBox = document.getElementById('md-groups');
+  gBox.innerHTML = mailDirectory.groups.length ? mailDirectory.groups.map(g => `<div class="fc-row" data-id="${escapeHtml(g.id)}"><div class="ml"><b>👥 ${escapeHtml(g.name)}</b><small>${groupEmails(g).length} adresse(s)</small></div><button data-act="edit" title="Modifier">✎</button><button data-act="del" title="Supprimer">✕</button></div>`).join('') : '<div style="font-size:12px;color:var(--ink-faint);">Aucun groupe.</div>';
+  gBox.querySelectorAll('[data-act="edit"]').forEach(b => b.onclick = () => mdEditGroup(b.closest('.fc-row').dataset.id));
+  gBox.querySelectorAll('[data-act="del"]').forEach(b => b.onclick = () => {
+    const id = b.closest('.fc-row').dataset.id, g = mailDirectory.groups.find(x => x.id === id);
+    if (!confirm('Supprimer le groupe « ' + (g ? g.name : '') + ' » ? (les adresses sont conservées)')) return;
+    mailDirectory.groups = mailDirectory.groups.filter(x => x.id !== id);
+    if (mdEditingGroup === id) mdEditGroup(null);
+    saveMailDirectory(); renderMailDir(); renderRecipientChips();
+  });
+  renderMdMembers();
+}
+function renderMdMembers(sel) {
+  const g = mdEditingGroup ? mailDirectory.groups.find(x => x.id === mdEditingGroup) : null;
+  const chosen = new Set(sel || (g ? g.members : []) || []);
+  const box = document.getElementById('md-group-members');
+  box.innerHTML = mailDirectory.contacts.length ? mailDirectory.contacts.map(c => `<label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" value="${escapeHtml(c.id)}" ${chosen.has(c.id) ? 'checked' : ''}>${escapeHtml(c.name || c.email)} <small style="color:var(--ink-faint);">${escapeHtml(c.email)}</small></label>`).join('') : '<span style="font-size:12px;color:var(--ink-faint);">Ajoute d\'abord des adresses.</span>';
+}
+function mdEditGroup(id) {
+  mdEditingGroup = id;
+  const g = id ? mailDirectory.groups.find(x => x.id === id) : null;
+  document.getElementById('md-group-title').textContent = g ? 'Modifier le groupe' : 'Nouveau groupe';
+  document.getElementById('md-group-name').value = g ? g.name : '';
+  document.getElementById('md-group-cancel').style.display = g ? '' : 'none';
+  renderMdMembers();
+}
+document.getElementById('md-add-contact').onclick = () => {
+  const name = document.getElementById('md-name').value.trim(), email = document.getElementById('md-email').value.trim();
+  if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(email)) { toast('Adresse mail invalide'); return; }
+  if (mailDirectory.contacts.some(c => c.email.toLowerCase() === email.toLowerCase())) { toast('Cette adresse existe déjà'); return; }
+  mailDirectory.contacts.push({ id: mdNewId('c'), name: name || email, email });
+  document.getElementById('md-name').value = ''; document.getElementById('md-email').value = '';
+  saveMailDirectory(); renderMailDir(); renderRecipientChips();
+};
+document.getElementById('md-group-save').onclick = () => {
+  const name = document.getElementById('md-group-name').value.trim();
+  const members = [...document.querySelectorAll('#md-group-members input:checked')].map(i => i.value);
+  if (!name) { toast('Donne un nom au groupe'); return; }
+  if (!members.length) { toast('Coche au moins une adresse'); return; }
+  if (mdEditingGroup) { const g = mailDirectory.groups.find(x => x.id === mdEditingGroup); if (g) { g.name = name; g.members = members; } }
+  else mailDirectory.groups.push({ id: mdNewId('g'), name, members });
+  mdEditingGroup = null; mdEditGroup(null);
+  saveMailDirectory(); renderMailDir(); renderRecipientChips(); toast('Groupe enregistré');
+};
+document.getElementById('md-group-cancel').onclick = () => mdEditGroup(null);
+document.getElementById('ex-manage').onclick = () => { mdModalOpen = true; mdEditingGroup = null; renderMailDir(); mdEditGroup(null); mdModal.classList.add('open'); };
+document.getElementById('md-close').onclick = () => { mdModalOpen = false; mdModal.classList.remove('open'); renderRecipientChips(); };
+
+// Gmail : nouveau message dans Gmail (web), tableau mis en forme copié pour le coller
+document.getElementById('ex-mail-gmail').onclick = () => {
+  if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
+  let body = exText(); const max = 1700; let note = '';
+  if (body.length > max) { body = body.slice(0, body.lastIndexOf('\n', max)); note = '\n… (liste complète : colle le tableau copié ici)'; }
+  const q = encodeURIComponent, to = exEmails().join(',');
+  const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + q(to) + '&su=' + q(exTitle()) + '&body=' + q(body + note);
+  window.open(url, '_blank');
+  copyRich().then(() => toast('Gmail ouvert — tableau mis en forme copié : Ctrl+V pour le coller')).catch(() => toast('Gmail ouvert (copie du tableau impossible : utilise « Copier le tableau »)'));
 };
 
 // ---------- THÈME CLAIR / SOMBRE (au choix de chacun) ----------
@@ -3261,6 +3413,7 @@ overlay.onclick = () => {
   document.getElementById('clients-config-modal').classList.remove('open');
   filtersConfigModal.classList.remove('open');
   exportModal.classList.remove('open');
+  mdModal.classList.remove('open'); mdModalOpen = false;
   document.getElementById('cc-content-modal').classList.remove('open');
   ccEditingClient = null;
   document.getElementById('hide-docks-modal').classList.remove('open');
