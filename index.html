@@ -1081,6 +1081,7 @@
     <div id="ex-preview" style="overflow:auto; max-height:34vh; border-radius:14px; background:#ffffff; padding:14px; color:#111827;"></div>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;">
       <button class="btn btn-primary" id="ex-mail-gmail">✉️ Gmail</button>
+      <button class="btn" id="ex-share-img">🖼️ Image</button>
       <button class="btn btn-ghost" id="ex-mail-eml">✉️ Outlook (fichier)</button>
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
@@ -3112,6 +3113,16 @@ document.getElementById('ex-manage').onclick = () => { mdModalOpen = true; mdEdi
 document.getElementById('md-close').onclick = () => { mdModalOpen = false; mdModal.classList.remove('open'); renderRecipientChips(); };
 
 // Gmail : sur téléphone on ouvre l'APPLICATION (message déjà rempli) ; sur PC, Gmail web.
+document.getElementById('ex-share-img').onclick = async () => {
+  if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
+  const blob = await exTableBlob();
+  const file = new File([blob], 'remorques-' + new Date().toISOString().slice(0, 10) + '.png', { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: exTitle() }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove(); toast('Image du tableau enregistrée');
+};
 document.getElementById('ex-mail-gmail').onclick = () => {
   if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
   const ua = navigator.userAgent || '', isAndroid = /Android/i.test(ua), isIOS = /iPhone|iPad|iPod/i.test(ua);
@@ -3119,20 +3130,20 @@ document.getElementById('ex-mail-gmail').onclick = () => {
   const cut = max => { let b = exText(), n = ''; if (b.length > max) { b = b.slice(0, b.lastIndexOf('\n', max)); n = '\n… (liste complète : colle le tableau copié ici)'; } return b + n; };
   const done = () => copyRich().then(() => toast('Tableau mis en forme copié : colle-le dans le message')).catch(() => {});
   if (isAndroid || isIOS) {
-    // Téléphone : le tableau part en IMAGE (propre et lisible) via le partage → choisir Gmail.
-    exTableBlob().then(async blob => {
-      const file = new File([blob], 'remorques-' + new Date().toISOString().slice(0, 10) + '.png', { type: 'image/png' });
-      const text = (to ? 'À : ' + to.replace(/,/g, ', ') + '\n\n' : '') + exTitle() + ' — ' + lastListExport.length + ' remorque(s)';
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: exTitle(), text }); return; }
-        catch (e) { if (e && e.name === 'AbortError') return; }
-      }
-      // Partage indisponible : on télécharge l'image du tableau et on ouvre un mail court (à joindre).
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
-      document.body.appendChild(a); a.click(); a.remove();
-      toast('Image du tableau enregistrée : joins-la au mail (trombone)');
-      setTimeout(() => { location.href = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q('Tableau en pièce jointe (image).'); }, 1200);
-    });
+    const mailto = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q(cut(7000));
+    if (isAndroid) {
+      // Android : intention directe vers l'app Gmail avec destinataires, objet ET tableau HTML dans le message.
+      const html = '<html><body>' + exHtmlTable() + '</body></html>';
+      const data = 'mailto:' + to + '?subject=' + q(exTitle());
+      const intent = 'intent:#Intent;action=android.intent.action.SENDTO;data=' + q(data) + ';package=com.google.android.gm;'
+        + 'S.android.intent.extra.SUBJECT=' + q(exTitle()) + ';S.android.intent.extra.TEXT=' + q(cut(7000)) + ';S.android.intent.extra.HTML_TEXT=' + q(html) + ';'
+        + 'S.browser_fallback_url=' + q(mailto) + ';end';
+      copyRich().catch(() => {});
+      location.href = intent;
+      return;
+    }
+    location.href = 'googlegmail:///co?to=' + q(to) + '&subject=' + q(exTitle()) + '&body=' + q(cut(7000));
+    setTimeout(() => { if (!document.hidden) location.href = mailto; }, 1200);
     return;
   }
   const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + q(to) + '&su=' + q(exTitle()) + '&body=' + q(cut(1700));
