@@ -3130,20 +3130,22 @@ document.getElementById('ex-mail-gmail').onclick = () => {
   const cut = max => { let b = exText(), n = ''; if (b.length > max) { b = b.slice(0, b.lastIndexOf('\n', max)); n = '\n… (liste complète : colle le tableau copié ici)'; } return b + n; };
   const done = () => copyRich().then(() => toast('Tableau mis en forme copié : colle-le dans le message')).catch(() => {});
   if (isAndroid || isIOS) {
-    const mailto = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q(cut(7000));
-    if (isAndroid) {
-      // Android : intention directe vers l'app Gmail avec destinataires, objet ET tableau HTML dans le message.
-      const html = '<html><body>' + exHtmlTable() + '</body></html>';
-      const data = 'mailto:' + to + '?subject=' + q(exTitle());
-      const intent = 'intent:#Intent;action=android.intent.action.SENDTO;data=' + q(data) + ';package=com.google.android.gm;'
-        + 'S.android.intent.extra.SUBJECT=' + q(exTitle()) + ';S.android.intent.extra.TEXT=' + q(cut(7000)) + ';S.android.intent.extra.HTML_TEXT=' + q(html) + ';'
-        + 'S.browser_fallback_url=' + q(mailto) + ';end';
-      copyRich().catch(() => {});
-      location.href = intent;
-      return;
+    // Téléphone : un seul clic → mail prêt (destinataires + objet + liste lisible), sans passer par le presse-papiers.
+    const { head, rows } = exRows();
+    const ico = { 'À vider': '🔴', 'Vide': '🟢', 'Chargé': '🔵', 'À charger': '🟡', 'Bloqué': '⚫' };
+    const iSt = head.indexOf('Statut');
+    let body = exTitle() + '\n' + exDateStr() + ' — ' + rows.length + ' remorque' + (rows.length > 1 ? 's' : '') + '\n\n';
+    const lines = rows.map(r => (iSt >= 0 ? (ico[r[iSt]] || '▪️') + ' ' : '▪️ ') + '*' + r[0] + '* | ' + r.slice(1).filter(Boolean).join(' | '));
+    let acc = body, n = 0;
+    for (const l of lines) { if ((acc + l + '\n\n').length > 7000) break; acc += l + '\n\n'; n++; }
+    if (n < lines.length) acc += '… (' + (lines.length - n) + ' autres remorques non affichées)';
+    const mailto = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q(acc);
+    if (isIOS) {
+      location.href = 'googlegmail:///co?to=' + q(to) + '&subject=' + q(exTitle()) + '&body=' + q(acc);
+      setTimeout(() => { if (!document.hidden) location.href = mailto; }, 1200);
+    } else {
+      location.href = mailto;
     }
-    location.href = 'googlegmail:///co?to=' + q(to) + '&subject=' + q(exTitle()) + '&body=' + q(cut(7000));
-    setTimeout(() => { if (!document.hidden) location.href = mailto; }, 1200);
     return;
   }
   const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + q(to) + '&su=' + q(exTitle()) + '&body=' + q(cut(1700));
