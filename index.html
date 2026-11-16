@@ -1068,8 +1068,11 @@
     <div class="field"><label>Titre</label><input type="text" id="ex-title" value="Remorques disponibles — Site TML Ghlin"></div>
     <div class="field"><label>Destinataire(s)</label><input type="text" id="ex-to" placeholder="nom@exemple.com, ..." autocomplete="off">
       <div id="ex-groups" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
-      <div id="ex-contacts" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;"></div>
-      <button type="button" class="btn btn-ghost" id="ex-manage" style="margin-top:8px; padding:6px 12px; font-size:12px;">⚙️ Gérer les adresses et groupes</button>
+      <details id="ex-contacts-det" style="margin-top:8px;">
+        <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-dim); padding:6px 0;" id="ex-contacts-sum">👤 Choisir des destinataires</summary>
+        <div id="ex-contacts" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;"></div>
+      </details>
+      <button type="button" class="btn btn-ghost" id="ex-manage" style="margin-top:6px; padding:6px 12px; font-size:12px;">⚙️ Gérer les adresses et groupes</button>
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:14px; margin:4px 0 10px; font-size:12.5px;">
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-loc" checked>Emplacement</label>
@@ -1082,7 +1085,6 @@
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;">
       <button class="btn btn-primary" id="ex-mail-eml">✉️ Mail Outlook</button>
       <button class="btn" id="ex-send-now">📨 Envoyer directement</button>
-      <button class="btn btn-ghost" id="ex-mail-pdf">📎 PDF seul</button>
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
     </div>
@@ -2685,7 +2687,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-16-send-1";
+const APP_VERSION = "2026-11-16-send-2";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2806,18 +2808,6 @@ document.getElementById('ex-mail-eml').onclick = () => {
   a.download = 'remorques-' + new Date().toISOString().slice(0, 10) + '.eml';
   document.body.appendChild(a); a.click(); a.remove();
   toast('Fichier téléchargé : ouvre-le (double-clic) pour qu\'Outlook crée le mail');
-};
-document.getElementById('ex-mail-pdf').onclick = async () => {
-  if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
-  const to = exEmails().join(',');
-  if (to && navigator.clipboard) navigator.clipboard.writeText(to.replace(/,/g, '; ')).catch(() => {});
-  const blob = await exTablePdfBlob();
-  const file = new File([blob], 'remorques-' + new Date().toISOString().slice(0, 10) + '.pdf', { type: 'application/pdf' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: exTitle() }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
-  }
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
-  document.body.appendChild(a); a.click(); a.remove(); toast('PDF enregistré');
 };
 // Envoi direct par le Worker (Brevo) : destinataires + tableau PDF en pièce jointe, sans ouvrir d'application mail.
 async function exSendNow() {
@@ -3106,6 +3096,7 @@ function renderRecipientChips() {
     return `<button type="button" class="rc-chip group ${on ? 'active' : ''}" data-g="${escapeHtml(g.id)}">👥 ${escapeHtml(g.name)} (${em.length})</button>`;
   }).join('');
   cBox.innerHTML = mailDirectory.contacts.map(c => `<button type="button" class="rc-chip ${cur.has(c.email.toLowerCase()) ? 'active' : ''}" data-c="${escapeHtml(c.id)}" title="${escapeHtml(c.email)}">${escapeHtml(c.name || c.email)}</button>`).join('');
+  { const n = mailDirectory.contacts.filter(c => cur.has(c.email.toLowerCase())).length, sm = document.getElementById('ex-contacts-sum'); if (sm) sm.textContent = '👤 Choisir des destinataires' + (n ? ' (' + n + ' sélectionné' + (n > 1 ? 's' : '') + ')' : ''); }
   if (!mailDirectory.contacts.length) cBox.innerHTML = '<span style="font-size:12px;color:var(--ink-faint);">Aucune adresse enregistrée : ajoute-en avec « Gérer ».</span>';
   gBox.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
     const g = mailDirectory.groups.find(x => x.id === b.dataset.g); if (!g) return;
