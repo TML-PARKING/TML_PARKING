@@ -1081,10 +1081,11 @@
     <div id="ex-preview" style="overflow:auto; max-height:34vh; border-radius:14px; background:#ffffff; padding:14px; color:#111827;"></div>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;">
       <button class="btn btn-primary" id="ex-mail-eml">✉️ Mail Outlook</button>
+      <button class="btn btn-ghost" id="ex-mail-pdf">📎 PDF seul</button>
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
     </div>
-    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;"><span id="ex-ver"></span>La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Mail Outlook » : sur PC, télécharge un message prêt à envoyer à ouvrir par double-clic ; sur téléphone, envoie le tableau en PDF (pièce jointe) via le partage : choisis Outlook ; les adresses sont copiées pour « À ».</div>
+    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;"><span id="ex-ver"></span>La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Mail Outlook » : crée un message prêt à envoyer (destinataires + tableau en PDF joint) à ouvrir ; « PDF seul » partage juste le PDF.</div>
   </div>
 </div>
 
@@ -2683,7 +2684,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-16-pdf-1";
+const APP_VERSION = "2026-11-16-eml-1";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2795,18 +2796,22 @@ document.getElementById('ex-mail-eml').onclick = () => {
   if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
   const to = exEmails().join(',');
   if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) {
-    // Téléphone : tableau en PDF (pièce jointe) via le partage → choisir Outlook. Adresses copiées pour le champ « À ».
-    if (to && navigator.clipboard) navigator.clipboard.writeText(to.replace(/,/g, '; ')).catch(() => {});
-    exTablePdfBlob().then(async blob => {
-      const file = new File([blob], 'remorques-' + new Date().toISOString().slice(0, 10) + '.pdf', { type: 'application/pdf' });
+    // Téléphone : fichier .eml = brouillon avec destinataires + objet + PDF du tableau EN PIÈCE JOINTE.
+    exTablePdfBlob().then(async pdf => {
+      const bytes = new Uint8Array(await pdf.arrayBuffer());
+      let bin = ''; for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+      const wrap = t => t.replace(/.{1,76}/g, '$&\r\n'), b64s = str => btoa(unescape(encodeURIComponent(str)));
+      const bd = '=_TML_' + Date.now(), day = new Date().toISOString().slice(0, 10);
+      const eml = (to ? 'To: ' + to + '\r\n' : '') + 'Subject: =?UTF-8?B?' + b64s(exTitle()) + '?=\r\nX-Unsent: 1\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="' + bd + '"\r\n\r\n'
+        + '--' + bd + '\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' + wrap(b64s('Bonjour,\n\nVeuillez trouver ci-joint la liste des remorques (' + lastListExport.length + ').\n\nCordialement')) + '\r\n'
+        + '--' + bd + '\r\nContent-Type: application/pdf; name="remorques-' + day + '.pdf"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="remorques-' + day + '.pdf"\r\n\r\n' + wrap(btoa(bin)) + '\r\n--' + bd + '--\r\n';
+      const file = new File([eml], 'remorques-' + day + '.eml', { type: 'message/rfc822' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { toast(to ? 'Adresses copiées : colle-les dans « À »' : 'Choisis Outlook'); await navigator.share({ files: [file], title: exTitle() }); return; }
-        catch (e) { if (e && e.name === 'AbortError') return; }
+        try { await navigator.share({ files: [file], title: exTitle() }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
       }
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
+      const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name;
       document.body.appendChild(a); a.click(); a.remove();
-      toast('PDF enregistré : joins-le au mail');
-      setTimeout(() => { location.href = 'mailto:' + to + '?subject=' + encodeURIComponent(exTitle()) + '&body=' + encodeURIComponent('Tableau en pièce jointe.'); }, 1200);
+      toast('Fichier enregistré : ouvre-le pour créer le mail');
     });
     return;
   }
@@ -2819,6 +2824,18 @@ document.getElementById('ex-mail-eml').onclick = () => {
   a.download = 'remorques-' + new Date().toISOString().slice(0, 10) + '.eml';
   document.body.appendChild(a); a.click(); a.remove();
   toast('Fichier téléchargé : ouvre-le (double-clic) pour qu\'Outlook crée le mail');
+};
+document.getElementById('ex-mail-pdf').onclick = async () => {
+  if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
+  const to = exEmails().join(',');
+  if (to && navigator.clipboard) navigator.clipboard.writeText(to.replace(/,/g, '; ')).catch(() => {});
+  const blob = await exTablePdfBlob();
+  const file = new File([blob], 'remorques-' + new Date().toISOString().slice(0, 10) + '.pdf', { type: 'application/pdf' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: exTitle() }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove(); toast('PDF enregistré');
 };
 async function copyRich() {
   const html = exHtmlTable();
