@@ -1085,7 +1085,7 @@
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
     </div>
-    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Gmail » ouvre un nouveau message avec la liste (l'application Gmail sur téléphone, Gmail web sur PC) et copie le tableau mis en forme à coller. « Outlook (fichier) » télécharge un message prêt à envoyer à ouvrir par double-clic.</div>
+    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Gmail » ouvre un nouveau message avec la liste (sur téléphone : le tableau part en image via le partage, choisis Gmail ; sur PC : Gmail web) et copie le tableau mis en forme à coller. « Outlook (fichier) » télécharge un message prêt à envoyer à ouvrir par double-clic.</div>
   </div>
 </div>
 
@@ -2707,6 +2707,33 @@ function exHtmlTable() {
 <table cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #e5e7eb;"><thead><tr>${head.map(h => `<th ${th}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
 <tbody>${rows.map((r, i) => `<tr>${r.map((c, j) => `<td ${td(i)}>${j === 0 ? '<b>' + escapeHtml(c) + '</b>' : escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
+// Tableau en IMAGE (PNG) : joli et identique partout, idéal pour le téléphone.
+function exTableCanvas() {
+  const { head, rows } = exRows();
+  const S = 2, pad = 16, rh = 34, f = '13px Arial, sans-serif', fb = 'bold 13px Arial, sans-serif';
+  const m = document.createElement('canvas').getContext('2d');
+  const widths = head.map((h, j) => { m.font = fb; let w = m.measureText(h).width; rows.forEach(r => { m.font = j === 0 ? fb : f; w = Math.max(w, m.measureText(String(r[j] || '')).width); }); return Math.ceil(w) + 24; });
+  const W = Math.max(widths.reduce((a, b) => a + b, 0), 360) + pad * 2, topH = 64;
+  const H = topH + rh * (rows.length + 1) + pad * 2;
+  const c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
+  const g = c.getContext('2d'); g.scale(S, S);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  g.textBaseline = 'middle'; g.fillStyle = '#111827'; g.font = 'bold 19px Arial, sans-serif'; g.fillText(exTitle(), pad, pad + 14);
+  g.fillStyle = '#6b7280'; g.font = '12px Arial, sans-serif'; g.fillText(exDateStr() + ' · ' + rows.length + ' remorque' + (rows.length > 1 ? 's' : ''), pad, pad + 38);
+  let y = pad + topH - 8;
+  g.fillStyle = '#111827'; g.fillRect(pad, y, W - pad * 2, rh);
+  let x = pad; g.fillStyle = '#fff'; g.font = fb;
+  head.forEach((h, j) => { g.fillText(h, x + 12, y + rh / 2); x += widths[j]; });
+  const stCol = { 'À vider': '#dc2626', 'Vide': '#16a34a', 'Chargé': '#2563eb', 'À charger': '#ca8a04', 'Bloqué': '#6b7280' };
+  rows.forEach((r, i) => {
+    y += rh; g.fillStyle = i % 2 ? '#f3f4f6' : '#fff'; g.fillRect(pad, y, W - pad * 2, rh);
+    g.fillStyle = '#e5e7eb'; g.fillRect(pad, y + rh - 1, W - pad * 2, 1);
+    x = pad; r.forEach((cell, j) => { cell = String(cell || ''); g.font = j === 0 ? fb : f; g.fillStyle = stCol[cell] || '#111827'; if (stCol[cell]) g.font = fb; g.fillText(cell, x + 12, y + rh / 2); x += widths[j]; });
+  });
+  return c;
+}
+function exTableBlob() { return new Promise(res => exTableCanvas().toBlob(res, 'image/png')); }
+
 function exText() {
   const { head, rows } = exRows();
   let t = exTitle() + '\n' + exDateStr() + ' — ' + rows.length + ' remorque' + (rows.length > 1 ? 's' : '') + '\n\n';
@@ -3092,15 +3119,17 @@ document.getElementById('ex-mail-gmail').onclick = () => {
   const cut = max => { let b = exText(), n = ''; if (b.length > max) { b = b.slice(0, b.lastIndexOf('\n', max)); n = '\n… (liste complète : colle le tableau copié ici)'; } return b + n; };
   const done = () => copyRich().then(() => toast('Tableau mis en forme copié : colle-le dans le message')).catch(() => {});
   if (isAndroid || isIOS) {
-    const body = cut(7000);
-    const mailto = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q(body);
-    if (isIOS) {
-      location.href = 'googlegmail:///co?to=' + q(to) + '&subject=' + q(exTitle()) + '&body=' + q(body);
-      setTimeout(() => { if (!document.hidden) location.href = mailto; }, 1200); // Gmail absent : app mail par défaut
-    } else {
-      location.href = mailto; // Android : ouvre l'app mail par défaut (Gmail), message déjà rempli
-    }
-    done();
+    // Téléphone : le tableau part en IMAGE (propre et lisible) via le partage → choisir Gmail.
+    exTableBlob().then(async blob => {
+      const file = new File([blob], 'remorques-' + new Date().toISOString().slice(0, 10) + '.png', { type: 'image/png' });
+      const text = (to ? 'À : ' + to.replace(/,/g, ', ') + '\n\n' : '') + exTitle() + ' — ' + lastListExport.length + ' remorque(s)';
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: exTitle(), text }); return; }
+        catch (e) { if (e && e.name === 'AbortError') return; }
+      }
+      const mailto = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q(cut(7000));
+      location.href = mailto;
+    });
     return;
   }
   const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + q(to) + '&su=' + q(exTitle()) + '&body=' + q(cut(1700));
