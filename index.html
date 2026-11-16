@@ -1468,7 +1468,8 @@ const PERMISSION_DEFS = [
   { key: 'users', label: '👤 Créer un utilisateur' },
   { key: 'usersEdit', label: '✏️ Modifier un profil utilisateur existant' },
   { key: 'usersViewCodes', label: '🔑 Voir les codes des utilisateurs existants' },
-  { key: 'usersDelete', label: '🗑️ Supprimer un profil utilisateur' }
+  { key: 'usersDelete', label: '🗑️ Supprimer un profil utilisateur' },
+  { key: 'mailManage', label: '✉️ Gérer les adresses et groupes mail (export)' }
 ];
 function hasPermission(key) {
   return !!(currentUser && currentUser.permissions && currentUser.permissions[key]);
@@ -2687,7 +2688,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-16-send-2";
+const APP_VERSION = "2026-11-16-send-3";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2783,6 +2784,7 @@ function renderExportPreview() {
   document.getElementById('ex-preview').innerHTML = rows.length ? exHtmlTable() : '<div class="empty">Aucune remorque dans la liste actuelle</div>';
 }
 function openExportModal() {
+  { const m = document.getElementById('ex-manage'); if (m) m.style.display = hasPermission('mailManage') ? '' : 'none'; }
   { const v = document.getElementById('ex-ver'); if (v) v.textContent = 'Version ' + APP_VERSION + ' — '; }
   if (!lastListExport.length) renderListPanel();
   renderRecipientChips();
@@ -3167,7 +3169,8 @@ document.getElementById('md-group-save').onclick = () => {
   saveMailDirectory(); renderMailDir(); renderRecipientChips(); toast('Groupe enregistré');
 };
 document.getElementById('md-group-cancel').onclick = () => mdEditGroup(null);
-document.getElementById('ex-manage').onclick = () => { mdModalOpen = true; mdEditingGroup = null; renderMailDir(); mdEditGroup(null); mdModal.classList.add('open'); };
+document.getElementById('ex-manage').onclick = () => {
+  if (!hasPermission('mailManage')) { toast('Accès non autorisé'); return; } mdModalOpen = true; mdEditingGroup = null; renderMailDir(); mdEditGroup(null); mdModal.classList.add('open'); };
 document.getElementById('md-close').onclick = () => { mdModalOpen = false; mdModal.classList.remove('open'); renderRecipientChips(); };
 
 // Gmail : sur téléphone on ouvre l'APPLICATION (message déjà rempli) ; sur PC, Gmail web.
