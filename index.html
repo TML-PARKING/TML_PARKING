@@ -1085,7 +1085,7 @@
       <button class="btn btn-ghost" id="ex-copy">📋 Copier le tableau</button>
       <button class="btn btn-ghost" id="ex-print">🖨️ Imprimer / PDF</button>
     </div>
-    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Gmail » ouvre un nouveau message avec la liste et copie le tableau mis en forme (colle-le avec Ctrl+V). « Outlook (fichier) » télécharge un message prêt à envoyer à ouvrir par double-clic.</div>
+    <div style="font-size:11px; color:var(--ink-faint); margin-top:10px;">La liste reprend exactement ce qui est affiché dans la liste (filtres, recherche et tri actifs). « Gmail » ouvre un nouveau message avec la liste (l'application Gmail sur téléphone, Gmail web sur PC) et copie le tableau mis en forme à coller. « Outlook (fichier) » télécharge un message prêt à envoyer à ouvrir par double-clic.</div>
   </div>
 </div>
 
@@ -3084,13 +3084,26 @@ document.getElementById('md-group-cancel').onclick = () => mdEditGroup(null);
 document.getElementById('ex-manage').onclick = () => { mdModalOpen = true; mdEditingGroup = null; renderMailDir(); mdEditGroup(null); mdModal.classList.add('open'); };
 document.getElementById('md-close').onclick = () => { mdModalOpen = false; mdModal.classList.remove('open'); renderRecipientChips(); };
 
-// Gmail : nouveau message dans Gmail (web), tableau mis en forme copié pour le coller
+// Gmail : sur téléphone on ouvre l'APPLICATION (message déjà rempli) ; sur PC, Gmail web.
 document.getElementById('ex-mail-gmail').onclick = () => {
   if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
-  let body = exText(); const max = 1700; let note = '';
-  if (body.length > max) { body = body.slice(0, body.lastIndexOf('\n', max)); note = '\n… (liste complète : colle le tableau copié ici)'; }
+  const ua = navigator.userAgent || '', isAndroid = /Android/i.test(ua), isIOS = /iPhone|iPad|iPod/i.test(ua);
   const q = encodeURIComponent, to = exEmails().join(',');
-  const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + q(to) + '&su=' + q(exTitle()) + '&body=' + q(body + note);
+  const cut = max => { let b = exText(), n = ''; if (b.length > max) { b = b.slice(0, b.lastIndexOf('\n', max)); n = '\n… (liste complète : colle le tableau copié ici)'; } return b + n; };
+  const done = () => copyRich().then(() => toast('Tableau mis en forme copié : colle-le dans le message')).catch(() => {});
+  if (isAndroid || isIOS) {
+    const body = cut(7000);
+    const mailto = 'mailto:' + to + '?subject=' + q(exTitle()) + '&body=' + q(body);
+    if (isIOS) {
+      location.href = 'googlegmail:///co?to=' + q(to) + '&subject=' + q(exTitle()) + '&body=' + q(body);
+      setTimeout(() => { if (!document.hidden) location.href = mailto; }, 1200); // Gmail absent : app mail par défaut
+    } else {
+      location.href = mailto; // Android : ouvre l'app mail par défaut (Gmail), message déjà rempli
+    }
+    done();
+    return;
+  }
+  const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + q(to) + '&su=' + q(exTitle()) + '&body=' + q(cut(1700));
   window.open(url, '_blank');
   copyRich().then(() => toast('Gmail ouvert — tableau mis en forme copié : Ctrl+V pour le coller')).catch(() => toast('Gmail ouvert (copie du tableau impossible : utilise « Copier le tableau »)'));
 };
