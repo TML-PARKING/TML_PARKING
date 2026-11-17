@@ -448,6 +448,13 @@
   .hd-tabs { display: flex; gap: 4px; padding: 4px; background: var(--panel-2); border-radius: 999px; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; box-shadow: inset 0 0 0 1px var(--panel-hair); }
   .hd-tabs::-webkit-scrollbar { display: none; }
   .tab .fdot { display: none; }
+  .hd-kind { display: contents; }
+  .hd-kind-menu .tab svg.i { width: 15px; height: 15px; }
+  @media (min-width: 761px) and (max-width: 1500px) {
+    .hd-kind-menu .tab { font-size: 0; gap: 0; padding: 8px 13px; }
+    .hd-kind-menu .tab svg.i { width: 17px; height: 17px; margin: 0; }
+  }
+  @media (min-width: 761px) and (max-width: 1180px) { .hd-bar { flex-wrap: wrap; } }
   .tab { border: none; background: transparent; color: var(--ink-dim); font: 700 12.5px var(--font-display); padding: 8px 14px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 8px; white-space: nowrap; transition: background .15s var(--ease), color .15s var(--ease); }
   .tab:hover { color: var(--ink); }
   .tab .n { background: var(--surface-3); color: var(--ink-dim); font: 700 11px var(--font-mono); padding: 2px 8px; border-radius: 999px; }
@@ -612,14 +619,17 @@
     .hd-top, .hd-bar { width: 100%; max-width: 100%; }
     .hd-bar { gap: 8px; flex-wrap: wrap; }
     /* Téléphone : un seul bouton déroulant à la place de la barre de filtres */
-    .hd-filter { display: block; position: relative; flex: 1 1 100%; order: 2; width: 100%; }
+    .hd-filter { display: block; position: relative; flex: 1 1 0; min-width: 0; order: 2; }
+    .hd-kind { display: block; position: relative; flex: 0 0 auto; order: 2; }
+    .hd-filter-btn > span:not(.n):not(.fdot) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .hd-kind-menu { min-width: 190px; }
     .hd-filter-btn { display: flex; align-items: center; gap: 9px; width: 100%; box-sizing: border-box; border: none; cursor: pointer; background: var(--panel-2); color: var(--ink); font: 700 13px var(--font-display); padding: 9px 14px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--panel-hair); white-space: nowrap; }
     .hd-filter-btn .n { background: var(--tab-on-bg); color: var(--tab-on-ink); font: 700 11px var(--font-mono); padding: 2px 8px; border-radius: 999px; }
     .hd-filter-btn .chev { width: 16px; height: 16px; margin-left: auto; transition: transform .18s var(--ease); }
     .hd-filter.open .hd-filter-btn .chev { transform: rotate(180deg); }
     .hd-filter-btn .fdot, .tab .fdot { display: block; width: 10px; height: 10px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; box-shadow: 0 0 0 2px rgba(255,255,255,.12); }
     .hd-tabs { display: none; position: fixed; top: 120px; left: 10px; min-width: 0; width: max-content; max-width: calc(100vw - 20px); max-height: 62vh; overflow-y: auto; overflow-x: hidden; flex-direction: column; gap: 3px; padding: 6px; background: var(--panel-glass, var(--panel-2)); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-radius: 20px; box-shadow: 0 18px 40px rgba(0,0,0,.45), inset 0 0 0 1px var(--panel-hair); z-index: 3000; }
-    .hd-filter.open .hd-tabs { display: flex; animation: hdpop .16s var(--ease); }
+    .hd-filter.open .hd-tabs, .hd-kind.open .hd-tabs { display: flex; animation: hdpop .16s var(--ease); }
     @keyframes hdpop { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
     .hd-tabs .tab { width: 100%; justify-content: flex-start; padding: 11px 12px; border-radius: 14px; font-size: 13.5px; }
     .hd-tabs .tab .n { margin-left: auto; }
@@ -707,6 +717,14 @@
       <div class="hd-filter" id="hd-filter">
         <button class="hd-filter-btn" id="hd-filter-btn" type="button" aria-haspopup="listbox"><span class="fdot" id="hd-filter-dot"></span><span id="hd-filter-label">Tous</span><span class="n" id="hd-filter-n">0</span><svg class="i chev"><use href="#i-chev"/></svg></button>
         <div class="hd-tabs" id="hd-tabs" role="listbox"></div>
+      </div>
+      <div class="hd-kind" id="hd-kind">
+        <button class="hd-filter-btn" id="hd-kind-btn" type="button" aria-haspopup="listbox"><svg class="i kico" id="hd-kind-ico"><use href="#i-grid"/></svg><span id="hd-kind-label">Tout</span><svg class="i chev"><use href="#i-chev"/></svg></button>
+        <div class="hd-tabs hd-kind-menu" id="hd-kind-menu" role="listbox">
+          <button class="tab" role="option" data-k="all" title="Tout"><svg class="i"><use href="#i-grid"/></svg>Tout</button>
+          <button class="tab" role="option" data-k="trailer" title="Remorques"><svg class="i"><use href="#i-trailer"/></svg>Remorques</button>
+          <button class="tab" role="option" data-k="vehicle" title="Camions"><svg class="i"><use href="#i-truck"/></svg>Camions</button>
+        </div>
       </div>
       <div class="top-actions">
         <div class="view-seg" id="btn-view-toggle">
@@ -2569,6 +2587,7 @@ function allStatuses() {
     if (!window.matchMedia('(max-width: 760px)').matches) return;
     const w = wrap(), open = !w.classList.contains('open');
     if (open) { // le menu est « fixed » (le bandeau d'en-tête coupe ce qui dépasse)
+      document.getElementById('hd-kind').classList.remove('open');
       const r = document.getElementById('hd-filter-btn').getBoundingClientRect(), m = document.getElementById('hd-tabs');
       m.style.top = Math.round(r.bottom + 8) + 'px'; m.style.left = Math.round(Math.max(10, r.left)) + 'px'; m.style.width = Math.round(Math.min(Math.max(r.width, 280), window.innerWidth - 20)) + 'px';
     }
@@ -2604,6 +2623,12 @@ function updateHeaderExtrasInner() {
       }
     }
   }
+  { // type : libellé + état actif
+    const kl = { all: 'Tout', trailer: 'Remorques', vehicle: 'Camions' }, ki = { all: 'i-grid', trailer: 'i-trailer', vehicle: 'i-truck' };
+    const lab = document.getElementById('hd-kind-label'); if (lab) lab.textContent = kl[lpKind] || 'Tout';
+    const ic = document.getElementById('hd-kind-ico'); if (ic) ic.firstElementChild.setAttribute('href', '#' + (ki[lpKind] || 'i-grid'));
+    document.querySelectorAll('#hd-kind-menu .tab').forEach(t => t.classList.toggle('active', t.dataset.k === lpKind));
+  }
   const dEl = document.getElementById('hd-date');
   if (dEl) { const ds = new Date().toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long' }); dEl.textContent = ds.charAt(0).toUpperCase() + ds.slice(1) + ' · Vue en direct'; }
   const nm = (currentUser && currentUser.name) || '';
@@ -2617,11 +2642,11 @@ function updateHeaderExtrasInner() {
 }
 // Estompe sur la carte les marqueurs qui ne correspondent pas au filtre de statut actif
 function applyMapFilters() {
-  const active = lpActiveFilters.size > 0;
+  const active = lpActiveFilters.size > 0 || lpKind !== 'all';
   const sq = (typeof mapSearchQ === 'string') ? mapSearchQ : '';
   const fade = (m, status, occupied, d) => {
     if (!m) return;
-    let match = !active || (occupied && !!d && matchesActiveListFilters(d));
+    let match = !active || (occupied && !!d && matchesActiveListFilters(d) && (lpKind === 'all' || kindOf(d) === lpKind));
     if (sq) match = match && !!d && mapSearchMatch(d, sq);
     m.setOpacity(match ? 1 : 0.18);
   };
@@ -2760,7 +2785,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-ocr-9";
+const APP_VERSION = "2026-11-17-ocr-11";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2778,12 +2803,27 @@ function setFormKind(k) {
   const l = document.getElementById('f-trailer-label'); if (l) l.textContent = formKind === 'vehicle' ? 'N° Camion' : 'N° Remorque';
 }
 document.querySelectorAll('#f-kind-tabs .kind-tab').forEach(b => b.onclick = () => setFormKind(b.dataset.k));
-document.querySelectorAll('#lp-kind-tabs .kind-tab').forEach(b => b.onclick = () => {
-  lpKind = b.dataset.k;
-  document.querySelectorAll('#lp-kind-tabs .kind-tab').forEach(x => x.classList.toggle('active', x === b));
+function setLpKind(k) {
+  lpKind = k === 'vehicle' || k === 'trailer' ? k : 'all';
+  document.querySelectorAll('#lp-kind-tabs .kind-tab').forEach(x => x.classList.toggle('active', x.dataset.k === lpKind));
   document.getElementById('lp-title').textContent = lpKind === 'vehicle' ? 'Camions sur site' : lpKind === 'trailer' ? 'Remorques sur site' : 'Remorques et camions sur site';
-  renderListPanel();
-});
+  try { renderListPanel(); } catch (e) {}
+  updateHeaderExtras();
+}
+document.querySelectorAll('#lp-kind-tabs .kind-tab').forEach(b => b.onclick = () => setLpKind(b.dataset.k));
+document.querySelectorAll('#hd-kind-menu .tab').forEach(b => b.onclick = () => { setLpKind(b.dataset.k); document.getElementById('hd-kind').classList.remove('open'); });
+document.getElementById('hd-kind-btn').onclick = (e) => {
+  e.stopPropagation();
+  if (!window.matchMedia('(max-width: 760px)').matches) return;
+  const w = document.getElementById('hd-kind'), open = !w.classList.contains('open');
+  if (open) {
+    document.getElementById('hd-filter').classList.remove('open');
+    const r = document.getElementById('hd-kind-btn').getBoundingClientRect(), m = document.getElementById('hd-kind-menu'), mw = 210;
+    m.style.top = Math.round(r.bottom + 8) + 'px'; m.style.width = mw + 'px'; m.style.left = Math.round(Math.max(10, Math.min(r.right - mw, window.innerWidth - mw - 10))) + 'px';
+  }
+  w.classList.toggle('open', open);
+};
+document.addEventListener('click', (e) => { const w = document.getElementById('hd-kind'); if (w && w.classList.contains('open') && !w.contains(e.target)) w.classList.remove('open'); });
 document.querySelectorAll('#db-kind-tabs .kind-tab').forEach(b => b.onclick = () => {
   dbKind = b.dataset.k;
   document.querySelectorAll('#db-kind-tabs .kind-tab').forEach(x => x.classList.toggle('active', x === b));
