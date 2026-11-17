@@ -1145,6 +1145,7 @@
   <div style="position:absolute; left:0; right:0; bottom:0; padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 22px); text-align:center; color:#fff;">
     <div id="ps-msg" style="font-weight:700; font-size:15px; margin-bottom:6px;">Place la plaque dans le cadre</div>
     <div id="ps-read" style="font:12px monospace; opacity:.7; min-height:16px;"></div>
+    <div id="ps-diag" style="font:11px monospace; opacity:.55; margin-top:4px; word-break:break-word;"></div>
     <button type="button" class="btn btn-ghost" id="ps-photo" style="display:none; margin-top:10px; background:rgba(255,255,255,.16); color:#fff;">📷 Prendre une photo à la place</button>
   </div>
 </div>
@@ -2703,7 +2704,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-veh-3";
+const APP_VERSION = "2026-11-17-veh-4";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -3015,6 +3016,12 @@ function psCropCanvas(variant) {
   return c;
 }
 let psVariantCounter = 0;
+const psDiagState = { cam: '', lecteur: '', n: 0, err: '', ms: 0 };
+function psDiag(patch) {
+  Object.assign(psDiagState, patch || {});
+  const el = document.getElementById('ps-diag'); if (!el) return;
+  el.textContent = 'v' + APP_VERSION.split('-').slice(-1)[0] + ' · cam ' + (psDiagState.cam || '…') + ' · lecteur ' + (psDiagState.lecteur || '…') + ' · lectures ' + psDiagState.n + (psDiagState.ms ? ' (' + psDiagState.ms + ' ms)' : '') + (psDiagState.err ? ' · ⚠ ' + psDiagState.err : '');
+}
 async function psLoop(workers) {
   const t0 = Date.now();
   const handle = (text) => {
@@ -3042,8 +3049,8 @@ async function psLoop(workers) {
     while (psRunning) {
       const c = psCropCanvas(psVariantCounter++ % 3);
       if (!c) { await new Promise(r => setTimeout(r, 80)); continue; }
-      let text = '';
-      try { text = (await w.recognize(c)).data.text || ''; } catch (e) { console.warn('ocr', e); }
+      let text = ''; const t1 = Date.now();
+      try { text = (await w.recognize(c)).data.text || ''; psDiag({ n: psDiagState.n + 1, ms: Date.now() - t1, err: '' }); } catch (e) { console.warn('ocr', e); psDiag({ err: 'lecture : ' + (e && e.message || e) }); await new Promise(r => setTimeout(r, 300)); }
       if (!psRunning) return;
       if (handle(text)) return;
     }
@@ -3056,7 +3063,9 @@ async function openPlateScanner() {
     psStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
   } catch (e) { toast("Caméra refusée ou indisponible : autorise-la dans le navigateur"); document.getElementById('scan-plate-input').click(); return; }
   psVideo.srcObject = psStream; psOv.style.display = 'block';
-  try { await psVideo.play(); } catch (e) {}
+  psDiag({ cam: '', lecteur: 'chargement', n: 0, err: '', ms: 0 });
+  try { await psVideo.play(); } catch (e) { psDiag({ err: 'vidéo : ' + (e && e.message || e) }); }
+  { const t = psStream.getVideoTracks()[0], st = (t && t.getSettings && t.getSettings()) || {}; psDiag({ cam: (st.width || psVideo.videoWidth || '?') + '×' + (st.height || psVideo.videoHeight || '?') }); }
   document.getElementById('ps-photo').style.display = 'none';
   psVotes = []; psRunning = true; psMsg('Place la plaque dans le cadre'); document.getElementById('ps-read').textContent = '';
   try {
@@ -3065,12 +3074,13 @@ async function openPlateScanner() {
     document.getElementById('ps-torch').style.display = caps.torch ? '' : 'none';
   } catch (e) {}
   try {
-    const workers = await getOcrWorker(m => psMsg(m));
+    const workers = await Promise.race([getOcrWorker(m => psMsg(m)), new Promise((_, rej) => setTimeout(() => rej(new Error('chargement trop long (réseau bloqué ?)')), 45000))]);
     if (!psRunning) return;
+    psDiag({ lecteur: 'prêt (' + workers.length + ')' });
     psMsg('Place la plaque dans le cadre');
     psLoop(workers);
   } catch (e) {
-    console.error(e); psStop(); showScanStatus('⚠️ Lecteur indisponible (' + escapeHtml(e.message || 'erreur') + '). Vérifie ta connexion internet.');
+    console.error(e); psDiag({ lecteur: 'ÉCHEC', err: (e && e.message) || 'erreur' }); psStop(); showScanStatus('⚠️ Lecteur indisponible (' + escapeHtml(e.message || 'erreur') + '). Vérifie ta connexion internet.');
   }
 }
 document.getElementById('ps-close').onclick = psStop;
