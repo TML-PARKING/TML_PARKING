@@ -460,10 +460,11 @@
   .fc-row .ml { flex: 1; min-width: 0; font-size: 13px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fc-row .ml small { display: block; max-width: none; }
   .kind-tabs { display: flex; gap: 6px; padding: 0 14px 10px; }
+  .kind-tab svg.i { width: 17px; height: 17px; vertical-align: -3px; margin-right: 4px; }
   .kind-tab { flex: 1; border: none; cursor: pointer; border-radius: 999px; padding: 7px 8px; font: 700 12px var(--font-display); background: var(--surface-3); color: var(--ink); }
   .kind-tab.active { background: var(--amber); color: var(--amber-ink); }
   .is-vehicle { position: relative; }
-  .is-vehicle::after { content: '🚗'; position: absolute; top: -9px; right: -9px; font-size: 13px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+  .is-vehicle::after { content: ''; position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='12' fill='%23111827'/><g transform='translate(3.2 3.6) scale(.7)' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M1.5 6h12v10h-12z'/><path d='M13.5 9.2h4.2l3.3 3.6V16h-7.5z'/><circle cx='6' cy='17.6' r='2'/><circle cx='17' cy='17.6' r='2'/></g></svg>") center/contain no-repeat; border: 1.5px solid rgba(255,255,255,.85); border-radius: 50%; }
   .rc-chip { border: none; cursor: pointer; border-radius: 999px; padding: 6px 12px; font: 600 12px var(--font-display); background: var(--surface-3); color: var(--ink); }
   .rc-chip.active { background: var(--amber); color: var(--amber-ink); }
   .rc-chip.group { box-shadow: inset 0 0 0 1.5px var(--amber); }
@@ -646,6 +647,8 @@
 <symbol id="i-list" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></symbol>
 <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
 <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></symbol>
+<symbol id="i-trailer" viewBox="0 0 24 24"><rect x="1.5" y="4.5" width="21" height="10.5" rx="1.2"/><circle cx="16.5" cy="18.2" r="2"/><circle cx="11.5" cy="18.2" r="2"/><path d="M4.5 15v4.2M3 19.2h3"/></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24"><path d="M1.5 6h12v10h-12z"/><path d="M13.5 9.2h4.2l3.3 3.6V16h-7.5z"/><circle cx="6" cy="17.6" r="2"/><circle cx="17" cy="17.6" r="2"/></symbol>
 <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
 <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/></symbol>
 <symbol id="i-radio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/></symbol>
@@ -789,7 +792,7 @@
     <button class="btn btn-ghost" id="btn-list-close" style="padding:4px 8px;"><svg class="i"><use href="#i-x"/></svg></button>
   </div>
   <div class="lp-search"><input type="text" id="lp-search-input" placeholder="Rechercher n°, client..."></div>
-  <div class="kind-tabs" id="lp-kind-tabs"><button type="button" class="kind-tab active" data-k="all">Tout</button><button type="button" class="kind-tab" data-k="trailer">🚛 Remorques</button><button type="button" class="kind-tab" data-k="vehicle">🚗 Camions</button></div>
+  <div class="kind-tabs" id="lp-kind-tabs"><button type="button" class="kind-tab active" data-k="all">Tout</button><button type="button" class="kind-tab" data-k="trailer"><svg class="i"><use href="#i-trailer"/></svg> Remorques</button><button type="button" class="kind-tab" data-k="vehicle"><svg class="i"><use href="#i-truck"/></svg> Camions</button></div>
   <div id="lp-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; align-items:center;">
     <span style="margin-left:auto; display:flex; gap:6px; flex-shrink:0;">
       <button class="lp-icon-btn" id="btn-lp-status" title="Trier par statut : À vider, Bloqué, Chargé, En cours de chargement, Vide" style="width:auto; padding:0 10px;">🚦</button>
@@ -827,7 +830,7 @@
   <div class="sheet-body">
     <div class="field" id="f-kind-field">
       <label>Type</label>
-      <div class="kind-tabs" style="padding:0;" id="f-kind-tabs"><button type="button" class="kind-tab active" data-k="trailer">🚛 Remorque</button><button type="button" class="kind-tab" data-k="vehicle">🚗 Camion</button></div>
+      <div class="kind-tabs" style="padding:0;" id="f-kind-tabs"><button type="button" class="kind-tab active" data-k="trailer"><svg class="i"><use href="#i-trailer"/></svg> Remorque</button><button type="button" class="kind-tab" data-k="vehicle"><svg class="i"><use href="#i-truck"/></svg> Camion</button></div>
     </div>
     <div class="field">
       <label id="f-trailer-label">N° Remorque</label>
@@ -1281,7 +1284,7 @@
     <button class="btn btn-ghost" id="btn-db-panel-close" style="padding:4px 8px;"><svg class="i"><use href="#i-x"/></svg></button>
   </div>
   <div class="lp-search"><input type="text" id="db-panel-search" placeholder="Rechercher n° remorque..."></div>
-  <div class="kind-tabs" id="db-kind-tabs"><button type="button" class="kind-tab active" data-k="trailer">🚛 Remorques</button><button type="button" class="kind-tab" data-k="vehicle">🚗 Camions</button></div>
+  <div class="kind-tabs" id="db-kind-tabs"><button type="button" class="kind-tab active" data-k="trailer"><svg class="i"><use href="#i-trailer"/></svg> Remorques</button><button type="button" class="kind-tab" data-k="vehicle"><svg class="i"><use href="#i-truck"/></svg> Camions</button></div>
   <div id="db-panel-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; align-items:center;">
     <button class="lp-icon-btn" id="btn-db-sort" title="Trier par n° A-Z" style="width:auto; padding:0 8px;">🔤⬇️</button>
     <button class="lp-icon-btn" id="btn-db-sort-date" title="Trier par date" style="width:auto; padding:0 8px; margin-left:auto;">📅⬇️</button>
@@ -2438,7 +2441,7 @@ function renderFreeTrailers() {
     const s = getMarkerSize(30);
     const icon = L.divIcon({
       className: '',
-      html: `<div class="trailer-marker${selectedTargetKey === 'free-'+id ? ' marker-selected' : ''}" style="background:${vs.color}; width:${s}px; height:${s}px; font-size:${Math.max(10, Math.round(s*0.5))}px;">${kindOf(t) === 'vehicle' ? '🚗' : '🚛'}</div>`,
+      html: `<div class="trailer-marker${selectedTargetKey === 'free-'+id ? ' marker-selected' : ''}" style="background:${vs.color}; width:${s}px; height:${s}px; font-size:${Math.max(10, Math.round(s*0.5))}px;"><svg class="i" style="width:62%;height:62%;"><use href="#${kindOf(t) === 'vehicle' ? 'i-truck' : 'i-trailer'}"/></svg></div>`,
       iconSize: [s, s], iconAnchor: [s/2, s/2]
     });
     const d = toDisplayLatLng(t.lat, t.lng);
@@ -2703,7 +2706,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-ocr-6";
+const APP_VERSION = "2026-11-17-ocr-7";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -4104,7 +4107,7 @@ function renderListPanel() {
     const compactLabel = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-num">${kindOf(it) === 'vehicle' ? '🚗 ' : ''}${it.trailer || '(sans n°)'}</div>
+        <div class="lp-num"><svg class="i" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px;opacity:.75"><use href="#${kindOf(it) === 'vehicle' ? 'i-truck' : 'i-trailer'}"/></svg>${it.trailer || '(sans n°)'}</div>
         <div style="display:flex; gap:6px; align-items:center;">
           ${ctBadgeHtml}
           <div class="lp-badge ${badgeClass}">${badgeText}</div>
