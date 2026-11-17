@@ -2702,7 +2702,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-veh-1";
+const APP_VERSION = "2026-11-17-veh-2";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -4996,12 +4996,14 @@ document.getElementById('db-import-file-input').addEventListener('change', async
     // Repère les colonnes par leur en-tête (insensible à la casse/accents), peu importe l'ordre
     const headerRow = rows[0].map(h => String(h || '').trim().toLowerCase());
     const findCol = (...names) => headerRow.findIndex(h => names.some(n => h.includes(n)));
-    const colTrailer = findCol('remorque', 'n°remorque', 'numero remorque');
+    let colTrailer = findCol('remorque', 'camion', 'véhicule', 'vehicule', 'tracteur', 'traction', 'numero', 'numéro');
+    if (colTrailer === -1) colTrailer = headerRow.findIndex(h => (h.includes('n°') || h.startsWith('n ') || h === 'n' || h.includes('num')) && !h.includes('plaque'));
+    if (colTrailer === -1) colTrailer = headerRow.findIndex((h, i) => i === 0 && !h.includes('plaque') && !h.includes('date') && !h.includes('échéance') && !h.includes('echeance'));
     const colPlate = findCol('plaque');
     const colDate = findCol('échéance', 'echeance', 'date');
 
     if (colTrailer === -1 || colDate === -1) {
-      toast("Colonnes non reconnues — vérifie les en-têtes (N°remorque / N°plaque / Échéance)");
+      toast("Colonnes non reconnues — vérifie les en-têtes (N°remorque ou N°camion / N°plaque / Échéance)");
       e.target.value = '';
       return;
     }
