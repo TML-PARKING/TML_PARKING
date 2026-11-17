@@ -443,8 +443,17 @@
   .user-chip i { font-style: normal; width: 32px; height: 32px; border-radius: 50%; background: var(--amber); color: var(--amber-ink); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; }
   .user-chip b { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
   .hd-bar { justify-content: space-between; }
-  .hd-tabs { display: flex; gap: 4px; padding: 4px; background: var(--panel-2); border-radius: 999px; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; box-shadow: inset 0 0 0 1px var(--panel-hair); }
-  .hd-tabs::-webkit-scrollbar { display: none; }
+  .hd-filter { position: relative; flex: 0 0 auto; }
+  .hd-filter-btn { display: flex; align-items: center; gap: 9px; width: 100%; box-sizing: border-box; border: none; cursor: pointer; background: var(--panel-2); color: var(--ink); font: 700 13px var(--font-display); padding: 9px 14px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--panel-hair); white-space: nowrap; }
+  .hd-filter-btn .n { background: var(--tab-on-bg); color: var(--tab-on-ink); font: 700 11px var(--font-mono); padding: 2px 8px; border-radius: 999px; }
+  .hd-filter-btn .chev { width: 16px; height: 16px; margin-left: auto; transition: transform .18s var(--ease); }
+  .hd-filter.open .hd-filter-btn .chev { transform: rotate(180deg); }
+  .hd-filter-btn .fdot, .tab .fdot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; box-shadow: 0 0 0 2px rgba(255,255,255,.12); }
+  .hd-tabs { display: none; position: fixed; top: 120px; left: 10px; min-width: 280px; width: max-content; max-width: 92vw; max-height: 62vh; overflow-y: auto; flex-direction: column; gap: 3px; padding: 6px; background: var(--panel-glass, var(--panel-2)); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-radius: 20px; box-shadow: 0 18px 40px rgba(0,0,0,.45), inset 0 0 0 1px var(--panel-hair); z-index: 3000; }
+  .hd-filter.open .hd-tabs { display: flex; animation: hdpop .16s var(--ease); }
+  @keyframes hdpop { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+  .hd-tabs .tab { width: 100%; justify-content: flex-start; padding: 11px 12px; border-radius: 14px; font-size: 13.5px; }
+  .hd-tabs .tab .n { margin-left: auto; }
   .tab { border: none; background: transparent; color: var(--ink-dim); font: 700 12.5px var(--font-display); padding: 8px 14px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 8px; white-space: nowrap; transition: background .15s var(--ease), color .15s var(--ease); }
   .tab:hover { color: var(--ink); }
   .tab .n { background: var(--surface-3); color: var(--ink-dim); font: 700 11px var(--font-mono); padding: 2px 8px; border-radius: 999px; }
@@ -608,11 +617,9 @@
     header { align-items: stretch; overflow: hidden; }
     .hd-top, .hd-bar { width: 100%; max-width: 100%; }
     .hd-bar { gap: 8px; flex-wrap: wrap; }
-    .hd-tabs { flex: 1 1 100%; order: 2; width: 100%; box-sizing: border-box; }
+    .hd-filter { flex: 1 1 100%; order: 2; width: 100%; }
+    .hd-tabs { min-width: 0; max-width: calc(100vw - 20px); }
     .hd-bar { gap: 6px; }
-    .tab { padding: 5px 11px; font-size: 11.5px; gap: 6px; }
-    .tab .n { padding: 1px 6px; font-size: 10px; }
-    .hd-tabs { padding: 3px; }
     .top-actions { order: 1; width: 100%; }
     .view-seg { width: 100%; box-sizing: border-box; padding: 3px; }
     .view-seg button { flex: 1; justify-content: center; padding: 0 6px; height: 28px; font-size: 12px; }
@@ -636,7 +643,7 @@
       border-right-width: 8px !important; border-radius: 26px 34px 34px 26px !important;
     }
   }
-  body.driver-mode #rail, body.driver-mode .hd-tabs, body.driver-mode .search-pill, body.driver-mode .user-chip, body.driver-mode .hd-top .sub { display: none !important; }
+  body.driver-mode #rail, body.driver-mode .hd-filter, body.driver-mode .search-pill, body.driver-mode .user-chip, body.driver-mode .hd-top .sub { display: none !important; }
   body.driver-mode #map { margin: 8px !important; }
   body.driver-mode header { margin: 8px 8px 0 !important; }
 
@@ -647,6 +654,7 @@
 <symbol id="i-list" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></symbol>
 <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
 <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
 <symbol id="i-trailer" viewBox="0 0 24 24"><rect x="1.5" y="4.5" width="21" height="10.5" rx="1.2"/><circle cx="16.5" cy="18.2" r="2"/><circle cx="11.5" cy="18.2" r="2"/><path d="M4.5 15v4.2M3 19.2h3"/></symbol>
 <symbol id="i-truck" viewBox="0 0 24 24"><path d="M1.5 6h12v10h-12z"/><path d="M13.5 9.2h4.2l3.3 3.6V16h-7.5z"/><circle cx="6" cy="17.6" r="2"/><circle cx="17" cy="17.6" r="2"/></symbol>
 <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
@@ -692,8 +700,9 @@
       </div>
     </div>
     <div class="hd-bar">
-      <div class="hd-tabs" id="hd-tabs">
-
+      <div class="hd-filter" id="hd-filter">
+        <button class="hd-filter-btn" id="hd-filter-btn" type="button" aria-haspopup="listbox"><span class="fdot" id="hd-filter-dot"></span><span id="hd-filter-label">Tous</span><span class="n" id="hd-filter-n">0</span><svg class="i chev"><use href="#i-chev"/></svg></button>
+        <div class="hd-tabs" id="hd-tabs" role="listbox"></div>
       </div>
       <div class="top-actions">
         <div class="view-seg" id="btn-view-toggle">
@@ -2536,6 +2545,20 @@ function allStatuses() {
   Object.values(dockOccupancy).forEach(d => out.push(d.status));
   return out;
 }
+(function () {
+  const wrap = () => document.getElementById('hd-filter');
+  document.getElementById('hd-filter-btn').onclick = (e) => {
+    e.stopPropagation();
+    const w = wrap(), open = !w.classList.contains('open');
+    if (open) { // le menu est « fixed » (le bandeau d'en-tête coupe ce qui dépasse)
+      const r = document.getElementById('hd-filter-btn').getBoundingClientRect(), m = document.getElementById('hd-tabs');
+      m.style.top = Math.round(r.bottom + 8) + 'px'; m.style.left = Math.round(Math.max(10, r.left)) + 'px'; m.style.width = Math.round(Math.min(Math.max(r.width, 280), window.innerWidth - 20)) + 'px';
+    }
+    w.classList.toggle('open', open);
+  };
+  document.addEventListener('click', (e) => { const w = wrap(); if (w && w.classList.contains('open') && !w.contains(e.target)) w.classList.remove('open'); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') wrap().classList.remove('open'); });
+})();
 function updateHeaderExtras() {
   try { updateHeaderExtrasInner(); } catch (e) { /* variables pas encore initialisées au tout début : ignoré */ }
 }
@@ -2550,6 +2573,19 @@ function updateHeaderExtrasInner() {
     const k = t.dataset.tab, f = fs.find(x => x.id === k) || {};
     t.classList.toggle('active', f.type === 'all' ? lpActiveFilters.size === 0 : lpActiveFilters.has(k));
   });
+  { // libellé du bouton déroulant
+    const lbl = document.getElementById('hd-filter-label'), nn = document.getElementById('hd-filter-n'), dot = document.getElementById('hd-filter-dot');
+    if (lbl) {
+      const act = [...lpActiveFilters].map(id => fs.find(x => x.id === id)).filter(Boolean);
+      const sCol = { pleine: '#ef4444', vide: '#22c55e', charge: '#06b6d4', achar: '#eab308', fleet: '#8b5cf6' };
+      if (!act.length) { lbl.textContent = 'Tous'; nn.textContent = all.length; dot.style.background = ''; }
+      else {
+        lbl.textContent = act.length === 1 ? act[0].label : act.length + ' filtres';
+        nn.textContent = all.filter(d => matchesActiveListFilters(d)).length;
+        dot.style.background = act.length === 1 && act[0].type === 'status' && sCol[act[0].value] ? sCol[act[0].value] : '';
+      }
+    }
+  }
   const dEl = document.getElementById('hd-date');
   if (dEl) { const ds = new Date().toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long' }); dEl.textContent = ds.charAt(0).toUpperCase() + ds.slice(1) + ' · Vue en direct'; }
   const nm = (currentUser && currentUser.name) || '';
@@ -2706,7 +2742,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-ocr-7";
+const APP_VERSION = "2026-11-17-ocr-8";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -3964,7 +4000,8 @@ function renderFilterBars() {
   lp.querySelectorAll('.lp-filter-btn').forEach(b => b.onclick = () => toggleListFilter(b.dataset.filter));
   // en-tête
   const tabs = document.getElementById('hd-tabs');
-  tabs.innerHTML = lf.filter(f => f.type !== 'fixed').map(f => `<button class="tab" data-tab="${escapeHtml(f.id)}">${escapeHtml(f.label)} <span class="n" data-n="${escapeHtml(f.id)}">0</span></button>`).join('');
+  const stCol = { pleine: '#ef4444', vide: '#22c55e', charge: '#06b6d4', achar: '#eab308', fleet: '#8b5cf6' };
+  tabs.innerHTML = lf.filter(f => f.type !== 'fixed').map(f => `<button class="tab" role="option" data-tab="${escapeHtml(f.id)}"><span class="fdot" style="${f.type === 'status' && stCol[f.value] ? 'background:' + stCol[f.value] : ''}"></span>${escapeHtml(f.label)} <span class="n" data-n="${escapeHtml(f.id)}">0</span></button>`).join('');
   tabs.querySelectorAll('.tab').forEach(t => t.onclick = () => toggleListFilter(t.dataset.tab));
   // base remorques
   const dp = document.getElementById('db-panel-filters');
