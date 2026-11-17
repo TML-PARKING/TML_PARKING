@@ -786,6 +786,7 @@
   <div class="lp-search"><input type="text" id="lp-search-input" placeholder="Rechercher n°, client..."></div>
   <div id="lp-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; align-items:center;">
     <span style="margin-left:auto; display:flex; gap:6px; flex-shrink:0;">
+      <button class="lp-icon-btn" id="btn-lp-status" title="Trier par statut : À vider, Bloqué, Chargé, À charger, Vide" style="width:auto; padding:0 10px;">🚦</button>
       <button class="lp-icon-btn" id="btn-lp-date" title="Trier par date de dépose" style="width:auto; padding:0 10px;">📅</button>
       <button class="lp-icon-btn" id="btn-lp-sort" title="Trier A-Z">⬇️</button>
     </span>
@@ -2688,7 +2689,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-send-4";
+const APP_VERSION = "2026-11-17-send-5";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -3821,8 +3822,11 @@ document.getElementById('lp-search-input').oninput = renderListPanel;
 let lpActiveFilters = new Set(); // statuts sélectionnés (pleine/vide/fleet/charge), vide = tous
 let lpFixedOnly = false; // filtre "P" (emplacements fixes uniquement)
 let lpDateSort = null; // null | 'old' (plus ancienne d'abord) | 'new' (plus récente d'abord)
+let lpStatusSort = false; // tri par statut : À vider → Bloqué → Chargé → À charger → Vide
+const LP_STATUS_ORDER = ['pleine', 'fleet', 'charge', 'achar', 'vide'];
 let lpSortAsc = null; // null = pas trié (ordre naturel), true = A-Z, false = Z-A
 document.getElementById('btn-lp-sort').onclick = () => {
+  lpStatusSort = false; document.getElementById('btn-lp-status').classList.remove('active');
   lpDateSort = null; document.getElementById('btn-lp-date').classList.remove('active'); document.getElementById('btn-lp-date').textContent = '📅';
   lpSortAsc = lpSortAsc === true ? false : true;
   document.getElementById('btn-lp-sort').textContent = lpSortAsc ? '⬇️' : '⬆️';
@@ -3931,11 +3935,18 @@ try { renderFilterBars(); } catch (e) { console.warn('renderFilterBars différé
 
 let lastListExport = [];
 document.getElementById('btn-lp-date').onclick = () => {
+  lpStatusSort = false; document.getElementById('btn-lp-status').classList.remove('active');
   lpDateSort = lpDateSort === 'old' ? 'new' : 'old';
   const b = document.getElementById('btn-lp-date');
   b.classList.add('active');
   b.textContent = lpDateSort === 'old' ? '📅⬆️' : '📅⬇️';
   b.title = lpDateSort === 'old' ? 'Plus anciennes déposées en premier' : 'Plus récentes déposées en premier';
+  renderListPanel();
+};
+document.getElementById('btn-lp-status').onclick = () => {
+  lpStatusSort = !lpStatusSort;
+  document.getElementById('btn-lp-status').classList.toggle('active', lpStatusSort);
+  if (lpStatusSort) { lpDateSort = null; lpSortAsc = null; const d = document.getElementById('btn-lp-date'); d.classList.remove('active'); d.textContent = '📅'; }
   renderListPanel();
 };
 function renderListPanel() {
@@ -3971,7 +3982,10 @@ function renderListPanel() {
     const nq = normPlate(q);
     return nq.length >= 3 && !!(ctEntry && ctEntry.plate) && normPlate(ctEntry.plate).includes(nq);
   }) : filtered;
-  if (lpDateSort) {
+  if (lpStatusSort) {
+    const rk = st => { const i = LP_STATUS_ORDER.indexOf(st); return i < 0 ? 99 : i; };
+    filtered = filtered.slice().sort((a, b) => (rk(a.status) - rk(b.status)) || (a.trailer || '').localeCompare(b.trailer || '', 'fr', { numeric: true }));
+  } else if (lpDateSort) {
     filtered = filtered.slice().sort((a, b) => {
       const ta = a.time ? new Date(a.time).getTime() : Infinity, tb = b.time ? new Date(b.time).getTime() : Infinity;
       return lpDateSort === 'old' ? ta - tb : tb - ta;
