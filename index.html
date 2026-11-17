@@ -1065,7 +1065,7 @@
     <button class="btn btn-ghost" id="btn-export-close" style="padding:6px 10px;"><svg class="i"><use href="#i-x"/></svg></button>
   </div>
   <div class="sheet-body">
-    <div class="field"><label>Titre</label><input type="text" id="ex-title" value="Remorques disponibles — Site TML Ghlin"></div>
+    <div class="field"><label>Titre</label><input type="text" id="ex-title" value="Check Parking"></div>
     <div class="field"><label>Destinataire(s)</label><input type="text" id="ex-to" placeholder="nom@exemple.com, ..." autocomplete="off">
       <div id="ex-groups" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
       <details id="ex-contacts-det" style="margin-top:8px;">
@@ -2688,7 +2688,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-16-send-3";
+const APP_VERSION = "2026-11-17-send-4";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2712,7 +2712,7 @@ function exRows() {
   });
   return { head, rows };
 }
-function exTitle() { return document.getElementById('ex-title').value.trim() || 'Liste des remorques'; }
+function exTitle() { return document.getElementById('ex-title').value.trim() || 'Check Parking'; }
 function exDateStr() { return new Date().toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 function exHtmlTable() {
   const { head, rows } = exRows();
@@ -2807,7 +2807,7 @@ document.getElementById('ex-mail-eml').onclick = () => {
   const eml = (to ? 'To: ' + to + '\r\n' : '') + 'Subject: =?UTF-8?B?' + b64(exTitle()) + '?=\r\nX-Unsent: 1\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' + wrap(b64(html));
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([eml], { type: 'message/rfc822' }));
-  a.download = 'remorques-' + new Date().toISOString().slice(0, 10) + '.eml';
+  a.download = 'Check Parking ' + new Date().toISOString().slice(0, 10) + '.eml';
   document.body.appendChild(a); a.click(); a.remove();
   toast('Fichier téléchargé : ouvre-le (double-clic) pour qu\'Outlook crée le mail');
 };
@@ -2822,7 +2822,7 @@ async function exSendNow() {
     const blob = await exTablePdfBlob(), bytes = new Uint8Array(await blob.arrayBuffer());
     let bin = ''; for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
     const resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'sendMail', data: { to, subject: exTitle(), count: lastListExport.length, filename: 'remorques-' + new Date().toISOString().slice(0, 10) + '.pdf', pdfBase64: btoa(bin) } }) });
+      body: JSON.stringify({ action: 'sendMail', data: { to, subject: exTitle(), count: lastListExport.length, filename: 'Check Parking ' + new Date().toISOString().slice(0, 10) + '.pdf', pdfBase64: btoa(bin) } }) });
     const r = await resp.json();
     if (r.ok) toast('✅ Mail envoyé à ' + r.sent + ' destinataire(s)');
     else if (r.error === 'mail_not_configured') toast('Envoi non configuré côté serveur (clé Brevo manquante)');
