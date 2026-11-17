@@ -2704,7 +2704,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-veh-4";
+const APP_VERSION = "2026-11-17-ocr-5";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2934,12 +2934,26 @@ let ocrWorkerPromise = null;
 function loadScript(src) {
   return new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error('chargement impossible : ' + src)); document.head.appendChild(el); });
 }
+// Le lecteur de texte est hébergé avec le site (dossier ocr/) : fonctionne même si le réseau bloque les CDN.
+// Repli automatique sur le CDN si le dossier ocr/ est absent.
+const OCR_LOCAL = new URL('ocr/', location.href).href;
+let ocrSource = '';
+function ocrLogger(m) { try { if (m && m.status) psDiag({ lecteur: m.status.replace('loading ', '').replace('tesseract ', '') + ' ' + Math.round((m.progress || 0) * 100) + '%' }); } catch (e) {} }
 async function makeOcrWorker() {
-  const base = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0';
+  const params = { tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ', tessedit_pageseg_mode: '7', preserve_interword_spaces: '1', tessedit_do_invert: '0', load_system_dawg: '0', load_freq_dawg: '0' };
   let w;
-  try { w = await Tesseract.createWorker('eng', 1, { langPath: base + '_fast' }); }          // modèle rapide
-  catch (e) { w = await Tesseract.createWorker('eng', 1, { langPath: base + '_best_int' }); } // repli
-  await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ', tessedit_pageseg_mode: '7', preserve_interword_spaces: '1', tessedit_do_invert: '0', load_system_dawg: '0', load_freq_dawg: '0' });
+  if (ocrSource === 'local') {
+    try {
+      w = await Tesseract.createWorker('eng', 1, { workerPath: OCR_LOCAL + 'tml-ocr-worker.js', corePath: OCR_LOCAL, langPath: OCR_LOCAL.replace(/\/$/, ''), gzip: false, logger: ocrLogger });
+    } catch (e) { console.warn('ocr local indisponible', e); }
+  }
+  if (!w) {
+    const base = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0';
+    try { w = await Tesseract.createWorker('eng', 1, { langPath: base + '_fast', logger: ocrLogger }); }
+    catch (e) { w = await Tesseract.createWorker('eng', 1, { langPath: base + '_best_int', logger: ocrLogger }); }
+    ocrSource = 'cdn';
+  }
+  await w.setParameters(params);
   return w;
 }
 // 2 lecteurs en parallèle : les images sont lues en alternance, donc ~2x plus de lectures par seconde
@@ -2947,7 +2961,10 @@ async function getOcrWorker(onStatus) {
   if (!ocrWorkerPromise) {
     ocrWorkerPromise = (async () => {
       onStatus('Premier lancement : chargement du lecteur (quelques secondes)…');
-      if (!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+      if (!window.Tesseract) {
+        try { await loadScript(OCR_LOCAL + 'tml-ocr.js'); ocrSource = 'local'; }
+        catch (e) { await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'); ocrSource = 'cdn'; }
+      }
       const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       const n = !isIOS && (navigator.hardwareConcurrency || 4) >= 6 && (navigator.deviceMemory || 4) >= 4 ? 2 : 1; // iPhone / appareils modestes : 1 seul lecteur (évite les plantages mémoire)
       const ws = await Promise.all(Array.from({ length: n }, makeOcrWorker));
@@ -3076,7 +3093,7 @@ async function openPlateScanner() {
   try {
     const workers = await Promise.race([getOcrWorker(m => psMsg(m)), new Promise((_, rej) => setTimeout(() => rej(new Error('chargement trop long (réseau bloqué ?)')), 45000))]);
     if (!psRunning) return;
-    psDiag({ lecteur: 'prêt (' + workers.length + ')' });
+    psDiag({ lecteur: 'prêt (' + workers.length + ', ' + (ocrSource || '?') + ')' });
     psMsg('Place la plaque dans le cadre');
     psLoop(workers);
   } catch (e) {
