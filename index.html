@@ -1145,6 +1145,7 @@
   <div style="position:absolute; left:0; right:0; bottom:0; padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 22px); text-align:center; color:#fff;">
     <div id="ps-msg" style="font-weight:700; font-size:15px; margin-bottom:6px;">Place la plaque dans le cadre</div>
     <div id="ps-read" style="font:12px monospace; opacity:.7; min-height:16px;"></div>
+    <button type="button" class="btn btn-ghost" id="ps-photo" style="display:none; margin-top:10px; background:rgba(255,255,255,.16); color:#fff;">📷 Prendre une photo à la place</button>
   </div>
 </div>
 
@@ -2702,7 +2703,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-veh-2";
+const APP_VERSION = "2026-11-17-veh-3";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2946,7 +2947,8 @@ async function getOcrWorker(onStatus) {
     ocrWorkerPromise = (async () => {
       onStatus('Premier lancement : chargement du lecteur (quelques secondes)…');
       if (!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
-      const n = (navigator.hardwareConcurrency || 4) >= 4 ? 2 : 1;
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const n = !isIOS && (navigator.hardwareConcurrency || 4) >= 6 && (navigator.deviceMemory || 4) >= 4 ? 2 : 1; // iPhone / appareils modestes : 1 seul lecteur (évite les plantages mémoire)
       const ws = await Promise.all(Array.from({ length: n }, makeOcrWorker));
       ws.setParameters = async (p) => { await Promise.all(ws.map(w => w.setParameters(p))); };
       return ws;
@@ -2989,7 +2991,8 @@ function psStop() {
   if (psStream) { psStream.getTracks().forEach(t => t.stop()); psStream = null; }
   psVideo.srcObject = null; psOv.style.display = 'none'; psTorch = false;
 }
-function psCropCanvas() {
+function psCropCanvas(variant) {
+  variant = variant || 0; // 0 : gris 420px · 1 : canal min (texte rouge ressort) 640px · 2 : noir/blanc 640px
   // zone du cadre à l'écran -> zone correspondante dans l'image de la caméra (object-fit: cover)
   const vr = psVideo.getBoundingClientRect(), fr = psFrame.getBoundingClientRect();
   const vw = psVideo.videoWidth, vh = psVideo.videoHeight;
@@ -2998,18 +3001,20 @@ function psCropCanvas() {
   const ox = (vw * scale - vr.width) / 2, oy = (vh * scale - vr.height) / 2;
   const sx = Math.max(0, (fr.left - vr.left + ox) / scale), sy = Math.max(0, (fr.top - vr.top + oy) / scale);
   const sw = Math.min(vw - sx, fr.width / scale), sh = Math.min(vh - sy, fr.height / scale);
-  const W = 420, H = Math.max(40, Math.round(W * sh / sw));
+  const W = variant === 0 ? 420 : 640, H = Math.max(40, Math.round(W * sh / sw));
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const ctx = c.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(psVideo, sx, sy, sw, sh, 0, 0, W, H);
   const img = ctx.getImageData(0, 0, W, H), d = img.data;
   let lo = 255, hi = 0;
-  for (let i = 0; i < d.length; i += 4) { const g = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) | 0; d[i] = g; if (g < lo) lo = g; if (g > hi) hi = g; }
-  const span = Math.max(1, hi - lo);
-  for (let i = 0; i < d.length; i += 4) { const g = ((d[i] - lo) * 255 / span) | 0; d[i] = d[i + 1] = d[i + 2] = g; }
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) { const g = variant === 1 ? Math.min(d[i], d[i + 1], d[i + 2]) : ((d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) | 0); d[i] = g; sum += g; if (g < lo) lo = g; if (g > hi) hi = g; }
+  const span = Math.max(1, hi - lo), mid = ((sum / (d.length / 4)) - lo) * 255 / span;
+  for (let i = 0; i < d.length; i += 4) { let g = ((d[i] - lo) * 255 / span) | 0; if (variant === 2) g = g > mid * 0.85 ? 255 : 0; d[i] = d[i + 1] = d[i + 2] = g; }
   ctx.putImageData(img, 0, 0);
   return c;
 }
+let psVariantCounter = 0;
 async function psLoop(workers) {
   const t0 = Date.now();
   const handle = (text) => {
@@ -3029,13 +3034,13 @@ async function psLoop(workers) {
         return true;
       }
       psMsg('Plaque détectée, ne bouge pas…');
-    } else if (Date.now() - t0 > 7000) psMsg('Rapproche-toi, évite les reflets, cadre uniquement la plaque');
+    } else if (Date.now() - t0 > 7000) { psMsg('Rapproche-toi, évite les reflets, cadre uniquement la plaque'); document.getElementById('ps-photo').style.display = ''; }
     return false;
   };
   const runOne = async (w, delay) => {
     await new Promise(r => setTimeout(r, delay));
     while (psRunning) {
-      const c = psCropCanvas();
+      const c = psCropCanvas(psVariantCounter++ % 3);
       if (!c) { await new Promise(r => setTimeout(r, 80)); continue; }
       let text = '';
       try { text = (await w.recognize(c)).data.text || ''; } catch (e) { console.warn('ocr', e); }
@@ -3052,6 +3057,7 @@ async function openPlateScanner() {
   } catch (e) { toast("Caméra refusée ou indisponible : autorise-la dans le navigateur"); document.getElementById('scan-plate-input').click(); return; }
   psVideo.srcObject = psStream; psOv.style.display = 'block';
   try { await psVideo.play(); } catch (e) {}
+  document.getElementById('ps-photo').style.display = 'none';
   psVotes = []; psRunning = true; psMsg('Place la plaque dans le cadre'); document.getElementById('ps-read').textContent = '';
   try {
     const tr = psStream.getVideoTracks()[0], caps = (tr.getCapabilities && tr.getCapabilities()) || {};
@@ -3068,6 +3074,7 @@ async function openPlateScanner() {
   }
 }
 document.getElementById('ps-close').onclick = psStop;
+document.getElementById('ps-photo').onclick = () => { psStop(); document.getElementById('scan-plate-input').click(); };
 document.getElementById('ps-torch').onclick = async () => {
   try { psTorch = !psTorch; await psStream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: psTorch }] }); } catch (e) {}
 };
