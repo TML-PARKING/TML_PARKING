@@ -770,7 +770,7 @@
   <div><span style="background:#16a34a"></span>Vide</div>
   <div><span style="background:#dc2626"></span>À vider</div>
   <div><span style="background:#0891b2"></span>Chargé</div>
-  <div><span style="background:#eab308"></span>À charger</div>
+  <div><span style="background:#eab308"></span>En cours de chargement</div>
   <div><span style="background:#7c3aed"></span>Fleet (bloqué)</div>
 </div>
 
@@ -789,10 +789,10 @@
     <button class="btn btn-ghost" id="btn-list-close" style="padding:4px 8px;"><svg class="i"><use href="#i-x"/></svg></button>
   </div>
   <div class="lp-search"><input type="text" id="lp-search-input" placeholder="Rechercher n°, client..."></div>
-  <div class="kind-tabs" id="lp-kind-tabs"><button type="button" class="kind-tab active" data-k="all">Tout</button><button type="button" class="kind-tab" data-k="trailer">🚛 Remorques</button><button type="button" class="kind-tab" data-k="vehicle">🚗 Véhicules</button></div>
+  <div class="kind-tabs" id="lp-kind-tabs"><button type="button" class="kind-tab active" data-k="all">Tout</button><button type="button" class="kind-tab" data-k="trailer">🚛 Remorques</button><button type="button" class="kind-tab" data-k="vehicle">🚗 Camions</button></div>
   <div id="lp-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; align-items:center;">
     <span style="margin-left:auto; display:flex; gap:6px; flex-shrink:0;">
-      <button class="lp-icon-btn" id="btn-lp-status" title="Trier par statut : À vider, Bloqué, Chargé, À charger, Vide" style="width:auto; padding:0 10px;">🚦</button>
+      <button class="lp-icon-btn" id="btn-lp-status" title="Trier par statut : À vider, Bloqué, Chargé, En cours de chargement, Vide" style="width:auto; padding:0 10px;">🚦</button>
       <button class="lp-icon-btn" id="btn-lp-date" title="Trier par date de dépose" style="width:auto; padding:0 10px;">📅</button>
       <button class="lp-icon-btn" id="btn-lp-sort" title="Trier A-Z">⬇️</button>
     </span>
@@ -827,7 +827,7 @@
   <div class="sheet-body">
     <div class="field" id="f-kind-field">
       <label>Type</label>
-      <div class="kind-tabs" style="padding:0;" id="f-kind-tabs"><button type="button" class="kind-tab active" data-k="trailer">🚛 Remorque</button><button type="button" class="kind-tab" data-k="vehicle">🚗 Véhicule</button></div>
+      <div class="kind-tabs" style="padding:0;" id="f-kind-tabs"><button type="button" class="kind-tab active" data-k="trailer">🚛 Remorque</button><button type="button" class="kind-tab" data-k="vehicle">🚗 Camion</button></div>
     </div>
     <div class="field">
       <label id="f-trailer-label">N° Remorque</label>
@@ -850,7 +850,7 @@
         <div class="status-chip" data-status="vide">Vide</div>
         <div class="status-chip" data-status="fleet">Fleet</div>
         <div class="status-chip" data-status="charge">Chargé</div>
-        <div class="status-chip" data-status="achar">À charger</div>
+        <div class="status-chip" data-status="achar">En cours de chargement</div>
       </div>
     </div>
     <div class="field">
@@ -985,7 +985,7 @@
         <div class="status-chip" data-status="vide">Vide</div>
         <div class="status-chip" data-status="fleet">Fleet</div>
         <div class="status-chip" data-status="charge">Chargé</div>
-        <div class="status-chip" data-status="achar">À charger</div>
+        <div class="status-chip" data-status="achar">En cours de chargement</div>
       </div>
     </div>
     <div class="field">
@@ -1146,7 +1146,6 @@
     <div id="ps-msg" style="font-weight:700; font-size:15px; margin-bottom:6px;">Place la plaque dans le cadre</div>
     <div id="ps-read" style="font:12px monospace; opacity:.7; min-height:16px;"></div>
     <div id="ps-diag" style="font:11px monospace; opacity:.55; margin-top:4px; word-break:break-word;"></div>
-    <button type="button" class="btn btn-ghost" id="ps-photo" style="display:none; margin-top:10px; background:rgba(255,255,255,.16); color:#fff;">📷 Prendre une photo à la place</button>
   </div>
 </div>
 
@@ -1282,7 +1281,7 @@
     <button class="btn btn-ghost" id="btn-db-panel-close" style="padding:4px 8px;"><svg class="i"><use href="#i-x"/></svg></button>
   </div>
   <div class="lp-search"><input type="text" id="db-panel-search" placeholder="Rechercher n° remorque..."></div>
-  <div class="kind-tabs" id="db-kind-tabs"><button type="button" class="kind-tab active" data-k="trailer">🚛 Remorques</button><button type="button" class="kind-tab" data-k="vehicle">🚗 Véhicules</button></div>
+  <div class="kind-tabs" id="db-kind-tabs"><button type="button" class="kind-tab active" data-k="trailer">🚛 Remorques</button><button type="button" class="kind-tab" data-k="vehicle">🚗 Camions</button></div>
   <div id="db-panel-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; align-items:center;">
     <button class="lp-icon-btn" id="btn-db-sort" title="Trier par n° A-Z" style="width:auto; padding:0 8px;">🔤⬇️</button>
     <button class="lp-icon-btn" id="btn-db-sort-date" title="Trier par date" style="width:auto; padding:0 8px; margin-left:auto;">📅⬇️</button>
@@ -1592,7 +1591,7 @@ async function loadAll(preFetched) {
   tempAccesses = d.tempAccesses || {};
   teamUsers = d.teamUsers || {};
   clientPresets = Array.isArray(d.clientPresets) ? d.clientPresets : [];
-  filtersConfig = (d.filtersConfig && typeof d.filtersConfig === 'object') ? d.filtersConfig : null;
+  filtersConfig = (d.filtersConfig && typeof d.filtersConfig === 'object') ? JSON.parse(JSON.stringify(d.filtersConfig).replace(/À charger/g, 'En cours de chargement')) : null;
   if (d.mailDirectory && Array.isArray(d.mailDirectory.contacts)) mailDirectory = { contacts: d.mailDirectory.contacts, groups: Array.isArray(d.mailDirectory.groups) ? d.mailDirectory.groups : [] };
   try { renderFilterBars(); } catch (e) {}
   contentPresetsByClient = d.contentPresets || {};
@@ -1912,7 +1911,7 @@ function applyFreshState(d) {
     if (d.tempAccesses && typeof d.tempAccesses === 'object') tempAccesses = d.tempAccesses;
     if (Array.isArray(d.clientPresets)) clientPresets = d.clientPresets;
     if (d.contentPresets && typeof d.contentPresets === 'object') contentPresetsByClient = d.contentPresets;
-    if (d.filtersConfig && typeof d.filtersConfig === 'object') { filtersConfig = d.filtersConfig; renderFilterBars(); }
+    if (d.filtersConfig && typeof d.filtersConfig === 'object') { filtersConfig = JSON.parse(JSON.stringify(d.filtersConfig).replace(/À charger/g, 'En cours de chargement')); renderFilterBars(); }
     if (d.mailDirectory && Array.isArray(d.mailDirectory.contacts) && typeof mdModalOpen !== 'undefined' && !mdModalOpen) mailDirectory = { contacts: d.mailDirectory.contacts, groups: Array.isArray(d.mailDirectory.groups) ? d.mailDirectory.groups : [] };
   } catch (e) { console.warn('refresh listes', e); }
   const newOcc = d.occupancy || {};
@@ -2618,7 +2617,7 @@ document.querySelector('.search-pill svg').addEventListener('click', () => { if 
 // ---------- CONFIG DES FILTRES ----------
 const filtersConfigModal = document.getElementById('filters-config-modal');
 const FC_KINDS = {
-  list: [['status:pleine', 'Statut : À vider'], ['status:vide', 'Statut : Vide'], ['status:charge', 'Statut : Chargé'], ['status:achar', 'Statut : À charger'], ['status:fleet', 'Statut : Fleet'], ['fixed:', 'Emplacements fixes (P)'], ['client:', 'Client…'], ['text:', 'Texte (n°, notes, client)…'], ['age:', 'Date de dépose (jours sur site)…']],
+  list: [['status:pleine', 'Statut : À vider'], ['status:vide', 'Statut : Vide'], ['status:charge', 'Statut : Chargé'], ['status:achar', 'Statut : En cours de chargement'], ['status:fleet', 'Statut : Fleet'], ['fixed:', 'Emplacements fixes (P)'], ['client:', 'Client…'], ['text:', 'Texte (n°, notes, client)…'], ['age:', 'Date de dépose (jours sur site)…']],
   db: [['ct:ok', 'Contrôle technique : OK'], ['ct:soon', 'Contrôle technique : < 2 mois'], ['ct:nok', 'Contrôle technique : Non OK'], ['text:', 'Texte (n°, plaque, notes)…']]
 };
 function fcEditable() {
@@ -2704,7 +2703,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-ocr-5";
+const APP_VERSION = "2026-11-17-ocr-6";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2719,29 +2718,29 @@ const APP_VERSION = "2026-11-17-ocr-5";
 function setFormKind(k) {
   formKind = k === 'vehicle' ? 'vehicle' : 'trailer';
   document.querySelectorAll('#f-kind-tabs .kind-tab').forEach(b => b.classList.toggle('active', b.dataset.k === formKind));
-  const l = document.getElementById('f-trailer-label'); if (l) l.textContent = formKind === 'vehicle' ? 'N° Véhicule' : 'N° Remorque';
+  const l = document.getElementById('f-trailer-label'); if (l) l.textContent = formKind === 'vehicle' ? 'N° Camion' : 'N° Remorque';
 }
 document.querySelectorAll('#f-kind-tabs .kind-tab').forEach(b => b.onclick = () => setFormKind(b.dataset.k));
 document.querySelectorAll('#lp-kind-tabs .kind-tab').forEach(b => b.onclick = () => {
   lpKind = b.dataset.k;
   document.querySelectorAll('#lp-kind-tabs .kind-tab').forEach(x => x.classList.toggle('active', x === b));
-  document.getElementById('lp-title').textContent = lpKind === 'vehicle' ? 'Véhicules sur site' : lpKind === 'trailer' ? 'Remorques sur site' : 'Remorques et véhicules sur site';
+  document.getElementById('lp-title').textContent = lpKind === 'vehicle' ? 'Camions sur site' : lpKind === 'trailer' ? 'Remorques sur site' : 'Remorques et camions sur site';
   renderListPanel();
 });
 document.querySelectorAll('#db-kind-tabs .kind-tab').forEach(b => b.onclick = () => {
   dbKind = b.dataset.k;
   document.querySelectorAll('#db-kind-tabs .kind-tab').forEach(x => x.classList.toggle('active', x === b));
-  document.getElementById('db-title').textContent = dbKind === 'vehicle' ? 'Base véhicules' : 'Base remorques';
-  document.getElementById('btn-db-new').textContent = dbKind === 'vehicle' ? '➕ Ajouter un véhicule' : '➕ Ajouter une remorque';
-  document.getElementById('db-panel-search').placeholder = dbKind === 'vehicle' ? 'Rechercher n° véhicule...' : 'Rechercher n° remorque...';
+  document.getElementById('db-title').textContent = dbKind === 'vehicle' ? 'Base camions' : 'Base remorques';
+  document.getElementById('btn-db-new').textContent = dbKind === 'vehicle' ? '➕ Ajouter un camion' : '➕ Ajouter une remorque';
+  document.getElementById('db-panel-search').placeholder = dbKind === 'vehicle' ? 'Rechercher n° camion...' : 'Rechercher n° remorque...';
   renderDbPanel();
 });
 function exRows() {
   const cols = { loc: document.getElementById('ex-col-loc').checked, status: document.getElementById('ex-col-status').checked, days: document.getElementById('ex-col-days').checked, notes: document.getElementById('ex-col-notes').checked };
   const hasV = lastListExport.some(it => kindOf(it) === 'vehicle'), hasT = lastListExport.some(it => kindOf(it) === 'trailer');
-  const head = [hasV && hasT ? 'N° remorque / véhicule' : hasV ? 'N° véhicule' : 'N° remorque', 'Client'];
+  const head = [hasV && hasT ? 'N° remorque / camion' : hasV ? 'N° camion' : 'N° remorque', 'Client'];
   if (cols.loc) head.push('Emplacement'); if (cols.status) head.push('Statut'); if (cols.days) head.push('Déposée le', 'Jours sur site'); if (cols.notes) head.push('Notes');
-  const stLabel = st => st === 'fleet' ? 'Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'À charger' : 'À vider';
+  const stLabel = st => st === 'fleet' ? 'Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'En cours de chargement' : 'À vider';
   const rows = lastListExport.map(it => {
     const loc = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     const r = [it.trailer || '(sans n°)', it.client || ''];
@@ -2778,7 +2777,7 @@ function exTableCanvas() {
   g.fillStyle = '#111827'; g.fillRect(pad, y, W - pad * 2, rh);
   let x = pad; g.fillStyle = '#fff'; g.font = fb;
   head.forEach((h, j) => { g.fillText(h, x + 12, y + rh / 2); x += widths[j]; });
-  const stCol = { 'À vider': '#dc2626', 'Vide': '#16a34a', 'Chargé': '#2563eb', 'À charger': '#ca8a04', 'Bloqué': '#6b7280' };
+  const stCol = { 'À vider': '#dc2626', 'Vide': '#16a34a', 'Chargé': '#2563eb', 'En cours de chargement': '#ca8a04', 'Bloqué': '#6b7280' };
   rows.forEach((r, i) => {
     y += rh; g.fillStyle = i % 2 ? '#f3f4f6' : '#fff'; g.fillRect(pad, y, W - pad * 2, rh);
     g.fillStyle = '#e5e7eb'; g.fillRect(pad, y + rh - 1, W - pad * 2, 1);
@@ -2995,10 +2994,13 @@ async function photoToCanvas(file, rotate) {
 function showScanStatus(html) { const el = document.getElementById('scan-plate-status'); el.style.display = html ? 'block' : 'none'; el.innerHTML = html || ''; }
 function applyScannedTrailer(num, plate) {
   const inp = document.getElementById('f-trailer');
+  const isV = kindOf(trailerDB[num]) === 'vehicle';
+  setFormKind(isV ? 'vehicle' : 'trailer');
   inp.value = num; inp.dispatchEvent(new Event('input', { bubbles: true }));
   updateCtIndicator();
-  showScanStatus('✅ ' + (plate ? 'Plaque <b>' + escapeHtml(plate) + '</b> → ' : '') + 'remorque <b>' + escapeHtml(num) + '</b>');
-  toast('Remorque trouvée : ' + num);
+  const noun = isV ? 'camion' : 'remorque';
+  showScanStatus('✅ ' + (plate ? 'Plaque <b>' + escapeHtml(plate) + '</b> → ' : '') + noun + ' <b>' + escapeHtml(num) + '</b>');
+  toast((isV ? 'Camion' : 'Remorque') + ' trouvé' + (isV ? '' : 'e') + ' : ' + num);
 }
 // ---- Scanner en direct (comme un lecteur de code-barres) ----
 const psOv = document.getElementById('plate-scanner'), psVideo = document.getElementById('ps-video'), psFrame = document.getElementById('ps-frame');
@@ -3058,7 +3060,7 @@ async function psLoop(workers) {
         return true;
       }
       psMsg('Plaque détectée, ne bouge pas…');
-    } else if (Date.now() - t0 > 7000) { psMsg('Rapproche-toi, évite les reflets, cadre uniquement la plaque'); document.getElementById('ps-photo').style.display = ''; }
+    } else if (Date.now() - t0 > 7000) { psMsg('Rapproche-toi, évite les reflets, cadre uniquement la plaque') }
     return false;
   };
   const runOne = async (w, delay) => {
@@ -3083,7 +3085,6 @@ async function openPlateScanner() {
   psDiag({ cam: '', lecteur: 'chargement', n: 0, err: '', ms: 0 });
   try { await psVideo.play(); } catch (e) { psDiag({ err: 'vidéo : ' + (e && e.message || e) }); }
   { const t = psStream.getVideoTracks()[0], st = (t && t.getSettings && t.getSettings()) || {}; psDiag({ cam: (st.width || psVideo.videoWidth || '?') + '×' + (st.height || psVideo.videoHeight || '?') }); }
-  document.getElementById('ps-photo').style.display = 'none';
   psVotes = []; psRunning = true; psMsg('Place la plaque dans le cadre'); document.getElementById('ps-read').textContent = '';
   try {
     const tr = psStream.getVideoTracks()[0], caps = (tr.getCapabilities && tr.getCapabilities()) || {};
@@ -3101,7 +3102,6 @@ async function openPlateScanner() {
   }
 }
 document.getElementById('ps-close').onclick = psStop;
-document.getElementById('ps-photo').onclick = () => { psStop(); document.getElementById('scan-plate-input').click(); };
 document.getElementById('ps-torch').onclick = async () => {
   try { psTorch = !psTorch; await psStream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: psTorch }] }); } catch (e) {}
 };
@@ -3893,7 +3893,7 @@ document.getElementById('lp-search-input').oninput = renderListPanel;
 let lpActiveFilters = new Set(); // statuts sélectionnés (pleine/vide/fleet/charge), vide = tous
 let lpFixedOnly = false; // filtre "P" (emplacements fixes uniquement)
 let lpDateSort = null; // null | 'old' (plus ancienne d'abord) | 'new' (plus récente d'abord)
-let lpStatusSort = false; // tri par statut : À vider → Bloqué → Chargé → À charger → Vide
+let lpStatusSort = false; // tri par statut : À vider → Bloqué → Chargé → En cours de chargement → Vide
 const LP_STATUS_ORDER = ['pleine', 'fleet', 'charge', 'achar', 'vide'];
 let lpSortAsc = null; // null = pas trié (ordre naturel), true = A-Z, false = Z-A
 document.getElementById('btn-lp-sort').onclick = () => {
@@ -3910,7 +3910,7 @@ const DEFAULT_FILTERS = {
     { id: 'pleine', label: 'À vider', type: 'status', value: 'pleine' },
     { id: 'vide', label: 'Vide', type: 'status', value: 'vide' },
     { id: 'charge', label: 'Chargé', type: 'status', value: 'charge' },
-    { id: 'achar', label: 'À charger', type: 'status', value: 'achar' },
+    { id: 'achar', label: 'En cours de chargement', type: 'status', value: 'achar' },
     { id: 'fleet', label: 'Fleet', type: 'status', value: 'fleet' },
     { id: 'fixed', label: 'P', type: 'fixed' }
   ],
@@ -4088,7 +4088,7 @@ function renderListPanel() {
     const relevantThreshold = it.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
     const isOverThreshold = (it.status === 'pleine' || it.status === 'charge') && days > relevantThreshold;
     const badgeClass = it.status;
-    const badgeText = it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : (it.status === 'achar' ? 'À charger' : it.status))));
+    const badgeText = it.status === 'fleet' ? 'Bloqué' : (it.status === 'pleine' ? 'À vider' : (it.status === 'vide' ? 'Vide' : (it.status === 'charge' ? 'Chargé' : (it.status === 'achar' ? 'En cours de chargement' : it.status))));
 
     const ctEntry = it.trailer ? trailerDB[it.trailer] : null;
     const ctStatus = ctEntry ? getCtStatus(ctEntry.ctExpiryDate) : null;
@@ -4275,7 +4275,7 @@ function renderHistoryPanel() {
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-num">${h.trailer || '(sans n°)'}</div>
-        <div class="lp-badge ${h.status || 'pleine'}">${h.status === 'fleet' ? 'Fleet' : (h.status === 'vide' ? 'Vide' : (h.status === 'pleine' ? 'À vider' : (h.status === 'charge' ? 'Chargé' : (h.status === 'achar' ? 'À charger' : (h.status || '')))))}</div>
+        <div class="lp-badge ${h.status || 'pleine'}">${h.status === 'fleet' ? 'Fleet' : (h.status === 'vide' ? 'Vide' : (h.status === 'pleine' ? 'À vider' : (h.status === 'charge' ? 'Chargé' : (h.status === 'achar' ? 'En cours de chargement' : (h.status || '')))))}</div>
       </div>
       <div class="lp-meta">${h.label}${h.client ? ' · ' + h.client : ''}</div>
       <div class="lp-meta">📥 Déposé : ${formatDateTime(h.dropTime)}${(h.encodedBy && hasPermission('viewAuthors')) ? ' par ' + h.encodedBy : ''}</div>
@@ -4318,7 +4318,7 @@ function openDetailView(item) {
   const badges = document.getElementById('detail-badges');
   badges.innerHTML = '';
   const vs = getVisualState(item);
-  const statusLabel = item.status === 'fleet' ? 'Fleet — Bloqué' : (item.status === 'vide' ? 'Vide' : (item.status === 'charge' ? 'Chargé' : (item.status === 'achar' ? 'À charger' : 'À vider')));
+  const statusLabel = item.status === 'fleet' ? 'Fleet — Bloqué' : (item.status === 'vide' ? 'Vide' : (item.status === 'charge' ? 'Chargé' : (item.status === 'achar' ? 'En cours de chargement' : 'À vider')));
   badges.innerHTML += `<span class="detail-pill" style="background:${vs.color}22; color:${vs.color};">${statusLabel}</span>`;
   const relevantThreshold = item.status === 'fleet' ? fleetAlertThresholdDays : alertThresholdDays;
   if (days > relevantThreshold && (item.status === 'pleine' || item.status === 'charge')) {
@@ -4441,7 +4441,7 @@ document.getElementById('btn-edit-status-save').onclick = async () => {
   if (!record) { toast("Introuvable"); closeEditStatusModal(); return; }
   // Trace de la modification (qui / quand / quoi) ajoutée automatiquement aux commentaires
   const changes = [];
-  const statusName = st => st === 'fleet' ? 'Fleet — Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'À charger' : st ? 'À vider' : '—';
+  const statusName = st => st === 'fleet' ? 'Fleet — Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'En cours de chargement' : st ? 'À vider' : '—';
   if ((record.status || '') !== status) changes.push(`statut : ${statusName(record.status)} → ${statusName(status)}`);
   if ((record.client || '') !== client) changes.push(`client : ${record.client || '—'} → ${client || '—'}`);
   if ((record.notes || '') !== notes) changes.push(`note : ${record.notes || '—'} → ${notes || '—'}`);
@@ -4919,7 +4919,7 @@ function renderDbPanel() {
   lastFilteredDbEntries = entries;
 
   if (!entries.length) {
-    container.innerHTML = '<div class="empty">' + (dbKind === 'vehicle' ? 'Aucun véhicule enregistré' : 'Aucune remorque enregistrée') + '</div>';
+    container.innerHTML = '<div class="empty">' + (dbKind === 'vehicle' ? 'Aucun camion enregistré' : 'Aucune remorque enregistrée') + '</div>';
     return;
   }
   container.innerHTML = '';
@@ -4951,7 +4951,7 @@ document.getElementById('btn-db-import').onclick = () => document.getElementById
 
 document.getElementById('btn-db-export').onclick = () => {
   if (!lastFilteredDbEntries.length) { toast("Rien à exporter"); return; }
-  const rows = [[dbKind === 'vehicle' ? 'N°véhicule' : 'N°remorque', 'N°plaque', 'Échéance', 'Statut CT', 'Notes']];
+  const rows = [[dbKind === 'vehicle' ? 'N°camion' : 'N°remorque', 'N°plaque', 'Échéance', 'Statut CT', 'Notes']];
   lastFilteredDbEntries.forEach(([num, entry]) => {
     const status = getCtStatus(entry.ctExpiryDate);
     const statusLabel = status ? (status.level === 'nok' ? 'NON OK' : (status.level === 'soon' ? 'BIENTÔT' : 'OK')) : '';
@@ -4961,7 +4961,7 @@ document.getElementById('btn-db-export').onclick = () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'CT');
   const dateStr = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `base-${dbKind === 'vehicle' ? 'vehicules' : 'remorques'}-CT-${dateStr}.xlsx`);
+  XLSX.writeFile(wb, `base-${dbKind === 'vehicle' ? 'camions' : 'remorques'}-CT-${dateStr}.xlsx`);
   toast(`${lastFilteredDbEntries.length} remorque(s) exportée(s)`);
 };
 
@@ -5087,7 +5087,7 @@ document.getElementById('db-import-file-input').addEventListener('change', async
 function openDbSheet(trailerNum) {
   dbCurrentTrailer = trailerNum;
   const entry = trailerNum ? trailerDB[trailerNum] : null;
-  { const k = entry ? kindOf(entry) : dbKind; document.getElementById('db-sheet-title').textContent = k === 'vehicle' ? 'Base véhicules (contrôle technique)' : 'Base remorques (contrôle technique)'; }
+  { const k = entry ? kindOf(entry) : dbKind; document.getElementById('db-sheet-title').textContent = k === 'vehicle' ? 'Base camions (contrôle technique)' : 'Base remorques (contrôle technique)'; }
   document.getElementById('db-f-trailer').value = trailerNum || '';
   document.getElementById('db-f-trailer').disabled = !!trailerNum;
   document.getElementById('db-f-date').value = entry ? (entry.ctExpiryDate || '') : '';
