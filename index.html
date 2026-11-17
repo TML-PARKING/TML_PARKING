@@ -479,7 +479,7 @@
   .rc-chip.active { background: var(--amber); color: var(--amber-ink); }
   .rc-chip.group { box-shadow: inset 0 0 0 1.5px var(--amber); }
   .fc-add { display: flex; flex-wrap: wrap; gap: 6px; }
-  #btn-lp-date.active { background: var(--amber); color: var(--amber-ink); }
+  #btn-lp-date.active, #btn-lp-status.active { background: var(--amber); color: var(--amber-ink); box-shadow: 0 0 0 2px var(--amber-ink) inset; }
   .fc-add select, .fc-add input { flex: 1 1 140px; min-width: 0; height: 38px; }
   .view-seg { display: flex; gap: 4px; padding: 4px; background: var(--panel-2); border-radius: 999px; box-shadow: inset 0 0 0 1px var(--panel-hair); flex-shrink: 0; }
   .view-seg button { border: none; background: transparent; color: var(--ink-dim); font: 700 12.5px var(--font-display); height: 32px; padding: 0 14px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
@@ -2785,7 +2785,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-17-ocr-11";
+const APP_VERSION = "2026-11-17-ocr-12";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
