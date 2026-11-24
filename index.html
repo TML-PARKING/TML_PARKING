@@ -1128,6 +1128,7 @@
       <button type="button" class="btn btn-ghost" id="ex-manage" style="margin-top:6px; padding:6px 12px; font-size:12px;">⚙️ Gérer les adresses et groupes</button>
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:14px; margin:4px 0 10px; font-size:12.5px;">
+      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-plate" checked>Plaque</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-loc" checked>Emplacement</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-status" checked>Statut</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-ct" checked>CT</label>
@@ -2819,7 +2820,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-24-ocr-21";
+const APP_VERSION = "2026-11-24-ocr-23";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2879,14 +2880,18 @@ function exCommentsCell(it) {
   return (it.comments || []).filter(c => c && c.text && !c.auto).map(c => c.text.replace(/\s+/g, ' ').trim()).join(' · ');
 }
 function exRows() {
-  const cols = { loc: document.getElementById('ex-col-loc').checked, status: document.getElementById('ex-col-status').checked, days: document.getElementById('ex-col-days').checked, notes: document.getElementById('ex-col-notes').checked, ct: document.getElementById('ex-col-ct').checked, comments: document.getElementById('ex-col-comments').checked };
+  const cols = { plate: document.getElementById('ex-col-plate').checked, loc: document.getElementById('ex-col-loc').checked, status: document.getElementById('ex-col-status').checked, days: document.getElementById('ex-col-days').checked, notes: document.getElementById('ex-col-notes').checked, ct: document.getElementById('ex-col-ct').checked, comments: document.getElementById('ex-col-comments').checked };
   const hasV = lastListExport.some(it => kindOf(it) === 'vehicle'), hasT = lastListExport.some(it => kindOf(it) === 'trailer');
-  const head = [hasV && hasT ? 'N° remorque / camion' : hasV ? 'N° camion' : 'N° remorque', 'Client'];
+  const head = [hasV && hasT ? 'N° remorque / camion' : hasV ? 'N° camion' : 'N° remorque'];
+  if (cols.plate) head.push('Plaque');
+  head.push('Client');
   if (cols.loc) head.push('Emplacement'); if (cols.status) head.push('Statut'); if (cols.ct) head.push('CT'); if (cols.days) head.push('Déposée le', 'Jours sur site'); if (cols.notes) head.push('Notes'); if (cols.comments) head.push('Commentaires');
   const stLabel = st => st === 'fleet' ? 'Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'En cours de chargement' : 'À vider';
   const rows = lastListExport.map(it => {
     const loc = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
-    const r = [it.trailer || '(sans n°)', it.client || ''];
+    const r = [it.trailer || '(sans n°)'];
+    if (cols.plate) r.push((it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].plate) || '');
+    r.push(it.client || '');
     if (cols.loc) r.push(loc); if (cols.status) r.push(stLabel(it.status)); if (cols.ct) r.push(exCtCell(it)); if (cols.days) r.push(it.time ? new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '', daysSince(it.time) + ' j'); if (cols.notes) r.push(it.notes || ''); if (cols.comments) r.push(exCommentsCell(it));
     return r;
   });
@@ -2896,23 +2901,24 @@ function exTitle() { return document.getElementById('ex-title').value.trim() || 
 function exDateStr() { return new Date().toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 // Récapitulatif (haut droite de l'export) : remorques / camions par statut + CT par état
 const EX_ST = [['pleine', 'À vider', '#dc2626'], ['fleet', 'Fleet', '#6b7280'], ['charge', 'Chargé', '#2563eb'], ['achar', 'En cours', '#ca8a04'], ['vide', 'Vide', '#16a34a']];
-function exSummaryLines() {
+function exSummary() {
   const mk = () => ({ n: 0, st: {} }), tr = mk(), tk = mk(), ct = { ok: 0, soon: 0, nok: 0, none: 0 };
   lastListExport.forEach(it => {
     const g = kindOf(it) === 'vehicle' ? tk : tr; g.n++; g.st[it.status] = (g.st[it.status] || 0) + 1;
     const e = it.trailer ? trailerDB[it.trailer] : null, c = e ? getCtStatus(e.ctExpiryDate) : null;
     ct[c ? c.level : 'none']++;
   });
-  const line = (label, g) => g.n ? [{ t: label + ' ' + g.n + ' : ', c: '#111827', b: true }].concat(EX_ST.filter(([k]) => g.st[k]).map(([k, l, c], i) => ({ t: (i ? ' · ' : '') + l + ' ' + g.st[k], c }))) : null;
-  const ctl = [{ t: 'CT : ', c: '#111827', b: true }, { t: 'OK ' + ct.ok, c: '#16a34a' }, { t: ' · Bientôt ' + ct.soon, c: '#ea580c' }, { t: ' · Expiré ' + ct.nok, c: '#dc2626' }];
-  if (ct.none) ctl.push({ t: ' · Sans CT ' + ct.none, c: '#6b7280' });
-  return [line('Remorques', tr), line('Camions', tk), ctl].filter(Boolean);
+  const grp = (label, g) => g.n ? { label, n: g.n, items: EX_ST.filter(([k]) => g.st[k]).map(([k, l, c]) => ({ l, n: g.st[k], c })) } : null;
+  const ctItems = [{ l: 'OK', n: ct.ok, c: '#16a34a' }, { l: 'Bientôt', n: ct.soon, c: '#ea580c' }, { l: 'Expiré', n: ct.nok, c: '#dc2626' }];
+  if (ct.none) ctItems.push({ l: 'Sans CT', n: ct.none, c: '#6b7280' });
+  return [grp('Remorques', tr), grp('Camions', tk), { label: 'Contrôle technique', n: null, items: ctItems }].filter(Boolean);
 }
+function exSummaryLines() { return exSummary().map(g => [{ t: g.label + (g.n != null ? ' ' + g.n : '') + ' : ' }].concat(g.items.map((x, i) => ({ t: (i ? ' · ' : '') + x.l + ' ' + x.n })))); }
 function exHtmlTable() {
   const { head, rows } = exRows();
   const th = 'style="background:#111827;color:#ffffff;text-align:left;padding:8px 12px;font:600 13px Arial,sans-serif;"';
   const td = i => `style="padding:7px 12px;border-bottom:1px solid #e5e7eb;font:13px Arial,sans-serif;color:#111827;${i % 2 ? 'background:#f9fafb;' : ''}"`;
-  const sum = exSummaryLines().map(l => '<div style="margin:0 0 3px;font:12px Arial,sans-serif;white-space:nowrap;">' + l.map(x => `<span style="color:${x.c};${x.b ? 'font-weight:700;' : 'font-weight:600;'}">${escapeHtml(x.t)}</span>`).join('') + '</div>').join('');
+  const sum = exSummary().map(g => `<div style="display:inline-block;vertical-align:top;margin:0 0 6px 8px;padding:7px 11px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;text-align:left;font:12px Arial,sans-serif;"><div style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${escapeHtml(g.label)}${g.n != null ? ' <span style="color:#111827;font-size:15px;">' + g.n + '</span>' : ''}</div><div style="margin-top:4px;">${g.items.map(x => `<span style="display:inline-block;margin:0 6px 2px 0;font-weight:700;color:${x.c};">${escapeHtml(x.l)} ${x.n}</span>`).join('')}</div></div>`).join('');
   return `<div style="font-family:Arial,sans-serif;"><table width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 12px;border-collapse:collapse;"><tr><td valign="top"><h2 style="margin:0 0 4px;font:700 18px Arial,sans-serif;color:#111827;">${escapeHtml(exTitle())}</h2>
 <div style="font:12px Arial,sans-serif;color:#6b7280;">${escapeHtml(exDateStr())} · ${rows.length} remorque${rows.length > 1 ? 's' : ''}</div></td><td valign="top" align="right">${sum}</td></tr></table>
 <table cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #e5e7eb;"><thead><tr>${head.map(h => `<th ${th}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
@@ -2934,19 +2940,31 @@ function exTableCanvas() {
   };
   const cells = rows.map(r => r.map((c, j) => wrap(c, widths[j], j === 0 ? fb : f)));
   const rhs = cells.map(cs => Math.max(34, Math.max(...cs.map(l => l.length)) * lh + 16));
-  const sumLines = exSummaryLines();
-  const segW = segs => segs.reduce((a, x) => { m.font = (x.b ? 'bold ' : 'bold ') + '12px Arial, sans-serif'; return a + m.measureText(x.t).width; }, 0);
-  m.font = 'bold 19px Arial, sans-serif'; const titleW = m.measureText(exTitle()).width;
-  const sumW = Math.max(0, ...sumLines.map(segW));
-  const W = Math.max(widths.reduce((a, b) => a + b, 0), 360, titleW + sumW + 40) + pad * 2, topH = 64, hh = 34;
+  const groups = exSummary(), cardW = 270, cgap = 10, pillH = 22;
+  const rr = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  m.font = 'bold 12px Arial, sans-serif';
+  const cards = groups.map(gr => { // disposition des pastilles (retour à la ligne dans la carte)
+    let cx = 0, row = 0; const pills = gr.items.map(it => { const t = it.l + ' ' + it.n, w = Math.ceil(m.measureText(t).width) + 18; if (cx + w > cardW - 24 && cx > 0) { row++; cx = 0; } const o = { it, t, w, x: cx, row }; cx += w + 6; return o; });
+    return { gr, pills, h: 38 + (row + 1) * (pillH + 6) + 8 };
+  });
+  const cardsH = Math.max(0, ...cards.map(c => c.h)), cardsW = cards.length ? cards.length * cardW + (cards.length - 1) * cgap : 0;
+  m.font = 'bold 19px Arial, sans-serif'; let titleW = m.measureText(exTitle()).width;
+  m.font = '12px Arial, sans-serif'; titleW = Math.max(titleW, m.measureText(exDateStr() + ' · ' + rows.length + ' remorque' + (rows.length > 1 ? 's' : '')).width);
+  const W = Math.max(widths.reduce((a, b) => a + b, 0), 360, titleW + cardsW + 40) + pad * 2, topH = Math.max(64, cardsH + 14), hh = 34;
   const H = topH + hh + rhs.reduce((a, b) => a + b, 0) + pad * 2;
   const c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
   const g = c.getContext('2d'); g.scale(S, S);
   g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
   g.textBaseline = 'middle'; g.fillStyle = '#111827'; g.font = 'bold 19px Arial, sans-serif'; g.fillText(exTitle(), pad, pad + 14);
   g.fillStyle = '#6b7280'; g.font = '12px Arial, sans-serif'; g.fillText(exDateStr() + ' · ' + rows.length + ' remorque' + (rows.length > 1 ? 's' : ''), pad, pad + 38);
-  sumLines.forEach((segs, li) => { let x0 = W - pad - segW(segs); g.font = 'bold 12px Arial, sans-serif'; segs.forEach(x => { g.fillStyle = x.c; g.fillText(x.t, x0, pad + 10 + li * 17); x0 += m.measureText(x.t).width; }); });
-  let y = pad + topH - 8;
+  cards.forEach((cd, i) => {
+    const x0 = W - pad - cardsW + i * (cardW + cgap), y0 = pad;
+    rr(g, x0, y0, cardW, cardsH, 12); g.fillStyle = '#f3f4f6'; g.fill(); g.strokeStyle = '#e5e7eb'; g.lineWidth = 1; g.stroke();
+    g.textBaseline = 'middle'; g.fillStyle = '#6b7280'; g.font = 'bold 11px Arial, sans-serif'; g.textAlign = 'left'; g.fillText(cd.gr.label.toUpperCase(), x0 + 12, y0 + 18);
+    if (cd.gr.n != null) { g.fillStyle = '#111827'; g.font = 'bold 22px Arial, sans-serif'; g.textAlign = 'right'; g.fillText(String(cd.gr.n), x0 + cardW - 12, y0 + 19); g.textAlign = 'left'; }
+    cd.pills.forEach(pl => { const px = x0 + 12 + pl.x, py = y0 + 36 + pl.row * (pillH + 6); rr(g, px, py, pl.w, pillH, 11); g.fillStyle = pl.it.c; g.fill(); g.fillStyle = '#fff'; g.font = 'bold 12px Arial, sans-serif'; g.fillText(pl.t, px + 9, py + pillH / 2 + 1); });
+  });
+  let y = pad + topH;
   g.fillStyle = '#111827'; g.fillRect(pad, y, W - pad * 2, hh);
   let x = pad; g.fillStyle = '#fff'; g.font = fb;
   head.forEach((h, j) => { g.fillText(h, x + 12, y + hh / 2); x += widths[j]; });
@@ -3015,7 +3033,7 @@ function openExportModal() {
 function closeExportModal() { exportModal.classList.remove('open'); overlay.classList.remove('show'); }
 document.getElementById('btn-lp-export').onclick = openExportModal;
 document.getElementById('btn-export-close').onclick = closeExportModal;
-['ex-title', 'ex-col-loc', 'ex-col-status', 'ex-col-ct', 'ex-col-days', 'ex-col-notes', 'ex-col-comments'].forEach(id => document.getElementById(id).addEventListener('input', renderExportPreview));
+['ex-title', 'ex-col-plate', 'ex-col-loc', 'ex-col-status', 'ex-col-ct', 'ex-col-days', 'ex-col-notes', 'ex-col-comments'].forEach(id => document.getElementById(id).addEventListener('input', renderExportPreview));
 // Fichier .eml en brouillon (X-Unsent) : s'ouvre dans Outlook installé sur le PC par simple double-clic,
 // avec le tableau mis en forme directement dans le message — sans dépendre du lien mailto.
 document.getElementById('ex-mail-eml').onclick = () => {
