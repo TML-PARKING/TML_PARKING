@@ -2819,7 +2819,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-24-ocr-19";
+const APP_VERSION = "2026-11-24-ocr-20";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -3682,7 +3682,9 @@ function checkTrailerAlreadyOnSiteLive() {
     document.getElementById('f-trailer').insertAdjacentElement('afterend', warnEl);
   }
   if (val && isTrailerAlreadyOnSite(val, currentTarget)) {
-    warnEl.textContent = '⚠ Cette remorque est déjà encodée sur le site (parking ou quai)';
+    const f = findOnSite(val, currentTarget), where = f ? (f.type === 'spot' ? 'Parking ' + f.id : f.type === 'dock' ? 'Quai Q' + f.id : 'Zone libre') : 'le site';
+    warnEl.innerHTML = '⚠ Déjà sur le site (' + escapeHtml(where) + ') <button type="button" class="btn btn-primary" id="btn-locate-dup" style="padding:6px 12px; margin-left:6px; font-size:12.5px;">📍 Localiser</button>';
+    document.getElementById('btn-locate-dup').onclick = () => locateOnSite(val);
   } else {
     warnEl.textContent = '';
   }
@@ -3786,6 +3788,25 @@ document.querySelectorAll('.status-chip').forEach(chip => {
   };
 });
 
+function findOnSite(trailerNum, excludeTarget) {
+  const ex = excludeTarget || {};
+  for (const [id, d] of Object.entries(occupancy)) if (!(ex.type === 'spot' && String(ex.id) === String(id)) && d.trailer === trailerNum) return { type: 'spot', id };
+  for (const [id, d] of Object.entries(freeTrailers)) if (!(ex.type === 'free' && ex.id === id) && d.trailer === trailerNum) return { type: 'free', id };
+  for (const [id, d] of Object.entries(dockOccupancy)) if (!(ex.type === 'dock' && String(ex.id) === String(id)) && d.trailer === trailerNum) return { type: 'dock', id };
+  return null;
+}
+// Localise une remorque déjà sur le site : ferme la saisie, zoome sur la carte et ouvre sa fiche (modifier / déplacer)
+function locateOnSite(trailerNum) {
+  const t = findOnSite(trailerNum, null); if (!t) { toast('Introuvable sur le site'); return; }
+  const pos = t.type === 'spot' ? spotsConfig[t.id] : t.type === 'dock' ? dockConfig[t.id] : freeTrailers[t.id];
+  closeSheet();
+  const want = t.type === 'dock' ? 'quai' : 'parking';
+  if (viewMode !== 'all' && viewMode !== want) setViewMode(want);
+  selectedTargetKey = t.type + '-' + t.id;
+  renderSpots(); renderFreeTrailers(); renderDocks();
+  if (pos && pos.lat != null) map.flyTo([pos.lat, pos.lng], Math.max(map.getZoom(), 19), { duration: 0.6 });
+  setTimeout(() => { if (t.type === 'spot') openSheetForSpot(t.id); else if (t.type === 'dock') openSheetForDock(t.id); else openSheetForFree(t.id); }, 250);
+}
 function isTrailerAlreadyOnSite(trailerNum, excludeTarget) {
   for (const [num, d] of Object.entries(occupancy)) {
     if (excludeTarget && excludeTarget.type === 'spot' && String(excludeTarget.id) === String(num)) continue;
@@ -3806,7 +3827,8 @@ document.getElementById('btn-save').onclick = async () => {
   const trailer = document.getElementById('f-trailer').value.trim().toUpperCase();
   if (!trailer) { toast("Indique un n° de remorque"); return; }
   if (isTrailerAlreadyOnSite(trailer, currentTarget)) {
-    toast("Cette remorque est déjà encodée sur le site");
+    toast("Déjà sur le site : localisation…");
+    locateOnSite(trailer);
     return;
   }
   const client = document.getElementById('f-client').value.trim().toUpperCase();
