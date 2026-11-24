@@ -2818,7 +2818,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-24-ocr-16";
+const APP_VERSION = "2026-11-24-ocr-18";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -5790,10 +5790,13 @@ function showIdentifyScreen() {
       const pin = input.value.trim();
       if (!pin || busy) return;
       busy = true; errorEl.textContent = 'Vérification…';
-      const r = await apiLogin(pin);
+      let r = await apiLogin(pin);
+      if (r && !r.ok && !['bad_pin', 'too_many', 'network'].includes(r.error)) { // ancien Worker sans connexion sécurisée : vérification comme avant
+        try { const d0 = await backendGetAll(); const u = d0 && d0.teamUsers && d0.teamUsers[pin]; if (u) { setAuthToken('open'); r = { ok: true, name: u.name, permissions: u.permissions || {} }; } else r = { ok: false, error: 'bad_pin' }; } catch (e) { r = { ok: false, error: 'network' }; }
+      }
       busy = false;
       if (!r || !r.ok) {
-        errorEl.textContent = r && r.error === 'too_many' ? "Trop d'essais — réessaie dans 10 minutes." : r && r.error === 'network' ? "Serveur injoignable, réessaie." : "Code incorrect, réessaie.";
+        errorEl.textContent = r && r.error === 'too_many' ? "Trop d'essais — réessaie dans 10 minutes." : r && r.error === 'network' ? "Serveur injoignable, réessaie." : r && r.error === 'bad_pin' ? "Code incorrect, réessaie." : "Le serveur (Worker) n'est pas à jour : colle le nouveau cloudflare-worker.js et fais Deploy.";
         input.value = '';
         input.focus();
         return;
@@ -5861,7 +5864,7 @@ async function ensureIdentified() {
 
   if (currentUser) return d;
   const storedPin = localStorage.getItem(USER_PIN_STORAGE_KEY);
-  if (storedPin && teamUsers[storedPin] && getAuthToken()) {
+  if (storedPin && teamUsers[storedPin]) {
     currentUser = { pin: storedPin, name: teamUsers[storedPin].name, permissions: teamUsers[storedPin].permissions || {} };
     return d;
   }
