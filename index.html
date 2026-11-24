@@ -2820,7 +2820,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-24-ocr-23";
+const APP_VERSION = "2026-11-24-ocr-25";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2887,15 +2887,22 @@ function exRows() {
   head.push('Client');
   if (cols.loc) head.push('Emplacement'); if (cols.status) head.push('Statut'); if (cols.ct) head.push('CT'); if (cols.days) head.push('Déposée le', 'Jours sur site'); if (cols.notes) head.push('Notes'); if (cols.comments) head.push('Commentaires');
   const stLabel = st => st === 'fleet' ? 'Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'En cours de chargement' : 'À vider';
-  const rows = lastListExport.map(it => {
+  const mkRow = it => {
     const loc = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     const r = [it.trailer || '(sans n°)'];
     if (cols.plate) r.push((it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].plate) || '');
     r.push(it.client || '');
     if (cols.loc) r.push(loc); if (cols.status) r.push(stLabel(it.status)); if (cols.ct) r.push(exCtCell(it)); if (cols.days) r.push(it.time ? new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '', daysSince(it.time) + ' j'); if (cols.notes) r.push(it.notes || ''); if (cols.comments) r.push(exCommentsCell(it));
     return r;
-  });
-  return { head, rows };
+  };
+  const rows = lastListExport.map(mkRow);
+  // Sections séparées : remorques puis camions
+  const sections = [['trailer', 'Remorques', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9']].map(([kind, title, h0, color]) => {
+    const its = lastListExport.filter(it => (kindOf(it) === 'vehicle' ? 'vehicle' : 'trailer') === kind);
+    const st = {}; its.forEach(it => { st[it.status] = (st[it.status] || 0) + 1; });
+    return { kind, title, color, head: [h0].concat(head.slice(1)), rows: its.map(mkRow), items: EX_ST.filter(([k]) => st[k]).map(([k, l, c]) => ({ l, n: st[k], c })) };
+  }).filter(sec => sec.rows.length);
+  return { head, rows, sections };
 }
 function exTitle() { return document.getElementById('ex-title').value.trim() || 'Check Parking'; }
 function exDateStr() { return new Date().toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
@@ -2915,48 +2922,48 @@ function exSummary() {
 }
 function exSummaryLines() { return exSummary().map(g => [{ t: g.label + (g.n != null ? ' ' + g.n : '') + ' : ' }].concat(g.items.map((x, i) => ({ t: (i ? ' · ' : '') + x.l + ' ' + x.n })))); }
 function exHtmlTable() {
-  const { head, rows } = exRows();
-  const th = 'style="background:#111827;color:#ffffff;text-align:left;padding:8px 12px;font:600 13px Arial,sans-serif;"';
-  const td = i => `style="padding:7px 12px;border-bottom:1px solid #e5e7eb;font:13px Arial,sans-serif;color:#111827;${i % 2 ? 'background:#f9fafb;' : ''}"`;
+  const { rows, sections } = exRows();
+  const bd = '1px solid #cbd5e1';
   const sum = exSummary().map(g => `<div style="display:inline-block;vertical-align:top;margin:0 0 6px 8px;padding:7px 11px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;text-align:left;font:12px Arial,sans-serif;"><div style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${escapeHtml(g.label)}${g.n != null ? ' <span style="color:#111827;font-size:15px;">' + g.n + '</span>' : ''}</div><div style="margin-top:4px;">${g.items.map(x => `<span style="display:inline-block;margin:0 6px 2px 0;font-weight:700;color:${x.c};">${escapeHtml(x.l)} ${x.n}</span>`).join('')}</div></div>`).join('');
-  return `<div style="font-family:Arial,sans-serif;"><table width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 12px;border-collapse:collapse;"><tr><td valign="top"><h2 style="margin:0 0 4px;font:700 18px Arial,sans-serif;color:#111827;">${escapeHtml(exTitle())}</h2>
-<div style="font:12px Arial,sans-serif;color:#6b7280;">${escapeHtml(exDateStr())} · ${rows.length} remorque${rows.length > 1 ? 's' : ''}</div></td><td valign="top" align="right">${sum}</td></tr></table>
-<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #e5e7eb;"><thead><tr>${head.map(h => `<th ${th}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
-<tbody>${rows.map((r, i) => `<tr>${r.map((c, j) => `<td ${td(i)}>${j === 0 ? '<b>' + escapeHtml(c) + '</b>' : (exCellColor(c) ? '<b style="color:' + exCellColor(c) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const secHtml = sections.map(sec => {
+    const th = `style="background:${sec.color};color:#ffffff;text-align:left;padding:8px 12px;border:${bd};font:600 13px Arial,sans-serif;"`;
+    const td = i => `style="padding:7px 12px;border:${bd};font:13px Arial,sans-serif;color:#111827;${i % 2 ? 'background:#f1f5f9;' : ''}"`;
+    return `<table cellspacing="0" cellpadding="0" width="100%" style="border-collapse:collapse;margin:16px 0 0;"><tr><td style="background:${sec.color};color:#ffffff;padding:9px 12px;font:700 15px Arial,sans-serif;border-radius:8px 8px 0 0;">${sec.kind === 'vehicle' ? '🚚' : '🚛'} ${escapeHtml(sec.title.toUpperCase())} · ${sec.rows.length}<span style="float:right;font:600 12px Arial,sans-serif;">${sec.items.map(x => escapeHtml(x.l) + ' ' + x.n).join(' · ')}</span></td></tr></table>
+<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:${bd};"><thead><tr>${sec.head.map(h => `<th ${th}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+<tbody>${sec.rows.map((r, i) => `<tr>${r.map((c, j) => `<td ${td(i)}>${j === 0 ? '<b>' + escapeHtml(c) + '</b>' : (exCellColor(c) ? '<b style="color:' + exCellColor(c) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  }).join('');
+  return `<div style="font-family:Arial,sans-serif;"><table width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 4px;border-collapse:collapse;"><tr><td valign="top"><h2 style="margin:0 0 4px;font:700 18px Arial,sans-serif;color:#111827;">${escapeHtml(exTitle())}</h2>
+<div style="font:12px Arial,sans-serif;color:#6b7280;">${escapeHtml(exDateStr())} · ${exCountLabel()}</div></td><td valign="top" align="right">${sum}</td></tr></table>${secHtml}</div>`;
+}
+function exCountLabel() {
+  const t = lastListExport.filter(it => kindOf(it) !== 'vehicle').length, v = lastListExport.length - t;
+  return [t ? t + ' remorque' + (t > 1 ? 's' : '') : '', v ? v + ' camion' + (v > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') || '0 remorque';
 }
 // Tableau en IMAGE (PNG) : joli et identique partout, idéal pour le téléphone.
 function exTableCanvas() {
-  const { head, rows } = exRows();
-  const S = 2, pad = 16, f = '13px Arial, sans-serif', fb = 'bold 13px Arial, sans-serif', lh = 18, maxW = 300;
+  const { head, rows, sections } = exRows();
+  const S = 2, pad = 16, f = '13px Arial, sans-serif', fb = 'bold 13px Arial, sans-serif', lh = 18, maxW = 300, GRID = '#cbd5e1';
   const m = document.createElement('canvas').getContext('2d');
-  const widths = head.map((h, j) => { m.font = fb; let w = m.measureText(h).width; rows.forEach(r => { m.font = j === 0 ? fb : f; w = Math.max(w, m.measureText(String(r[j] || '')).width); }); return Math.min(Math.ceil(w), maxW) + 24; });
-  const wrap = (txt, w, font) => { // retour à la ligne par mots
-    m.font = font; const out = []; let cur = '';
-    String(txt || '').split(/\s+/).forEach(word => {
-      const t = cur ? cur + ' ' + word : word;
-      if (m.measureText(t).width <= w - 24 || !cur) cur = t; else { out.push(cur); cur = word; }
-    });
-    out.push(cur); return out;
-  };
-  const cells = rows.map(r => r.map((c, j) => wrap(c, widths[j], j === 0 ? fb : f)));
-  const rhs = cells.map(cs => Math.max(34, Math.max(...cs.map(l => l.length)) * lh + 16));
+  // colonnes communes à toutes les sections (alignement parfait)
+  const widths = head.map((h, j) => { let w = 0; sections.forEach(sec => { m.font = fb; w = Math.max(w, m.measureText(sec.head[j]).width); sec.rows.forEach(r => { m.font = j === 0 ? fb : f; w = Math.max(w, m.measureText(String(r[j] || '')).width); }); }); return Math.min(Math.ceil(w), maxW) + 24; });
+  let tableW = widths.reduce((a, b) => a + b, 0);
+  const wrap = (txt, w, font) => { m.font = font; const out = []; let cur = ''; String(txt || '').split(/\s+/).forEach(word => { const t = cur ? cur + ' ' + word : word; if (m.measureText(t).width <= w - 24 || !cur) cur = t; else { out.push(cur); cur = word; } }); out.push(cur); return out; };
+  sections.forEach(sec => { sec.cells = sec.rows.map(r => r.map((c, j) => wrap(c, widths[j], j === 0 ? fb : f))); sec.rhs = sec.cells.map(cs => Math.max(34, Math.max(...cs.map(l => l.length)) * lh + 16)); });
   const groups = exSummary(), cardW = 270, cgap = 10, pillH = 22;
   const rr = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
   m.font = 'bold 12px Arial, sans-serif';
-  const cards = groups.map(gr => { // disposition des pastilles (retour à la ligne dans la carte)
-    let cx = 0, row = 0; const pills = gr.items.map(it => { const t = it.l + ' ' + it.n, w = Math.ceil(m.measureText(t).width) + 18; if (cx + w > cardW - 24 && cx > 0) { row++; cx = 0; } const o = { it, t, w, x: cx, row }; cx += w + 6; return o; });
-    return { gr, pills, h: 38 + (row + 1) * (pillH + 6) + 8 };
-  });
+  const cards = groups.map(gr => { let cx = 0, row = 0; const pills = gr.items.map(it => { const t = it.l + ' ' + it.n, w = Math.ceil(m.measureText(t).width) + 18; if (cx + w > cardW - 24 && cx > 0) { row++; cx = 0; } const o = { it, t, w, x: cx, row }; cx += w + 6; return o; }); return { gr, pills, h: 38 + (row + 1) * (pillH + 6) + 8 }; });
   const cardsH = Math.max(0, ...cards.map(c => c.h)), cardsW = cards.length ? cards.length * cardW + (cards.length - 1) * cgap : 0;
   m.font = 'bold 19px Arial, sans-serif'; let titleW = m.measureText(exTitle()).width;
-  m.font = '12px Arial, sans-serif'; titleW = Math.max(titleW, m.measureText(exDateStr() + ' · ' + rows.length + ' remorque' + (rows.length > 1 ? 's' : '')).width);
-  const W = Math.max(widths.reduce((a, b) => a + b, 0), 360, titleW + cardsW + 40) + pad * 2, topH = Math.max(64, cardsH + 14), hh = 34;
-  const H = topH + hh + rhs.reduce((a, b) => a + b, 0) + pad * 2;
+  m.font = '12px Arial, sans-serif'; titleW = Math.max(titleW, m.measureText(exDateStr() + ' · ' + exCountLabel()).width);
+  const W = Math.max(tableW, 360, titleW + cardsW + 40) + pad * 2, topH = Math.max(64, cardsH + 14), banH = 44, hh = 32, gapS = 22;
+  { const extra = W - pad * 2 - tableW; if (extra > 0) { const base = tableW; let used = 0; widths.forEach((w, j) => { const nw = j === widths.length - 1 ? base + extra - used : Math.round(w + extra * w / base); widths[j] = nw; used += nw; }); tableW = base + extra; } }
+  const H = topH + sections.reduce((a, sec, i) => a + (i ? gapS : 0) + banH + hh + sec.rhs.reduce((x, y) => x + y, 0), 0) + pad * 2;
   const c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
   const g = c.getContext('2d'); g.scale(S, S);
   g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
-  g.textBaseline = 'middle'; g.fillStyle = '#111827'; g.font = 'bold 19px Arial, sans-serif'; g.fillText(exTitle(), pad, pad + 14);
-  g.fillStyle = '#6b7280'; g.font = '12px Arial, sans-serif'; g.fillText(exDateStr() + ' · ' + rows.length + ' remorque' + (rows.length > 1 ? 's' : ''), pad, pad + 38);
+  g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillStyle = '#111827'; g.font = 'bold 19px Arial, sans-serif'; g.fillText(exTitle(), pad, pad + 14);
+  g.fillStyle = '#6b7280'; g.font = '12px Arial, sans-serif'; g.fillText(exDateStr() + ' · ' + exCountLabel(), pad, pad + 38);
   cards.forEach((cd, i) => {
     const x0 = W - pad - cardsW + i * (cardW + cgap), y0 = pad;
     rr(g, x0, y0, cardW, cardsH, 12); g.fillStyle = '#f3f4f6'; g.fill(); g.strokeStyle = '#e5e7eb'; g.lineWidth = 1; g.stroke();
@@ -2964,25 +2971,66 @@ function exTableCanvas() {
     if (cd.gr.n != null) { g.fillStyle = '#111827'; g.font = 'bold 22px Arial, sans-serif'; g.textAlign = 'right'; g.fillText(String(cd.gr.n), x0 + cardW - 12, y0 + 19); g.textAlign = 'left'; }
     cd.pills.forEach(pl => { const px = x0 + 12 + pl.x, py = y0 + 36 + pl.row * (pillH + 6); rr(g, px, py, pl.w, pillH, 11); g.fillStyle = pl.it.c; g.fill(); g.fillStyle = '#fff'; g.font = 'bold 12px Arial, sans-serif'; g.fillText(pl.t, px + 9, py + pillH / 2 + 1); });
   });
-  let y = pad + topH;
-  g.fillStyle = '#111827'; g.fillRect(pad, y, W - pad * 2, hh);
-  let x = pad; g.fillStyle = '#fff'; g.font = fb;
-  head.forEach((h, j) => { g.fillText(h, x + 12, y + hh / 2); x += widths[j]; });
-  y += hh;
+  // pictogrammes
+  const icon = (kind, x, y, col) => { // pictogramme 34x22 : remorque (caisse seule) / camion (cabine + caisse)
+    g.save(); g.translate(x, y); g.fillStyle = col;
+    if (kind === 'vehicle') {
+      rr(g, 0, 1, 19, 14, 2); g.fill();                                   // caisse
+      g.beginPath(); g.moveTo(21, 5); g.lineTo(27, 5); g.lineTo(33, 10); g.lineTo(33, 15); g.lineTo(21, 15); g.closePath(); g.fill(); // cabine
+      g.fillStyle = col === '#fff' ? '#6d28d9' : '#fff'; g.beginPath(); g.moveTo(23, 7); g.lineTo(26.5, 7); g.lineTo(30, 10.5); g.lineTo(23, 10.5); g.closePath(); g.fill(); // vitre
+    } else {
+      rr(g, 0, 1, 30, 14, 2); g.fill();                                   // caisse
+      g.fillRect(30, 12, 4, 3); g.fillRect(26, 15, 2, 3);                  // sellette + béquille
+      g.fillStyle = col === '#fff' ? '#0f766e' : '#fff'; for (let i = 0; i < 4; i++) g.fillRect(4 + i * 7, 4, 4, 8); // nervures
+    }
+    const wheel = (cx) => { g.fillStyle = '#fff'; g.beginPath(); g.arc(cx, 17.5, 4, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(cx, 17.5, 2.2, 0, 7); g.fill(); };
+    if (kind === 'vehicle') { wheel(8); wheel(15); wheel(28); } else { wheel(8); wheel(16); }
+    g.restore();
+  };
   const stCol = { 'À vider': '#dc2626', 'Vide': '#16a34a', 'Chargé': '#2563eb', 'En cours de chargement': '#ca8a04', 'Bloqué': '#6b7280' };
-  rows.forEach((r, i) => {
-    const rh = rhs[i];
-    g.fillStyle = i % 2 ? '#f3f4f6' : '#fff'; g.fillRect(pad, y, W - pad * 2, rh);
-    g.fillStyle = '#e5e7eb'; g.fillRect(pad, y + rh - 1, W - pad * 2, 1);
-    x = pad;
-    r.forEach((cell, j) => {
-      cell = String(cell || ''); const col = stCol[cell] || exCellColor(cell);
-      g.font = (j === 0 || col) ? fb : f; g.fillStyle = col || '#111827';
-      const lines = cells[i][j], top = y + (rh - lines.length * lh) / 2 + lh / 2;
-      lines.forEach((ln, k) => g.fillText(ln, x + 12, top + k * lh));
-      x += widths[j];
+  let y = pad + topH;
+  sections.forEach((sec, si) => {
+    if (si) y += gapS;
+    const x0 = pad, X1 = pad + tableW;
+    // bandeau de section
+    rr(g, x0, y, tableW, banH + 8, 10); g.fillStyle = sec.color; g.fill();
+    icon(sec.kind, x0 + 14, y + 10, '#fff');
+    g.fillStyle = '#fff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = 'bold 17px Arial, sans-serif'; g.fillText(sec.title.toUpperCase(), x0 + 60, y + banH / 2);
+    m.font = 'bold 17px Arial, sans-serif'; const tw = m.measureText(sec.title.toUpperCase()).width;
+    rr(g, x0 + 60 + tw + 10, y + banH / 2 - 11, 34, 22, 11); g.fillStyle = '#fff'; g.fill();
+    g.fillStyle = sec.color; g.font = 'bold 14px Arial, sans-serif'; g.textAlign = 'center'; g.fillText(String(sec.rows.length), x0 + 60 + tw + 27, y + banH / 2 + 1); g.textAlign = 'left';
+    // pastilles statuts (à droite)
+    let px = X1 - 12; g.font = 'bold 12px Arial, sans-serif';
+    sec.items.slice().reverse().forEach(it => { const t = it.l + ' ' + it.n, w = Math.ceil(g.measureText(t).width) + 18; px -= w; rr(g, px, y + banH / 2 - 11, w, 22, 11); g.fillStyle = '#fff'; g.fill(); g.fillStyle = it.c; g.textAlign = 'left'; g.fillText(t, px + 9, y + banH / 2 + 1); px -= 6; });
+    y += banH;
+    // en-tête de colonnes
+    g.fillStyle = sec.color; g.fillRect(x0, y, tableW, hh + 8); // (recouvre le bas arrondi du bandeau)
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(x0, y, tableW, hh + 8);
+    let x = x0; g.fillStyle = '#fff'; g.font = fb; g.textAlign = 'left';
+    sec.head.forEach((h, j) => { g.fillText(h, x + 12, y + 4 + hh / 2); x += widths[j]; });
+    const tableTop = y;
+    y += hh;
+    sec.rows.forEach((r, i) => {
+      const rh = sec.rhs[i];
+      g.fillStyle = i % 2 ? '#f1f5f9' : '#fff'; g.fillRect(x0, y, tableW, rh);
+      g.fillStyle = GRID; g.fillRect(x0, y + rh - 1, tableW, 1); // trait horizontal
+      x = x0;
+      r.forEach((cell, j) => {
+        cell = String(cell || ''); const col = stCol[cell] || exCellColor(cell);
+        g.font = (j === 0 || col) ? fb : f; g.fillStyle = col || '#111827';
+        const lines = sec.cells[i][j], top = y + (rh - lines.length * lh) / 2 + lh / 2;
+        lines.forEach((ln, k) => g.fillText(ln, x + 12, top + k * lh));
+        x += widths[j];
+      });
+      y += rh;
     });
-    y += rh;
+    // quadrillage vertical + cadre
+    g.fillStyle = GRID; let vx = x0;
+    widths.forEach(w => { g.fillRect(Math.round(vx), tableTop + hh, 1, y - tableTop - hh); vx += w; });
+    g.fillRect(Math.round(X1) - 1, tableTop + hh, 1, y - tableTop - hh);
+    g.fillStyle = 'rgba(255,255,255,.35)'; vx = x0; widths.forEach((w, j) => { if (j) g.fillRect(Math.round(vx), tableTop + 4, 1, hh); vx += w; });
+    g.fillStyle = sec.color; g.fillRect(x0, y, tableW, 3);
+    y += 3;
   });
   return c;
 }
@@ -3011,15 +3059,15 @@ async function exTablePdfBlob() {
 function exTableBlob() { return new Promise(res => exTableCanvas().toBlob(res, 'image/png')); }
 
 function exText() {
-  const { head, rows } = exRows();
-  let t = exTitle() + '\n' + exDateStr() + ' — ' + rows.length + ' remorque' + (rows.length > 1 ? 's' : '') + '\n\n';
-  t += exSummaryLines().map(l => l.map(x => x.t).join('')).join('\n') + '\n\n';
-  t += rows.map(r => '• ' + r.filter(Boolean).join(' — ')).join('\n');
+  const { sections } = exRows();
+  let t = exTitle() + '\n' + exDateStr() + ' — ' + exCountLabel() + '\n\n';
+  t += exSummaryLines().map(l => l.map(x => x.t).join('')).join('\n') + '\n';
+  sections.forEach(sec => { t += '\n== ' + sec.title.toUpperCase() + ' (' + sec.rows.length + ') ==\n' + sec.rows.map(r => '• ' + r.filter(Boolean).join(' — ')).join('\n') + '\n'; });
   return t;
 }
 function renderExportPreview() {
   const { rows } = exRows();
-  document.getElementById('ex-count').textContent = rows.length + ' remorque' + (rows.length > 1 ? 's' : '') + ' dans la liste';
+  document.getElementById('ex-count').textContent = exCountLabel() + ' dans la liste';
   document.getElementById('ex-preview').innerHTML = rows.length ? exHtmlTable() : '<div class="empty">Aucune remorque dans la liste actuelle</div>';
 }
 function openExportModal() {
