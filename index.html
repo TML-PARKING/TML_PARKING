@@ -981,6 +981,7 @@
 
     <div style="background:var(--surface-3); border-radius:12px; padding:14px; margin-bottom:14px;">
       <div class="detail-row"><span class="detail-label">Client</span><span id="detail-client" class="detail-value">—</span></div>
+      <div class="detail-row" id="detail-plate-row" style="display:none;"><span class="detail-label">Plaque</span><span id="detail-plate" class="detail-value">—</span></div>
       <div class="detail-row"><span class="detail-label">Emplacement</span><span id="detail-location" class="detail-value">—</span></div>
       <div class="detail-row"><span class="detail-label">Déposée depuis</span><span id="detail-days" class="detail-value">—</span></div>
       <div class="detail-row" id="detail-notes-row"><span class="detail-label">Notes</span><span id="detail-notes" class="detail-value">—</span></div>
@@ -2818,7 +2819,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-24-ocr-18";
+const APP_VERSION = "2026-11-24-ocr-19";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -4518,6 +4519,8 @@ function openDetailView(item) {
 
   document.getElementById('detail-client').textContent = item.client || '—';
   document.getElementById('detail-location').textContent = item.label || '—';
+  { const pe = item.trailer ? trailerDB[item.trailer] : null, pr = document.getElementById('detail-plate-row');
+    pr.style.display = pe && pe.plate ? '' : 'none'; document.getElementById('detail-plate').textContent = pe && pe.plate ? pe.plate : '—'; }
   document.getElementById('detail-days').textContent = `${days} jour${days > 1 ? 's' : ''}${item.time ? ' (depuis le ' + formatDateTime(item.time) + ')' : ''}`;
   const notesRow = document.getElementById('detail-notes-row');
   if (item.notes) {
