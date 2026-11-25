@@ -2847,7 +2847,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-25-ocr-29";
+const APP_VERSION = "2026-11-25-ocr-30";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -3897,9 +3897,6 @@ function renderTrailerSuggestions() {
   if (!q || nq.length < 2 || trailerDB[inp.value.trim()] || [occupancy, freeTrailers, dockOccupancy].some(o => Object.values(o || {}).some(d => d && d.trailer === inp.value.trim()))) { box.style.display = 'none'; return; }
   const hits = [], pool = {};
   Object.entries(trailerDB).forEach(([num, e]) => { pool[num] = e || {}; });
-  const addPool = (num, kind) => { if (num && !pool[num]) pool[num] = { kind }; };
-  [occupancy, freeTrailers, dockOccupancy].forEach(o => Object.values(o || {}).forEach(d => d && addPool(d.trailer, d.kind)));
-  (history || []).forEach(h => h && addPool(h.trailer, h.kind));
   Object.entries(pool).forEach(([num, e]) => {
     const n = num.toUpperCase(), np = normPlate(num), pl = e && e.plate ? normPlate(e.plate) : '';
     let score = -1;
