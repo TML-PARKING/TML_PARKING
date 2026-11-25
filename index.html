@@ -273,6 +273,19 @@
   .lp-item:active { background: #242427; }
   .lp-item .lp-num { font-weight: 600; font-size: 13px; letter-spacing: .01em; font-family: var(--font-mono); }
   .lp-item .lp-meta { font-size: 11px; color: var(--ink-dim); }
+  .ph-grid { display:flex; flex-wrap:wrap; gap:8px; }
+  .ph-thumb { position:relative; width:74px; height:74px; border-radius:12px; overflow:hidden; background:var(--surface-2); border:1px solid var(--line-strong); cursor:pointer; flex:0 0 auto; }
+  .ph-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .ph-thumb .ph-x { position:absolute; top:3px; right:3px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,.65); color:#fff; border:0; font-size:14px; line-height:22px; padding:0; cursor:pointer; }
+  .ph-add { width:74px; height:74px; border-radius:12px; border:1.5px dashed var(--line-strong); background:none; color:var(--ink-dim); font-size:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; flex:0 0 auto; }
+  .ph-add b { font-size:22px; line-height:1; }
+  .ph-busy { opacity:.5; pointer-events:none; }
+  #photo-viewer { position:fixed; inset:0; z-index:5000; background:rgba(0,0,0,.94); display:none; flex-direction:column; align-items:center; justify-content:center; }
+  #photo-viewer.open { display:flex; }
+  #photo-viewer img { max-width:100%; max-height:82vh; object-fit:contain; }
+  #photo-viewer .pv-bar { position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center; padding:14px 16px; color:#fff; font-size:14px; }
+  #photo-viewer button { background:rgba(255,255,255,.14); color:#fff; border:0; border-radius:999px; padding:10px 16px; font-size:15px; cursor:pointer; }
+  #photo-viewer .pv-nav { position:absolute; top:50%; transform:translateY(-50%); width:46px; height:46px; padding:0; font-size:22px; }
   #f-suggest { display:none; margin-top:6px; border:1px solid var(--line-strong); background:var(--surface-2); border-radius:14px; overflow:hidden; }
   #f-suggest button { display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; padding:11px 14px; background:none; border:0; border-bottom:1px solid var(--line); color:var(--ink); font-size:15px; text-align:left; cursor:pointer; }
   #f-suggest button:last-child { border-bottom:0; }
@@ -898,6 +911,11 @@
       <label>Contenu / notes</label>
       <input type="text" id="f-notes" list="content-presets-list" placeholder="Ex: TR Orbette, Retour Trémery..." autocomplete="off">
     </div>
+    <div class="field">
+      <label>Photos</label>
+      <div class="ph-grid" id="f-photos"></div>
+      <input type="file" id="f-photo-input" accept="image/*" multiple style="display:none;">
+    </div>
     <div class="sheet-actions">
       <button class="btn btn-danger" id="btn-remove">Retirer</button>
       <button class="btn btn-success" id="btn-save">Enregistrer</button>
@@ -966,6 +984,7 @@
   </div>
 </div>
 
+<div id="photo-viewer"><div class="pv-bar"><span id="pv-count"></span><span><button id="pv-del" style="display:none; margin-right:8px;">🗑 Retirer</button><button id="pv-close">✕ Fermer</button></span></div><button class="pv-nav" id="pv-prev" style="left:10px;">‹</button><img id="pv-img" alt=""><button class="pv-nav" id="pv-next" style="right:10px;">›</button></div>
 <div id="detail-sheet" class="bottom-sheet" style="z-index:2100; max-height:88vh;">
   <div class="handle"></div>
   <div class="sheet-header">
@@ -992,6 +1011,12 @@
     <div id="detail-ct-box" style="border-radius:12px; padding:14px; margin-bottom:14px; display:none;">
       <div style="font-size:12px; text-transform:uppercase; letter-spacing:.03em; opacity:.8; margin-bottom:4px;">Contrôle technique</div>
       <div id="detail-ct-text" style="font-weight:600; font-size:14px;"></div>
+    </div>
+
+    <div style="background:var(--surface-3); border-radius:12px; padding:14px; margin-bottom:14px;">
+      <div style="font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-dim); margin-bottom:8px;">Photos</div>
+      <div class="ph-grid" id="detail-photos"></div>
+      <input type="file" id="detail-photo-input" accept="image/*" multiple style="display:none;">
     </div>
 
     <div style="background:var(--surface-3); border-radius:12px; padding:14px; margin-bottom:14px;">
@@ -1564,6 +1589,7 @@ const PERMISSION_DEFS = [
   { key: 'usersEdit', label: '✏️ Modifier un profil utilisateur existant' },
   { key: 'usersViewCodes', label: '🔑 Voir les codes des utilisateurs existants' },
   { key: 'usersDelete', label: '🗑️ Supprimer un profil utilisateur' },
+  { key: 'deletePhotos', label: '🗑 Supprimer des photos' },
   { key: 'mailManage', label: '✉️ Gérer les adresses et groupes mail (export)' }
 ];
 function hasPermission(key) {
@@ -2693,6 +2719,7 @@ var mapSearchQ = '';
 function mapSearchMatch(d, q) {
   if ([d.trailer, d.client, d.notes].some(v => v && String(v).toLowerCase().includes(q))) return true;
   const e = d.trailer ? trailerDB[d.trailer] : null, nq = normPlate(q);
+  if (nq.length >= 2 && d.trailer && normPlate(d.trailer).includes(nq)) return true;
   return !!(e && e.plate && nq.length >= 3 && normPlate(e.plate).includes(nq));
 }
 function mapSearchResults(q) {
@@ -2820,7 +2847,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-24-ocr-25";
+const APP_VERSION = "2026-11-25-ocr-28";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2989,8 +3016,10 @@ function exTableCanvas() {
   };
   const stCol = { 'À vider': '#dc2626', 'Vide': '#16a34a', 'Chargé': '#2563eb', 'En cours de chargement': '#ca8a04', 'Bloqué': '#6b7280' };
   let y = pad + topH;
+  const breaks = [];
   sections.forEach((sec, si) => {
     if (si) y += gapS;
+    breaks.push(y - Math.floor(si ? gapS / 2 : 0));
     const x0 = pad, X1 = pad + tableW;
     // bandeau de section
     rr(g, x0, y, tableW, banH + 8, 10); g.fillStyle = sec.color; g.fill();
@@ -3022,7 +3051,7 @@ function exTableCanvas() {
         lines.forEach((ln, k) => g.fillText(ln, x + 12, top + k * lh));
         x += widths[j];
       });
-      y += rh;
+      y += rh; breaks.push(y);
     });
     // quadrillage vertical + cadre
     g.fillStyle = GRID; let vx = x0;
@@ -3032,27 +3061,43 @@ function exTableCanvas() {
     g.fillStyle = sec.color; g.fillRect(x0, y, tableW, 3);
     y += 3;
   });
+  c._breaks = breaks; c._scale = S;
   return c;
 }
 // PDF d'une page (image JPEG du tableau) — pièce jointe propre, sans bibliothèque.
 async function exTablePdfBlob() {
-  const c = exTableCanvas();
-  const jpg = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
-  const data = new Uint8Array(await jpg.arrayBuffer());
-  const pw = 595, ph = Math.max(Math.round(pw * c.height / c.width), 120);
+  const c = exTableCanvas(), S = c._scale || 2, PW = 842, PH = 595, M = 20; // A4 paysage
+  const cw = c.width / S, ch = c.height / S, k = (PW - M * 2) / cw, cap = (PH - M * 2) / k;
+  const slices = []; let y0 = 0;
+  while (y0 < ch - 1) {
+    let end = y0 + cap;
+    if (end >= ch) end = ch; else { const ok = (c._breaks || []).filter(b => b > y0 + cap * 0.35 && b <= end); if (ok.length) end = Math.max(...ok); }
+    slices.push([y0, end]); y0 = end;
+  }
+  const pages = [];
+  for (const [a0, a1] of slices) {
+    const sc = document.createElement('canvas'); sc.width = c.width; sc.height = Math.max(1, Math.round((a1 - a0) * S));
+    const g = sc.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, sc.width, sc.height); g.drawImage(c, 0, Math.round(a0 * S), c.width, sc.height, 0, 0, c.width, sc.height);
+    const jpg = await new Promise(r => sc.toBlob(r, 'image/jpeg', 0.92));
+    pages.push({ data: new Uint8Array(await jpg.arrayBuffer()), w: sc.width, h: sc.height });
+  }
   const enc = new TextEncoder(), parts = [], offs = []; let len = 0;
   const push = x => { const u = typeof x === 'string' ? enc.encode(x) : x; parts.push(u); len += u.length; };
   const obj = (n, body) => { offs[n] = len; push(n + ' 0 obj\n' + body + '\nendobj\n'); };
+  const N = pages.length;
   push('%PDF-1.4\n');
   obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
-  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-  obj(3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pw + ' ' + ph + '] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>');
-  const cs = 'q ' + pw + ' 0 0 ' + ph + ' 0 0 cm /Im0 Do Q';
-  obj(4, '<< /Length ' + cs.length + ' >>\nstream\n' + cs + '\nendstream');
-  offs[5] = len; push('5 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + c.width + ' /Height ' + c.height + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + data.length + ' >>\nstream\n'); push(data); push('\nendstream\nendobj\n');
-  const xr = len; push('xref\n0 6\n0000000000 65535 f \n');
-  for (let i = 1; i <= 5; i++) push(String(offs[i]).padStart(10, '0') + ' 00000 n \n');
-  push('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xr + '\n%%EOF');
+  obj(2, '<< /Type /Pages /Kids [' + pages.map((_, i) => (3 + i * 3) + ' 0 R').join(' ') + '] /Count ' + N + ' >>');
+  pages.forEach((pg, i) => {
+    const pn = 3 + i * 3, cn = pn + 1, im = pn + 2, w = pg.w / S * k, h = pg.h / S * k;
+    obj(pn, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 ' + im + ' 0 R >> >> /Contents ' + cn + ' 0 R >>');
+    const cs = 'q ' + w.toFixed(2) + ' 0 0 ' + h.toFixed(2) + ' ' + M + ' ' + (PH - M - h).toFixed(2) + ' cm /Im0 Do Q';
+    obj(cn, '<< /Length ' + cs.length + ' >>\nstream\n' + cs + '\nendstream');
+    offs[im] = len; push(im + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + pg.w + ' /Height ' + pg.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + pg.data.length + ' >>\nstream\n'); push(pg.data); push('\nendstream\nendobj\n');
+  });
+  const total = 3 + N * 3, xr = len; push('xref\n0 ' + total + '\n0000000000 65535 f \n');
+  for (let i = 1; i < total; i++) push(String(offs[i]).padStart(10, '0') + ' 00000 n \n');
+  push('trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xr + '\n%%EOF');
   return new Blob(parts, { type: 'application/pdf' });
 }
 
@@ -3133,7 +3178,7 @@ document.getElementById('ex-copy').onclick = async () => { try { await copyRich(
 document.getElementById('ex-print').onclick = () => {
   const w = window.open('', '_blank');
   if (!w) { toast('Autorise les fenêtres pop-up pour imprimer'); return; }
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHtml(exTitle()) + '</title><style>body{margin:28px;font-family:Arial,sans-serif}@media print{th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>' + exHtmlTable() + '<script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHtml(exTitle()) + '</title><style>@page{size:A4 landscape;margin:10mm}body{margin:12px;font-family:Arial,sans-serif}@media print{table{page-break-inside:auto}tr{page-break-inside:avoid}th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>' + exHtmlTable() + '<script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
   w.document.close();
 };
 
@@ -3587,7 +3632,99 @@ function closeSheet() {
   currentTarget = null;
 }
 
+// ---------- PHOTOS (stockées dans la table `photos` du Worker ; l'entrée ne garde que les identifiants) ----------
+const photoCache = {};
+let formPhotos = [];
+function photoId() { return 'ph' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function resizeImage(file, maxPx, q) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { const k = Math.min(1, maxPx / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', q)); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('image')); };
+    img.src = url;
+  });
+}
+async function uploadPhotoFile(file) {
+  const data = await resizeImage(file, 1280, 0.72), thumb = await resizeImage(file, 240, 0.7), id = photoId();
+  const resp = await apiFetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'savePhoto', data: { id, data, thumb } }) });
+  const r = await resp.json(); if (!r || !r.ok) throw new Error('upload');
+  photoCache[id] = data; photoCache[id + '_t'] = thumb;
+  return id;
+}
+async function loadPhoto(id, thumb) {
+  const key = thumb ? id + '_t' : id; if (photoCache[key]) return photoCache[key];
+  if (!thumb && photoCache[id + '_t'] && false) return photoCache[id + '_t'];
+  const resp = await apiFetch(APPS_SCRIPT_URL + '?action=getPhoto&id=' + encodeURIComponent(id) + (thumb ? '&thumb=1' : ''));
+  const r = await resp.json(); if (!r || !r.ok) throw new Error('nophoto');
+  return (photoCache[key] = r.data);
+}
+// Grille de miniatures ; opts: { onAdd(files), onRemove(id), canRemove }
+function renderPhotoGrid(box, ids, opts) {
+  opts = opts || {}; box.innerHTML = '';
+  (ids || []).forEach((id, i) => {
+    const t = document.createElement('div'); t.className = 'ph-thumb'; t.innerHTML = '<img alt="">';
+    loadPhoto(id, true).then(src => { t.firstChild.src = src; }).catch(() => { t.style.opacity = '.4'; t.title = 'Photo introuvable'; });
+    t.onclick = () => openPhotoViewer(ids, i, opts.onRemove);
+    if (opts.onRemove && opts.showX) { const x = document.createElement('button'); x.className = 'ph-x'; x.type = 'button'; x.textContent = '×'; x.onclick = ev => { ev.stopPropagation(); opts.onRemove(id); }; t.appendChild(x); }
+    box.appendChild(t);
+  });
+  if (opts.onAdd) {
+    const a = document.createElement('button'); a.type = 'button'; a.className = 'ph-add'; a.innerHTML = '<b>📷</b><span>Ajouter</span>';
+    a.onclick = () => opts.input.click(); box.appendChild(a);
+    opts.input.onchange = async () => {
+      const files = [...opts.input.files]; opts.input.value = ''; if (!files.length) return;
+      box.classList.add('ph-busy'); let fail = 0;
+      for (const f of files) { try { await opts.onAdd(await uploadPhotoFile(f)); } catch (e) { fail++; } }
+      box.classList.remove('ph-busy'); if (fail) toast(fail + ' photo(s) non envoyée(s)');
+    };
+  }
+}
+let pvIds = [], pvIdx = 0, pvOnRemove = null;
+async function pvShow() {
+  const img = document.getElementById('pv-img'); img.removeAttribute('src');
+  document.getElementById('pv-count').textContent = (pvIdx + 1) + ' / ' + pvIds.length;
+  document.getElementById('pv-prev').style.display = document.getElementById('pv-next').style.display = pvIds.length > 1 ? '' : 'none';
+  document.getElementById('pv-del').style.display = pvOnRemove ? '' : 'none';
+  try { img.src = await loadPhoto(pvIds[pvIdx], false); } catch (e) { toast('Photo introuvable'); }
+}
+function openPhotoViewer(ids, i, onRemove) { pvIds = ids.slice(); pvIdx = i || 0; pvOnRemove = onRemove || null; document.getElementById('photo-viewer').classList.add('open'); pvShow(); }
+document.getElementById('pv-close').onclick = () => document.getElementById('photo-viewer').classList.remove('open');
+document.getElementById('pv-prev').onclick = () => { pvIdx = (pvIdx + pvIds.length - 1) % pvIds.length; pvShow(); };
+document.getElementById('pv-next').onclick = () => { pvIdx = (pvIdx + 1) % pvIds.length; pvShow(); };
+document.getElementById('pv-del').onclick = () => { if (!pvOnRemove || !confirm('Retirer cette photo ?')) return; const id = pvIds[pvIdx]; document.getElementById('photo-viewer').classList.remove('open'); pvOnRemove(id); };
+const formNewPhotos = new Set(); // photos ajoutées pendant cette saisie : retirables par tout le monde avant l'enregistrement
+async function deletePhotoServer(id) {
+  const resp = await apiFetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'deletePhoto', data: { id } }) });
+  const r = await resp.json(); return !!(r && r.ok);
+}
+function renderFormPhotos() {
+  renderPhotoGrid(document.getElementById('f-photos'), formPhotos, { input: document.getElementById('f-photo-input'), onAdd: async id => { formPhotos.push(id); formNewPhotos.add(id); renderFormPhotos(); }, showX: true, onRemove: async id => {
+    if (!formNewPhotos.has(id) && !hasPermission('deletePhotos')) { toast("Tu n'as pas le droit de supprimer des photos"); return; }
+    if (hasPermission('deletePhotos')) { try { await deletePhotoServer(id); } catch (e) {} }
+    formPhotos = formPhotos.filter(x => x !== id); renderFormPhotos(); } });
+}
+// Fiche détail : on peut ajouter des photos à tout moment, même après le dépôt
+function renderDetailPhotos(item) {
+  const rec = item && item._target ? getRecordFor(item._target) : null;
+  const ids = (rec && rec.photos) || item.photos || [];
+  const persist = async () => {
+    if (!item._target) return; const t = item._target;
+    if (t.type === 'spot') await saveOccupancy(); else if (t.type === 'dock') await saveDockOccupancy(); else await saveFreeTrailers();
+    renderDetailPhotos(item);
+  };
+  renderPhotoGrid(document.getElementById('detail-photos'), ids, {
+    input: document.getElementById('detail-photo-input'),
+    onAdd: async id => { const r = getRecordFor(item._target); if (!r) return; r.photos = (r.photos || []).concat(id); item.photos = r.photos; await persist(); },
+    onRemove: hasPermission('deletePhotos') ? async id => {
+      let ok = false; try { ok = await deletePhotoServer(id); } catch (e) {}
+      if (!ok) { toast('Suppression refusée'); return; }
+      const r = getRecordFor(item._target); if (!r) return; r.photos = (r.photos || []).filter(x => x !== id); item.photos = r.photos; await persist(); toast('Photo supprimée');
+    } : null
+  });
+}
+
 function fillForm(data) {
+  formPhotos = (data && data.photos ? data.photos.slice() : []); formNewPhotos.clear(); renderFormPhotos();
   setFormKind(kindOf(data));
   document.getElementById('f-trailer').value = data?.trailer || '';
   document.getElementById('f-client').value = data?.client || '';
@@ -3626,6 +3763,7 @@ function setSheetReadOnly(readOnly) {
   document.getElementById('scan-plate-status').style.display = 'none';
   document.getElementById('f-client').disabled = readOnly;
   document.getElementById('f-notes').disabled = readOnly;
+  { const pf = document.getElementById('f-photos'); if (pf && pf.parentElement) pf.parentElement.style.display = readOnly ? 'none' : ''; }
   document.querySelectorAll('.status-chip').forEach(c => {
     c.style.pointerEvents = readOnly ? 'none' : 'auto';
     c.style.opacity = readOnly ? '0.6' : '1';
@@ -3737,9 +3875,13 @@ document.getElementById('f-trailer').addEventListener('input', updateCtIndicator
 function renderTrailerSuggestions() {
   const box = document.getElementById('f-suggest'), inp = document.getElementById('f-trailer');
   const q = inp.value.trim().toUpperCase(), nq = normPlate(q);
-  if (!q || nq.length < 2 || trailerDB[inp.value.trim()]) { box.style.display = 'none'; return; }
-  const hits = [];
-  Object.entries(trailerDB).forEach(([num, e]) => {
+  if (!q || nq.length < 2 || trailerDB[inp.value.trim()] || [occupancy, freeTrailers, dockOccupancy].some(o => Object.values(o || {}).some(d => d && d.trailer === inp.value.trim()))) { box.style.display = 'none'; return; }
+  const hits = [], pool = {};
+  Object.entries(trailerDB).forEach(([num, e]) => { pool[num] = e || {}; });
+  const addPool = (num, kind) => { if (num && !pool[num]) pool[num] = { kind }; };
+  [occupancy, freeTrailers, dockOccupancy].forEach(o => Object.values(o || {}).forEach(d => d && addPool(d.trailer, d.kind)));
+  (history || []).forEach(h => h && addPool(h.trailer, h.kind));
+  Object.entries(pool).forEach(([num, e]) => {
     const n = num.toUpperCase(), np = normPlate(num), pl = e && e.plate ? normPlate(e.plate) : '';
     let score = -1;
     if (np === nq) score = 0; else if (np.endsWith(nq)) score = 1; else if (np.includes(nq)) score = 2;
@@ -3929,7 +4071,7 @@ document.getElementById('btn-save').onclick = async () => {
   else if (currentTarget.type === 'free') { existingTime = freeTrailers[currentTarget.id]?.time; existingEncodedBy = freeTrailers[currentTarget.id]?.encodedBy; }
   else if (currentTarget.type === 'dock') { existingTime = dockOccupancy[currentTarget.id]?.time; existingEncodedBy = dockOccupancy[currentTarget.id]?.encodedBy; }
   const data = {
-    trailer, client, status, notes, kind: formKind === 'vehicle' ? 'vehicle' : undefined,
+    trailer, client, status, notes, kind: formKind === 'vehicle' ? 'vehicle' : undefined, photos: formPhotos.length ? formPhotos.slice() : undefined,
     time: existingTime || new Date().toISOString(),
     encodedBy: existingEncodedBy || (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : undefined)
   };
@@ -4155,6 +4297,7 @@ async function performRemove(target) {
       notes: removedData.notes,
       kind: removedData.kind === 'vehicle' ? 'vehicle' : undefined,
       comments: removedData.comments || [],
+      photos: removedData.photos,
       label,
       dropTime: removedData.time,
       removeTime: new Date().toISOString(),
@@ -4351,6 +4494,7 @@ function renderListPanel() {
     if (haystack.includes(q)) return true;
     // recherche de plaque tolérante : "qamx 398", "QAMX-398" et "qamx398" sont équivalents
     const nq = normPlate(q);
+    if (nq.length >= 2 && it.trailer && normPlate(it.trailer).includes(nq)) return true;
     return nq.length >= 3 && !!(ctEntry && ctEntry.plate) && normPlate(ctEntry.plate).includes(nq);
   }) : filtered;
   if (lpStatusSort || lpDateSort) {
@@ -4583,8 +4727,10 @@ function renderHistoryPanel() {
       <div class="lp-meta">📤 Retiré : ${formatDateTime(h.removeTime)}${(h.removedBy && hasPermission('viewAuthors')) ? ' par ' + h.removedBy : ''}</div>
       ${durationText ? `<div class="lp-meta">⏱️ Durée sur site : ${durationText}</div>` : ''}
       ${h.notes ? `<div class="lp-meta">📝 ${h.notes}</div>` : ''}
-      ${(h.comments && h.comments.length) ? h.comments.map(c => `<div class="lp-meta">💬 ${c.text}${hasPermission('viewAuthors') ? ' — ' + c.author : ''}</div>`).join('') : ''}
+      ${(h.comments && h.comments.length) ? h.comments.map(c => `<div class="lp-meta">${c.auto ? '' : '💬 '}${c.text} <span style="opacity:.75;">— 🕒 ${formatDateTime(c.date)}${hasPermission('viewAuthors') && c.author ? ' · ' + c.author : ''}</span></div>`).join('') : ''}
+      ${(h.photos && h.photos.length) ? '<div class="ph-grid" data-hist-photos style="margin-top:6px;"></div>' : ''}
     `;
+    { const g = div.querySelector('[data-hist-photos]'); if (g) renderPhotoGrid(g, h.photos, {}); }
     container.appendChild(div);
   });
 }
@@ -4615,6 +4761,7 @@ function openDetailView(item) {
   const days = daysSince(item.time);
   document.getElementById('detail-title').textContent = item.trailer || '(sans n°)';
   renderDetailComments(item);
+  renderDetailPhotos(item);
 
   const badges = document.getElementById('detail-badges');
   badges.innerHTML = '';
