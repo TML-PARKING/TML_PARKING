@@ -2847,7 +2847,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-25-ocr-28";
+const APP_VERSION = "2026-11-25-ocr-29";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -3670,14 +3670,33 @@ function renderPhotoGrid(box, ids, opts) {
   });
   if (opts.onAdd) {
     const a = document.createElement('button'); a.type = 'button'; a.className = 'ph-add'; a.innerHTML = '<b>📷</b><span>Ajouter</span>';
-    a.onclick = () => opts.input.click(); box.appendChild(a);
-    opts.input.onchange = async () => {
-      const files = [...opts.input.files]; opts.input.value = ''; if (!files.length) return;
+    // deux entrées : galerie (sans capture) et appareil photo (capture) → on laisse choisir
+    let cam = opts.input._cam;
+    if (!cam) { cam = opts.input._cam = document.createElement('input'); cam.type = 'file'; cam.accept = 'image/*'; cam.setAttribute('capture', 'environment'); cam.style.display = 'none'; document.body.appendChild(cam); }
+    a.onclick = () => askPhotoSource(() => cam.click(), () => opts.input.click()); box.appendChild(a);
+    const handler = async ev => {
+      const inp = ev.target, files = [...inp.files]; inp.value = ''; if (!files.length) return;
       box.classList.add('ph-busy'); let fail = 0;
       for (const f of files) { try { await opts.onAdd(await uploadPhotoFile(f)); } catch (e) { fail++; } }
       box.classList.remove('ph-busy'); if (fail) toast(fail + ' photo(s) non envoyée(s)');
     };
+    opts.input.onchange = handler; cam.onchange = handler;
   }
+}
+function askPhotoSource(onCam, onGallery) {
+  let m = document.getElementById('photo-source');
+  if (!m) {
+    m = document.createElement('div'); m.id = 'photo-source';
+    m.style.cssText = 'position:fixed;inset:0;z-index:5200;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;';
+    m.innerHTML = '<div style="width:100%;max-width:480px;background:var(--surface-1);border-radius:20px 20px 0 0;padding:16px 16px 22px;display:flex;flex-direction:column;gap:10px;"><div style="text-align:center;font-weight:700;margin-bottom:2px;">Ajouter une photo</div><button class="btn btn-primary" id="ps-cam" style="padding:14px;font-size:16px;">📷 Appareil photo</button><button class="btn btn-ghost" id="ps-gal" style="padding:14px;font-size:16px;border:1px solid var(--line-strong);">🖼️ Galerie</button><button class="btn btn-ghost" id="ps-cancel" style="padding:12px;">Annuler</button></div>';
+    document.body.appendChild(m);
+  }
+  const close = () => { m.style.display = 'none'; };
+  m.style.display = 'flex';
+  m.onclick = e => { if (e.target === m) close(); };
+  document.getElementById('ps-cam').onclick = () => { close(); onCam(); };
+  document.getElementById('ps-gal').onclick = () => { close(); onGallery(); };
+  document.getElementById('ps-cancel').onclick = close;
 }
 let pvIds = [], pvIdx = 0, pvOnRemove = null;
 async function pvShow() {
