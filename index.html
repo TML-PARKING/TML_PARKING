@@ -2875,7 +2875,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-48";
+const APP_VERSION = "2026-11-26-ocr-49";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -3042,9 +3042,9 @@ function exCountLabel() {
   return [n.trailer ? n.trailer + ' remorque' + (n.trailer > 1 ? 's' : '') : '', n.vehicle ? n.vehicle + ' camion' + (n.vehicle > 1 ? 's' : '') : '', n.van ? n.van + ' fourgon' + (n.van > 1 ? 's' : '') : '', n.tractor ? n.tractor + ' tracteur' + (n.tractor > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') || '0 remorque';
 }
 // Tableau en IMAGE (PNG) : joli et identique partout, idéal pour le téléphone.
-function exTableCanvas() {
+function exTableCanvas(scale) {
   const { head, rows, sections } = exRows();
-  const S = 2, pad = 16, f = '13px Arial, sans-serif', fb = 'bold 13px Arial, sans-serif', lh = 18, maxW = 300, GRID = '#cbd5e1';
+  const S = scale || 2, pad = 16, f = '13px Arial, sans-serif', fb = 'bold 13px Arial, sans-serif', lh = 18, maxW = 300, GRID = '#cbd5e1';
   const m = document.createElement('canvas').getContext('2d');
   // colonnes communes à toutes les sections (alignement parfait)
   const widths = head.map((h, j) => { let w = 0; sections.forEach(sec => { m.font = fb; w = Math.max(w, m.measureText(sec.head[j]).width); sec.rows.forEach(r => { m.font = j === 0 ? fb : f; w = Math.max(w, m.measureText(String(r[j] || '')).width); }); }); return Math.min(Math.ceil(w), maxW) + 24; });
@@ -3153,9 +3153,15 @@ function exTableCanvas() {
   return c;
 }
 // PDF d'une page (image JPEG du tableau) — pièce jointe propre, sans bibliothèque.
+// PDF toujours < ~2,8 Mo (limite d'envoi du mail) : on baisse la définition si le tableau est grand
 async function exTablePdfBlob() {
   await exSignLinks();
-  const c = exTableCanvas(), S = c._scale || 2, PW = 842, PH = 595, M = 20; // A4 paysage
+  let blob = null;
+  for (const [sc, q] of [[2, 0.88], [1.6, 0.8], [1.3, 0.72], [1, 0.65], [0.8, 0.6]]) { blob = await exTablePdfBuild(sc, q); if (blob.size <= 2.8e6) break; }
+  return blob;
+}
+async function exTablePdfBuild(SC, JQ) {
+  const c = exTableCanvas(SC), S = c._scale || 2, PW = 842, PH = 595, M = 20; // A4 paysage
   const cw = c.width / S, ch = c.height / S, k = (PW - M * 2) / cw, kk = () => k, cap = (PH - M * 2) / k;
   const slices = []; let y0 = 0;
   while (y0 < ch - 1) {
@@ -3168,7 +3174,7 @@ async function exTablePdfBlob() {
     const lk = (c._links || []).filter(l => l.y >= a0 - 1 && l.y + l.h <= a1 + 1);
     const sc = document.createElement('canvas'); sc.width = c.width; sc.height = Math.max(1, Math.round((a1 - a0) * S));
     const g = sc.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, sc.width, sc.height); g.drawImage(c, 0, Math.round(a0 * S), c.width, sc.height, 0, 0, c.width, sc.height);
-    const jpg = await new Promise(r => sc.toBlob(r, 'image/jpeg', 0.92));
+    const jpg = await new Promise(r => sc.toBlob(r, 'image/jpeg', JQ));
     pages.push({ data: new Uint8Array(await jpg.arrayBuffer()), w: sc.width, h: sc.height, a0, lk });
   }
   const enc = new TextEncoder(), parts = [], offs = []; let len = 0;
