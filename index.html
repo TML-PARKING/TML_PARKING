@@ -2867,7 +2867,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-41";
+const APP_VERSION = "2026-11-26-ocr-42";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -4497,13 +4497,16 @@ const DEFAULT_FILTERS = {
 };
 function getFilters(group) {
   const c = filtersConfig && Array.isArray(filtersConfig[group]) ? filtersConfig[group] : DEFAULT_FILTERS[group];
-  return c.some(f => f.type === 'all') ? c : [DEFAULT_FILTERS[group][0], ...c];
+  let r = c.some(f => f.type === 'all') ? c : [DEFAULT_FILTERS[group][0], ...c];
+  if (group === 'list' && !r.some(f => f.type === 'tractor')) { const i = r.findIndex(f => f.type === 'fixed'); const tf = { id: 'tractor', label: 'Tracteur', type: 'tractor' }; r = i < 0 ? [...r, tf] : [...r.slice(0, i), tf, ...r.slice(i)]; }
+  return r;
 }
 function filterHaystack(d) {
   return [d.trailer, d.client, d.notes, ...((d.comments || []).map(c => c.text))].filter(Boolean).join(' ').toLowerCase();
 }
 function itemMatchesFilter(f, d) {
-  if (f.type === 'status') return (d.status || 'pleine') === f.value;
+  if (f.type === 'tractor') return !!(d.trailer && isTractor(d.trailer));
+  if (f.type === 'status') return !(d.trailer && isTractor(d.trailer)) && (d.status || 'pleine') === f.value;
   if (f.type === 'client') return (d.client || '').trim().toLowerCase() === String(f.value || '').trim().toLowerCase();
   if (f.type === 'text') return filterHaystack(d).includes(String(f.value || '').toLowerCase());
   if (f.type === 'age') {
@@ -4535,8 +4538,8 @@ function renderFilterBars() {
   lp.querySelectorAll('.lp-filter-btn').forEach(b => b.onclick = () => toggleListFilter(b.dataset.filter));
   // en-tête
   const tabs = document.getElementById('hd-tabs');
-  const stCol = { pleine: '#ef4444', vide: '#22c55e', charge: '#06b6d4', achar: '#eab308', fleet: '#8b5cf6' };
-  tabs.innerHTML = lf.filter(f => f.type !== 'fixed').map(f => `<button class="tab" role="option" data-tab="${escapeHtml(f.id)}"><span class="fdot" style="${f.type === 'status' && stCol[f.value] ? 'background:' + stCol[f.value] : ''}"></span>${escapeHtml(f.label)} <span class="n" data-n="${escapeHtml(f.id)}">0</span></button>`).join('');
+  const stCol = { pleine: '#ef4444', vide: '#22c55e', charge: '#06b6d4', achar: '#eab308', fleet: '#8b5cf6', tractor: '#92400e' };
+  tabs.innerHTML = lf.filter(f => f.type !== 'fixed').map(f => `<button class="tab" role="option" data-tab="${escapeHtml(f.id)}"><span class="fdot" style="${f.type === 'status' && stCol[f.value] ? 'background:' + stCol[f.value] : f.type === 'tractor' ? 'background:#92400e' : ''}"></span>${escapeHtml(f.label)} <span class="n" data-n="${escapeHtml(f.id)}">0</span></button>`).join('');
   tabs.querySelectorAll('.tab').forEach(t => t.onclick = () => toggleListFilter(t.dataset.tab));
   // base remorques
   const dp = document.getElementById('db-panel-filters');
