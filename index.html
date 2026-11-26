@@ -1166,6 +1166,7 @@
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-days" checked>Date de dépose / jours</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-notes" checked>Notes</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-comments">Commentaires</label>
+      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-photos" checked>📷 Photos</label>
     </div>
     <div style="font-size:12px; color:var(--ink-faint); margin-bottom:8px;" id="ex-count"></div>
     <div id="ex-preview" style="overflow:auto; max-height:34vh; border-radius:14px; background:#ffffff; padding:14px; color:#111827;"></div>
@@ -2867,7 +2868,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-43";
+const APP_VERSION = "2026-11-26-ocr-45";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2944,6 +2945,8 @@ function exRows() {
   if (cols.container) head.push('Container');
   head.push('Client');
   if (cols.loc) head.push('Emplacement'); if (cols.status) head.push('Statut'); if (cols.ct) head.push('CT'); if (cols.days) head.push('Déposée le', 'Jours sur site'); if (cols.notes) head.push('Notes'); if (cols.comments) head.push('Commentaires');
+  cols.photos = document.getElementById('ex-col-photos').checked && lastListExport.some(it => (it.photos || []).length);
+  if (cols.photos) head.push('Photos');
   const stLabel = st => st === 'fleet' ? 'Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'En cours de chargement' : 'À vider';
   const mkRow = it => {
     const loc = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
@@ -2953,6 +2956,7 @@ function exRows() {
     if (cols.container) r.push(contOf(it));
     r.push(it.client || '');
     if (cols.loc) r.push(loc); if (cols.status) r.push(isTractor(it.trailer) ? '' : stLabel(it.status)); if (cols.ct) r.push(exCtCell(it)); if (cols.days) r.push(it.time ? new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '', daysSince(it.time) + ' j'); if (cols.notes) r.push(it.notes || ''); if (cols.comments) r.push(exCommentsCell(it));
+    if (cols.photos) { const n = (it.photos || []).length; r.push(n ? '📷 ' + n + ' photo' + (n > 1 ? 's' : '') + ' ›' : ''); }
     return r;
   };
   const rows = lastListExport.map(mkRow);
@@ -2968,9 +2972,21 @@ function exRows() {
       hd[0] = 'Plaque'; hd[pi] = h0;
       rws.forEach(r => { if (r[pi]) { const t = r[0]; r[0] = r[pi]; r[pi] = t; } });
     }
-    return { kind, title, color, head: hd, rows: rws, items: kind === 'tractor' ? [] : EX_ST.filter(([k]) => st[k]).map(([k, l, c]) => ({ l, n: st[k], c })) };
+    return { kind, title, color, head: hd, rows: rws, ph: its.map(it => (document.getElementById('ex-col-photos').checked ? (it.photos || []) : [])), items: kind === 'tractor' ? [] : EX_ST.filter(([k]) => st[k]).map(([k, l, c]) => ({ l, n: st[k], c })) };
   }).filter(sec => sec.rows.length);
   return { head, rows, sections };
+}
+const exImgs = {};
+async function exPreloadPhotos() {
+  if (!document.getElementById('ex-col-photos').checked) return;
+  const ids = [...new Set(lastListExport.flatMap(it => it.photos || []))].filter(id => !exImgs[id]);
+  for (let i = 0; i < ids.length; i += 8) await Promise.all(ids.slice(i, i + 8).map(async id => { try { const src = await loadPhoto(id, true), im = new Image(); im.src = src; await im.decode(); exImgs[id] = im; } catch (e) { } }));
+}
+const exPhUrl = ids => location.origin + location.pathname + '#ph=' + ids.join(',');
+const exPhSrc = id => photoCache[id + '_t'] || '';
+function exPhotoCells(ids, ncol, fold, key) {
+  const imgs = ids.filter(id => exPhSrc(id)).map((id, k) => `<img src="${exPhSrc(id)}" height="84" style="height:84px;margin:3px 6px 3px 0;border-radius:6px;border:1px solid #cbd5e1;${fold ? 'cursor:pointer;' : ''}" ${fold ? `data-exph="${escapeHtml(ids.join(','))}" data-i="${k}"` : ''}>`).join('');
+  return imgs ? `<tr ${fold ? `class="ex-phrow" data-k="${key}" style="display:none;"` : ''}><td colspan="${ncol}" style="padding:6px 12px;border:1px solid #cbd5e1;background:#f8fafc;">${imgs}</td></tr>` : '';
 }
 function exTitle() { return document.getElementById('ex-title').value.trim() || 'Check Parking'; }
 function exDateStr() { return new Date().toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
@@ -2989,7 +3005,7 @@ function exSummary() {
   return [grp('Remorques', tr), grp('Camions', tk), grp('Fourgons', tv), grp('Tracteurs', tt), { label: 'Contrôle technique', n: null, items: ctItems }].filter(Boolean);
 }
 function exSummaryLines() { return exSummary().map(g => [{ t: g.label + (g.n != null ? ' ' + g.n : '') + ' : ' }].concat(g.items.map((x, i) => ({ t: (i ? ' · ' : '') + x.l + ' ' + x.n })))); }
-function exHtmlTable() {
+function exHtmlTable(fold) {
   const { rows, sections } = exRows();
   const bd = '1px solid #cbd5e1';
   const sum = exSummary().map(g => `<div style="display:inline-block;vertical-align:top;margin:0 0 6px 8px;padding:7px 11px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;text-align:left;font:12px Arial,sans-serif;"><div style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${escapeHtml(g.label)}${g.n != null ? ' <span style="color:#111827;font-size:15px;">' + g.n + '</span>' : ''}</div><div style="margin-top:4px;">${g.items.map(x => `<span style="display:inline-block;margin:0 6px 2px 0;font-weight:700;color:${x.c};">${escapeHtml(x.l)} ${x.n}</span>`).join('')}</div></div>`).join('');
@@ -2998,7 +3014,7 @@ function exHtmlTable() {
     const td = i => `style="padding:7px 12px;border:${bd};font:13px Arial,sans-serif;color:#111827;${i % 2 ? 'background:#f1f5f9;' : ''}"`;
     return `<table cellspacing="0" cellpadding="0" width="100%" style="border-collapse:collapse;margin:16px 0 0;"><tr><td style="background:${sec.color};color:#ffffff;padding:9px 12px;font:700 15px Arial,sans-serif;border-radius:8px 8px 0 0;">${sec.kind === 'vehicle' ? '🚚' : sec.kind === 'tractor' ? '🚜' : '🚛'} ${escapeHtml(sec.title.toUpperCase())} · ${sec.rows.length}<span style="float:right;font:600 12px Arial,sans-serif;">${sec.items.map(x => escapeHtml(x.l) + ' ' + x.n).join(' · ')}</span></td></tr></table>
 <table cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:${bd};"><thead><tr>${sec.head.map(h => `<th ${th}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
-<tbody>${sec.rows.map((r, i) => `<tr>${r.map((c, j) => `<td ${td(i)}>${j === 0 ? '<b>' + escapeHtml(c) + '</b>' : ((exStCol[c] || exCellColor(c)) ? '<b style="color:' + (exStCol[c] || exCellColor(c)) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+<tbody>${sec.rows.map((r, i) => { const phs = (sec.ph[i] || []).filter(id => exPhSrc(id)); const key = sec.kind + i; return `<tr>${r.map((c, j) => `<td ${td(i)}>${(j === r.length - 1 && /^📷/.test(c) && (sec.ph[i] || []).length) ? `<a href="${escapeHtml(exPhUrl(sec.ph[i]))}" style="color:#2563eb;font-weight:bold;text-decoration:underline;">${escapeHtml(c)}</a>` : j === 0 ? (phs.length && fold ? `<span class="ex-tg" data-k="${key}" style="cursor:pointer;color:#0f766e;margin-right:6px;">▸ 📷${phs.length}</span>` : '') + '<b>' + escapeHtml(c) + '</b>' : ((exStCol[c] || exCellColor(c)) ? '<b style="color:' + (exStCol[c] || exCellColor(c)) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>` + (fold ? exPhotoCells(sec.ph[i] || [], r.length, fold, key) : ''); }).join('')}</tbody></table>`;
   }).join('');
   return `<div style="font-family:Arial,sans-serif;"><table width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 4px;border-collapse:collapse;"><tr><td valign="top"><h2 style="margin:0 0 4px;font:700 18px Arial,sans-serif;color:#111827;">${escapeHtml(exTitle())}</h2>
 <div style="font:12px Arial,sans-serif;color:#6b7280;">${escapeHtml(exDateStr())} · ${exCountLabel()}</div></td><td valign="top" align="right">${sum}</td></tr></table>${secHtml}</div>`;
@@ -3018,6 +3034,8 @@ function exTableCanvas() {
   { m.font = 'bold 17px Arial, sans-serif'; let need = 0; sections.forEach(sec => { const tw = m.measureText(sec.title.toUpperCase()).width; m.font = 'bold 12px Arial, sans-serif'; const pw = sec.items.reduce((a, it) => a + Math.ceil(m.measureText(it.l + ' ' + it.n).width) + 24, 0); m.font = 'bold 17px Arial, sans-serif'; need = Math.max(need, 60 + tw + 10 + 34 + 24 + pw + 12); }); if (need > tableW) { widths[widths.length - 1] += Math.ceil(need - tableW); tableW = widths.reduce((a, b) => a + b, 0); } }
   const wrap = (txt, w, font) => { m.font = font; const out = []; let cur = ''; String(txt || '').split(/\s+/).forEach(word => { const t = cur ? cur + ' ' + word : word; if (m.measureText(t).width <= w - 24 || !cur) cur = t; else { out.push(cur); cur = word; } }); out.push(cur); return out; };
   sections.forEach(sec => { sec.cells = sec.rows.map(r => r.map((c, j) => wrap(c, widths[j], j === 0 ? fb : f))); sec.rhs = sec.cells.map(cs => Math.max(34, Math.max(...cs.map(l => l.length)) * lh + 16)); });
+  const PHH = 84;
+  sections.forEach(sec => { sec.sub = sec.rows.map(() => null); }); // pas de miniatures dans l'image/PDF : colonne « Photos » avec lien
   const groups = exSummary(), cardW = 270, cgap = 10, pillH = 22;
   const rr = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
   m.font = 'bold 12px Arial, sans-serif';
@@ -3027,7 +3045,7 @@ function exTableCanvas() {
   m.font = '12px Arial, sans-serif'; titleW = Math.max(titleW, m.measureText(exDateStr() + ' · ' + exCountLabel()).width);
   const W = Math.max(tableW, 360, titleW + cardsW + 40) + pad * 2, topH = Math.max(64, cardsH + 14), banH = 44, hh = 32, gapS = 22;
   { const extra = W - pad * 2 - tableW; if (extra > 0) { const base = tableW; let used = 0; widths.forEach((w, j) => { const nw = j === widths.length - 1 ? base + extra - used : Math.round(w + extra * w / base); widths[j] = nw; used += nw; }); tableW = base + extra; } }
-  const H = topH + sections.reduce((a, sec, i) => a + (i ? gapS : 0) + banH + hh + sec.rhs.reduce((x, y) => x + y, 0), 0) + pad * 2;
+  const H = topH + sections.reduce((a, sec, i) => a + (i ? gapS : 0) + banH + hh + sec.rhs.reduce((x, y) => x + y, 0) + sec.sub.reduce((x, o) => x + (o ? o.h : 0), 0), 0) + pad * 2;
   const c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
   const g = c.getContext('2d'); g.scale(S, S);
   g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
@@ -3063,7 +3081,7 @@ function exTableCanvas() {
   };
   const stCol = { 'À vider': '#dc2626', 'Vide': '#16a34a', 'Chargé': '#2563eb', 'En cours de chargement': '#ca8a04', 'Bloqué': '#6b7280' };
   let y = pad + topH;
-  const breaks = [];
+  const breaks = [], links = [];
   sections.forEach((sec, si) => {
     if (si) y += gapS;
     breaks.push(y - Math.floor(si ? gapS / 2 : 0));
@@ -3084,7 +3102,7 @@ function exTableCanvas() {
     g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(x0, y, tableW, hh + 8);
     let x = x0; g.fillStyle = '#fff'; g.font = fb; g.textAlign = 'left';
     sec.head.forEach((h, j) => { g.fillText(h, x + 12, y + 4 + hh / 2); x += widths[j]; });
-    const tableTop = y;
+    const tableTop = y, gaps = [];
     y += hh;
     sec.rows.forEach((r, i) => {
       const rh = sec.rhs[i];
@@ -3092,29 +3110,34 @@ function exTableCanvas() {
       g.fillStyle = GRID; g.fillRect(x0, y + rh - 1, tableW, 1); // trait horizontal
       x = x0;
       r.forEach((cell, j) => {
-        cell = String(cell || ''); const col = stCol[cell] || exCellColor(cell);
+        cell = String(cell || ''); const col = stCol[cell] || exCellColor(cell) || (/^📷/.test(cell) ? '#2563eb' : null);
+        if (/^📷/.test(cell) && sec.ph[i] && sec.ph[i].length) links.push({ x, y, w: widths[j], h: rh, url: exPhUrl(sec.ph[i]) });
         g.font = (j === 0 || col) ? fb : f; g.fillStyle = col || '#111827';
         const lines = sec.cells[i][j], top = y + (rh - lines.length * lh) / 2 + lh / 2;
         lines.forEach((ln, k) => g.fillText(ln, x + 12, top + k * lh));
         x += widths[j];
       });
-      y += rh; breaks.push(y);
+      y += rh;
+      const sb = sec.sub[i];
+      if (sb) { g.fillStyle = '#f8fafc'; g.fillRect(x0, y, tableW, sb.h); const g0 = y; let py = y + 8; sb.lines.forEach(ln => { let px = x0 + 12; ln.forEach(o => { g.save(); rr(g, px, py, o.w, PHH, 6); g.clip(); g.drawImage(exImgs[o.id], px, py, o.w, PHH); g.restore(); g.strokeStyle = GRID; g.lineWidth = 1; rr(g, px, py, o.w, PHH, 6); g.stroke(); px += o.w + 8; }); py += PHH + 8; }); y += sb.h; g.fillStyle = GRID; g.fillRect(x0, y - 1, tableW, 1); gaps.push([g0, y]); }
+      breaks.push(y);
     });
     // quadrillage vertical + cadre
     g.fillStyle = GRID; let vx = x0;
-    widths.forEach(w => { g.fillRect(Math.round(vx), tableTop + hh, 1, y - tableTop - hh); vx += w; });
-    g.fillRect(Math.round(X1) - 1, tableTop + hh, 1, y - tableTop - hh);
+    const vseg = (vxp) => { let st = tableTop + hh; gaps.forEach(([a, b]) => { g.fillRect(vxp, st, 1, a - st); st = b; }); g.fillRect(vxp, st, 1, y - st); };
+    widths.forEach(w => { vseg(Math.round(vx)); vx += w; });
+    vseg(Math.round(X1) - 1);
     g.fillStyle = 'rgba(255,255,255,.35)'; vx = x0; widths.forEach((w, j) => { if (j) g.fillRect(Math.round(vx), tableTop + 4, 1, hh); vx += w; });
     g.fillStyle = sec.color; g.fillRect(x0, y, tableW, 3);
     y += 3;
   });
-  c._breaks = breaks; c._scale = S;
+  c._breaks = breaks; c._scale = S; c._links = links;
   return c;
 }
 // PDF d'une page (image JPEG du tableau) — pièce jointe propre, sans bibliothèque.
 async function exTablePdfBlob() {
   const c = exTableCanvas(), S = c._scale || 2, PW = 842, PH = 595, M = 20; // A4 paysage
-  const cw = c.width / S, ch = c.height / S, k = (PW - M * 2) / cw, cap = (PH - M * 2) / k;
+  const cw = c.width / S, ch = c.height / S, k = (PW - M * 2) / cw, kk = () => k, cap = (PH - M * 2) / k;
   const slices = []; let y0 = 0;
   while (y0 < ch - 1) {
     let end = y0 + cap;
@@ -3123,32 +3146,34 @@ async function exTablePdfBlob() {
   }
   const pages = [];
   for (const [a0, a1] of slices) {
+    const lk = (c._links || []).filter(l => l.y >= a0 - 1 && l.y + l.h <= a1 + 1);
     const sc = document.createElement('canvas'); sc.width = c.width; sc.height = Math.max(1, Math.round((a1 - a0) * S));
     const g = sc.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, sc.width, sc.height); g.drawImage(c, 0, Math.round(a0 * S), c.width, sc.height, 0, 0, c.width, sc.height);
     const jpg = await new Promise(r => sc.toBlob(r, 'image/jpeg', 0.92));
-    pages.push({ data: new Uint8Array(await jpg.arrayBuffer()), w: sc.width, h: sc.height });
+    pages.push({ data: new Uint8Array(await jpg.arrayBuffer()), w: sc.width, h: sc.height, a0, lk });
   }
   const enc = new TextEncoder(), parts = [], offs = []; let len = 0;
   const push = x => { const u = typeof x === 'string' ? enc.encode(x) : x; parts.push(u); len += u.length; };
   const obj = (n, body) => { offs[n] = len; push(n + ' 0 obj\n' + body + '\nendobj\n'); };
-  const N = pages.length;
+  const N = pages.length; let an = 3 + N * 3; pages.forEach(pg => { pg.an = pg.lk.map(() => an++); });
   push('%PDF-1.4\n');
   obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
   obj(2, '<< /Type /Pages /Kids [' + pages.map((_, i) => (3 + i * 3) + ' 0 R').join(' ') + '] /Count ' + N + ' >>');
   pages.forEach((pg, i) => {
     const pn = 3 + i * 3, cn = pn + 1, im = pn + 2, w = pg.w / S * k, h = pg.h / S * k;
-    obj(pn, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 ' + im + ' 0 R >> >> /Contents ' + cn + ' 0 R >>');
+    obj(pn, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 ' + im + ' 0 R >> >> /Contents ' + cn + ' 0 R' + (pg.an.length ? ' /Annots [' + pg.an.map(n => n + ' 0 R').join(' ') + ']' : '') + ' >>');
     const cs = 'q ' + w.toFixed(2) + ' 0 0 ' + h.toFixed(2) + ' ' + M + ' ' + (PH - M - h).toFixed(2) + ' cm /Im0 Do Q';
     obj(cn, '<< /Length ' + cs.length + ' >>\nstream\n' + cs + '\nendstream');
     offs[im] = len; push(im + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + pg.w + ' /Height ' + pg.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + pg.data.length + ' >>\nstream\n'); push(pg.data); push('\nendstream\nendobj\n');
   });
-  const total = 3 + N * 3, xr = len; push('xref\n0 ' + total + '\n0000000000 65535 f \n');
+  pages.forEach(pg => pg.lk.forEach((l, k) => { const x1 = M + l.x * kk(), y1 = PH - M - (l.y + l.h - pg.a0) * kk(), x2 = M + (l.x + l.w) * kk(), y2 = PH - M - (l.y - pg.a0) * kk(); obj(pg.an[k], '<< /Type /Annot /Subtype /Link /Rect [' + [x1, y1, x2, y2].map(v => v.toFixed(2)).join(' ') + '] /Border [0 0 0] /A << /S /URI /URI (' + l.url.replace(/[\\()]/g, '\\$&') + ') >> >>'); }));
+  const total = an, xr = len; push('xref\n0 ' + total + '\n0000000000 65535 f \n');
   for (let i = 1; i < total; i++) push(String(offs[i]).padStart(10, '0') + ' 00000 n \n');
   push('trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xr + '\n%%EOF');
   return new Blob(parts, { type: 'application/pdf' });
 }
 
-function exTableBlob() { return new Promise(res => exTableCanvas().toBlob(res, 'image/png')); }
+async function exTableBlob() { return new Promise(res => exTableCanvas().toBlob(res, 'image/png')); }
 
 function exText() {
   const { sections } = exRows();
@@ -3157,11 +3182,20 @@ function exText() {
   sections.forEach(sec => { t += '\n== ' + sec.title.toUpperCase() + ' (' + sec.rows.length + ') ==\n' + sec.rows.map(r => '• ' + r.filter(Boolean).join(' — ')).join('\n') + '\n'; });
   return t;
 }
-function renderExportPreview() {
+async function renderExportPreview() {
   const { rows } = exRows();
   document.getElementById('ex-count').textContent = exCountLabel() + ' dans la liste';
-  document.getElementById('ex-preview').innerHTML = rows.length ? exHtmlTable() : '<div class="empty">Aucune remorque dans la liste actuelle</div>';
+  const pv = document.getElementById('ex-preview');
+  pv.innerHTML = rows.length ? exHtmlTable(true) : '<div class="empty">Aucune remorque dans la liste actuelle</div>';
+  if (rows.length && document.getElementById('ex-col-photos').checked && lastListExport.some(it => (it.photos || []).length)) { const tok = (window._exTok = (window._exTok || 0) + 1); await exPreloadPhotos(); if (tok === window._exTok) pv.innerHTML = exHtmlTable(true); }
 }
+document.getElementById('ex-preview').addEventListener('click', e => {
+  const tg = e.target.closest('.ex-tg'), im = e.target.closest('img[data-exph]');
+  if (im) { openPhotoViewer(im.dataset.exph.split(','), +im.dataset.i || 0); return; }
+  if (!tg) return;
+  const row = document.getElementById('ex-preview').querySelector('.ex-phrow[data-k="' + tg.dataset.k + '"]'); if (!row) return;
+  const open = row.style.display === 'none'; row.style.display = open ? '' : 'none'; tg.textContent = (open ? '▾ ' : '▸ ') + tg.textContent.slice(2);
+});
 function openExportModal() {
   { const m = document.getElementById('ex-manage'); if (m) m.style.display = hasPermission('mailManage') ? '' : 'none'; }
   { const v = document.getElementById('ex-ver'); if (v) v.textContent = 'Version ' + APP_VERSION + ' — '; }
@@ -3173,10 +3207,10 @@ function openExportModal() {
 function closeExportModal() { exportModal.classList.remove('open'); overlay.classList.remove('show'); }
 document.getElementById('btn-lp-export').onclick = openExportModal;
 document.getElementById('btn-export-close').onclick = closeExportModal;
-['ex-title', 'ex-col-type', 'ex-col-plate', 'ex-col-loc', 'ex-col-status', 'ex-col-ct', 'ex-col-days', 'ex-col-notes', 'ex-col-comments'].forEach(id => document.getElementById(id).addEventListener('input', renderExportPreview));
+['ex-title', 'ex-col-type', 'ex-col-plate', 'ex-col-loc', 'ex-col-status', 'ex-col-ct', 'ex-col-days', 'ex-col-notes', 'ex-col-comments', 'ex-col-photos'].forEach(id => document.getElementById(id).addEventListener('input', renderExportPreview));
 // Fichier .eml en brouillon (X-Unsent) : s'ouvre dans Outlook installé sur le PC par simple double-clic,
 // avec le tableau mis en forme directement dans le message — sans dépendre du lien mailto.
-document.getElementById('ex-mail-eml').onclick = () => {
+document.getElementById('ex-mail-eml').onclick = async () => {
   if (!lastListExport.length) { toast('Aucune remorque à envoyer'); return; }
   const to = exEmails().join(',');
   if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) { exSendNow(); return; }
@@ -6415,8 +6449,11 @@ async function boot() {
   } else {
     const d = await ensureIdentified();
     await geocodeAndInit(d);
+    openPhotoLink();
   }
 }
+function openPhotoLink() { const m = /[#&]ph=([^&]+)/.exec(location.hash || ''); if (!m) return; const ids = decodeURIComponent(m[1]).split(',').filter(Boolean); if (ids.length) openPhotoViewer(ids, 0); }
+window.addEventListener('hashchange', openPhotoLink);
 
 boot();
 </script>
