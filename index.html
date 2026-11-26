@@ -247,6 +247,13 @@
   .sheet-actions { display: flex; gap: 8px; margin-top: 6px; }
   .sheet-actions .btn { flex: 1; padding: 13px; font-size: 14px; }
 
+  /* Téléphones : certains navigateurs affichent la liste (backdrop-filter) PAR-DESSUS les fenêtres → on la masque quand une fenêtre est ouverte et on coupe le flou */
+  @media (max-width: 760px) {
+    #list-panel, #overlay, #admin-tools, #history-panel, #users-panel, #presence-panel, #db-panel { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    #list-panel { background: var(--panel) !important; }
+    body.sheet-open #list-panel { visibility: hidden !important; }
+    .bottom-sheet { isolation: isolate; }
+  }
   /* Liste des remorques */
   #list-panel {
     position: fixed; top: 74px; right: 10px; bottom: 10px; width: 360px; border-radius: 24px; overflow-x: hidden; max-width: 92vw;
@@ -2875,7 +2882,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-49";
+const APP_VERSION = "2026-11-26-ocr-51";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -3264,11 +3271,12 @@ async function exSendNow() {
     let bin = ''; for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
     const resp = await apiFetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'sendMail', data: { to, subject: exTitle(), count: lastListExport.length, filename: 'Check Parking ' + new Date().toISOString().slice(0, 10) + '.pdf', pdfBase64: btoa(bin) } }) });
-    const r = await resp.json();
-    if (r.ok) toast('✅ Mail envoyé à ' + r.sent + ' destinataire(s)');
-    else if (r.error === 'mail_not_configured') toast('Envoi non configuré côté serveur (clé Brevo manquante)');
-    else toast('Envoi refusé : ' + r.error);
-  } catch (e) { toast('Envoi impossible : ' + e.message); }
+    const raw = await resp.text(); let r = null; try { r = JSON.parse(raw); } catch (e) { }
+    const mb = (bytes.length / 1048576).toFixed(2) + ' Mo';
+    if (r && r.ok) toast('✅ Mail envoyé à ' + r.sent + ' destinataire(s)');
+    else if (r && r.error === 'mail_not_configured') alert('Envoi non configuré côté serveur (clé Brevo ou expéditeur manquant).');
+    else alert('Le mail n\'est PAS parti.\n\nRéponse du serveur (HTTP ' + resp.status + ', PDF ' + mb + ') :\n' + (r ? (r.error || JSON.stringify(r)) : raw.slice(0, 300)) + '\n\nEnvoie-moi ce message.');
+  } catch (e) { alert('Le mail n\'est PAS parti.\n\nErreur : ' + e.message + '\n\nEnvoie-moi ce message.'); }
 }
 document.getElementById('ex-send-now').onclick = exSendNow;
 async function copyRich() {
@@ -6470,6 +6478,13 @@ async function bootDriverMode(token) {
   }
 }
 
+// Suit l'ouverture des fenêtres (bottom-sheets) pour la classe body.sheet-open
+(function () {
+  const upd = () => document.body.classList.toggle('sheet-open', !!document.querySelector('.bottom-sheet.open'));
+  const mo = new MutationObserver(upd);
+  document.querySelectorAll('.bottom-sheet').forEach(el => mo.observe(el, { attributes: true, attributeFilter: ['class'] }));
+  upd();
+})();
 async function showPhotoPage() {
   const m = /[#&]ph=([^&]+)/.exec(location.hash || ''), ids = m ? decodeURIComponent(m[1]).split(',').filter(Boolean) : [];
   const pg = document.getElementById('photo-page');
