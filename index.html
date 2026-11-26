@@ -1510,7 +1510,7 @@ async function backendGetHistory(fromISO, toISO) {
   let url = APPS_SCRIPT_URL + '?action=getHistory';
   if (fromISO) url += '&from=' + encodeURIComponent(fromISO);
   if (toISO) url += '&to=' + encodeURIComponent(toISO);
-  const resp = await fetch(url);
+  const resp = await apiFetch(url);
   const d = await resp.json();
   return Array.isArray(d.history) ? d.history : [];
 }
@@ -2882,7 +2882,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-51";
+const APP_VERSION = "2026-11-26-ocr-52";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
