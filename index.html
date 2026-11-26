@@ -489,7 +489,7 @@
   .fc-row .ml { flex: 1; min-width: 0; font-size: 13px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fc-row .ml small { display: block; max-width: none; }
   .type-sel { width:100%; border:none; border-radius:999px; padding:7px 12px; font:700 12px var(--font-display); background:var(--surface-3); color:var(--ink); }
-  .hd-kind-menu .type-sel { width:auto; font-size:12px; }
+  .hd-type { width:auto; min-width:120px; padding:9px 14px; box-shadow: inset 0 0 0 1px var(--panel-hair); background: var(--panel-2); }
   .kind-tabs { display: flex; gap: 6px; padding: 0 14px 10px; }
   .kind-tab svg.i { width: 17px; height: 17px; vertical-align: -3px; margin-right: 4px; }
   .kind-tab { flex: 1; border: none; cursor: pointer; border-radius: 999px; padding: 7px 8px; font: 700 12px var(--font-display); background: var(--surface-3); color: var(--ink); }
@@ -739,15 +739,7 @@
         <button class="hd-filter-btn" id="hd-filter-btn" type="button" aria-haspopup="listbox"><span class="fdot" id="hd-filter-dot"></span><span id="hd-filter-label">Tous</span><span class="n" id="hd-filter-n">0</span><svg class="i chev"><use href="#i-chev"/></svg></button>
         <div class="hd-tabs" id="hd-tabs" role="listbox"></div>
       </div>
-      <div class="hd-kind" id="hd-kind">
-        <button class="hd-filter-btn" id="hd-kind-btn" type="button" aria-haspopup="listbox"><svg class="i kico" id="hd-kind-ico"><use href="#i-grid"/></svg><span id="hd-kind-label">Tout</span><svg class="i chev"><use href="#i-chev"/></svg></button>
-        <div class="hd-tabs hd-kind-menu" id="hd-kind-menu" role="listbox">
-          <button class="tab" role="option" data-k="all" title="Tout"><svg class="i"><use href="#i-grid"/></svg>Tout</button>
-          <button class="tab" role="option" data-k="trailer" title="Remorques"><svg class="i"><use href="#i-trailer"/></svg>Remorques</button>
-          <button class="tab" role="option" data-k="vehicle" title="Camions"><svg class="i"><use href="#i-truck"/></svg>Camions</button>
-          <select id="hd-type-sel" class="type-sel" aria-label="Filtrer par type"></select>
-        </div>
-      </div>
+      <div class="hd-kind" id="hd-kind"><select id="hd-type-sel" class="type-sel hd-type" aria-label="Filtrer par type"></select></div>
       <div class="top-actions">
         <div class="view-seg" id="btn-view-toggle">
           <button data-view="parking"><svg class="i"><use href="#i-parking"/></svg>Parking</button>
@@ -845,8 +837,7 @@
     <button class="btn btn-ghost" id="btn-list-close" style="padding:4px 8px;"><svg class="i"><use href="#i-x"/></svg></button>
   </div>
   <div class="lp-search"><input type="text" id="lp-search-input" placeholder="Rechercher n°, client..."></div>
-  <div class="kind-tabs" id="lp-kind-tabs"><button type="button" class="kind-tab active" data-k="all">Tout</button><button type="button" class="kind-tab" data-k="trailer"><svg class="i"><use href="#i-trailer"/></svg> Remorques</button><button type="button" class="kind-tab" data-k="vehicle"><svg class="i"><use href="#i-truck"/></svg> Camions</button></div>
-  <div style="padding:0 14px 10px;"><select id="lp-type-sel" class="type-sel" aria-label="Filtrer par type"></select></div>
+    <div style="padding:0 14px 10px;"><select id="lp-type-sel" class="type-sel" aria-label="Filtrer par type"></select></div>
   <div id="lp-filters" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; align-items:center;">
     <span style="margin-left:auto; display:flex; gap:6px; flex-shrink:0;">
       <button class="lp-icon-btn" id="btn-lp-status" title="Trier par statut : À vider, Bloqué, Chargé, En cours de chargement, Vide" style="width:auto; padding:0 10px;">🚦</button>
@@ -2875,7 +2866,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-36";
+const APP_VERSION = "2026-11-26-ocr-38";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2895,7 +2886,7 @@ function setFormKind(k) {
 document.querySelectorAll('#f-kind-tabs .kind-tab').forEach(b => b.onclick = () => setFormKind(b.dataset.k));
 const itemVtype = it => { const e = it && it.trailer ? trailerDB[it.trailer] : null; return (e && e.vtype) || (kindOf(it) === 'vehicle' ? 'Camion' : 'Remorque'); };
 const typeOk = it => !lpType || itemVtype(it) === lpType;
-function syncTypeSel() { ['lp-type-sel', 'hd-type-sel'].forEach(id => { const el = document.getElementById(id); if (!el) return; if (!el.options.length) el.innerHTML = '<option value="">Tous les types</option>' + VTYPES.map(t => '<option value="' + t + '">' + vlabel(t) + '</option>').join(''); el.value = lpType; el.classList.toggle('active', !!lpType); }); }
+function syncTypeSel() { ['lp-type-sel', 'hd-type-sel'].forEach(id => { const el = document.getElementById(id); if (!el) return; if (!el.options.length) el.innerHTML = '<option value="">Tout</option>' + VTYPES.map(t => '<option value="' + t + '">' + vlabel(t) + '</option>').join(''); el.value = lpType; el.classList.toggle('active', !!lpType); }); }
 function setLpType(t) { lpType = t || ''; syncTypeSel(); try { renderListPanel(); } catch (e) {} applyMapFilters(); updateHeaderExtras(); }
 document.addEventListener('DOMContentLoaded', syncTypeSel); setTimeout(syncTypeSel, 0);
 ['lp-type-sel', 'hd-type-sel'].forEach(id => { const el = document.getElementById(id); if (el) { el.onchange = () => setLpType(el.value); el.onclick = e => e.stopPropagation(); } });
@@ -2908,7 +2899,7 @@ function setLpKind(k) {
 }
 document.querySelectorAll('#lp-kind-tabs .kind-tab').forEach(b => b.onclick = () => setLpKind(b.dataset.k));
 document.querySelectorAll('#hd-kind-menu .tab').forEach(b => b.onclick = () => { setLpKind(b.dataset.k); document.getElementById('hd-kind').classList.remove('open'); });
-document.getElementById('hd-kind-btn').onclick = (e) => {
+if (document.getElementById('hd-kind-btn')) document.getElementById('hd-kind-btn').onclick = (e) => {
   e.stopPropagation();
   if (!window.matchMedia('(max-width: 760px)').matches) return;
   const w = document.getElementById('hd-kind'), open = !w.classList.contains('open');
@@ -2964,7 +2955,7 @@ function exRows() {
   };
   const rows = lastListExport.map(mkRow);
   // Sections séparées : remorques puis camions
-  const sections = [['trailer', 'Remorques et châssis', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9'], ['tractor', 'Tracteurs', 'N° tracteur', '#b45309']].map(([kind, title, h0, color]) => {
+  const sections = [['trailer', 'Remorques', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9'], ['tractor', 'Tracteurs', 'N° tracteur', '#b45309']].map(([kind, title, h0, color]) => {
     const ORD = { 'Remorque': 0, 'Châssis': 1, 'Camion': 2, 'Fourgon': 3, 'Tracteur': 4 };
     const its = lastListExport.filter(it => exGroup(it) === kind).sort((a, b) => ((ORD[itemVtype(a)] ?? 9) - (ORD[itemVtype(b)] ?? 9)) || String(a.trailer || '').localeCompare(String(b.trailer || ''), 'fr', { numeric: true }));
     const st = {}; its.forEach(it => { st[it.status] = (st[it.status] || 0) + 1; });
