@@ -2868,7 +2868,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-45";
+const APP_VERSION = "2026-11-26-ocr-46";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2982,7 +2982,9 @@ async function exPreloadPhotos() {
   const ids = [...new Set(lastListExport.flatMap(it => it.photos || []))].filter(id => !exImgs[id]);
   for (let i = 0; i < ids.length; i += 8) await Promise.all(ids.slice(i, i + 8).map(async id => { try { const src = await loadPhoto(id, true), im = new Image(); im.src = src; await im.decode(); exImgs[id] = im; } catch (e) { } }));
 }
-const exPhUrl = ids => location.origin + location.pathname + '#ph=' + ids.join(',');
+try { if (/^https?:$/.test(location.protocol) && !/^(localhost|127\.)/.test(location.hostname)) localStorage.setItem('yardPublicUrl', location.origin + location.pathname); } catch (e) { }
+const exBase = () => { let u = ''; try { u = localStorage.getItem('yardPublicUrl') || ''; } catch (e) { } return u || (location.origin + location.pathname); };
+const exPhUrl = ids => exBase() + '#ph=' + ids.join(',');
 const exPhSrc = id => photoCache[id + '_t'] || '';
 function exPhotoCells(ids, ncol, fold, key) {
   const imgs = ids.filter(id => exPhSrc(id)).map((id, k) => `<img src="${exPhSrc(id)}" height="84" style="height:84px;margin:3px 6px 3px 0;border-radius:6px;border:1px solid #cbd5e1;${fold ? 'cursor:pointer;' : ''}" ${fold ? `data-exph="${escapeHtml(ids.join(','))}" data-i="${k}"` : ''}>`).join('');
@@ -3014,7 +3016,7 @@ function exHtmlTable(fold) {
     const td = i => `style="padding:7px 12px;border:${bd};font:13px Arial,sans-serif;color:#111827;${i % 2 ? 'background:#f1f5f9;' : ''}"`;
     return `<table cellspacing="0" cellpadding="0" width="100%" style="border-collapse:collapse;margin:16px 0 0;"><tr><td style="background:${sec.color};color:#ffffff;padding:9px 12px;font:700 15px Arial,sans-serif;border-radius:8px 8px 0 0;">${sec.kind === 'vehicle' ? '🚚' : sec.kind === 'tractor' ? '🚜' : '🚛'} ${escapeHtml(sec.title.toUpperCase())} · ${sec.rows.length}<span style="float:right;font:600 12px Arial,sans-serif;">${sec.items.map(x => escapeHtml(x.l) + ' ' + x.n).join(' · ')}</span></td></tr></table>
 <table cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:${bd};"><thead><tr>${sec.head.map(h => `<th ${th}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
-<tbody>${sec.rows.map((r, i) => { const phs = (sec.ph[i] || []).filter(id => exPhSrc(id)); const key = sec.kind + i; return `<tr>${r.map((c, j) => `<td ${td(i)}>${(j === r.length - 1 && /^📷/.test(c) && (sec.ph[i] || []).length) ? `<a href="${escapeHtml(exPhUrl(sec.ph[i]))}" style="color:#2563eb;font-weight:bold;text-decoration:underline;">${escapeHtml(c)}</a>` : j === 0 ? (phs.length && fold ? `<span class="ex-tg" data-k="${key}" style="cursor:pointer;color:#0f766e;margin-right:6px;">▸ 📷${phs.length}</span>` : '') + '<b>' + escapeHtml(c) + '</b>' : ((exStCol[c] || exCellColor(c)) ? '<b style="color:' + (exStCol[c] || exCellColor(c)) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>` + (fold ? exPhotoCells(sec.ph[i] || [], r.length, fold, key) : ''); }).join('')}</tbody></table>`;
+<tbody>${sec.rows.map((r, i) => { const phs = (sec.ph[i] || []).filter(id => exPhSrc(id)); const key = sec.kind + i; return `<tr>${r.map((c, j) => `<td ${td(i)}>${(j === r.length - 1 && /^📷/.test(c) && (sec.ph[i] || []).length) ? `<a href="${escapeHtml(exPhUrl(sec.ph[i]))}" target="_blank" rel="noopener" style="color:#2563eb;font-weight:bold;text-decoration:underline;">${escapeHtml(c)}</a>` : j === 0 ? (phs.length && fold ? `<span class="ex-tg" data-k="${key}" style="cursor:pointer;color:#0f766e;margin-right:6px;">▸ 📷${phs.length}</span>` : '') + '<b>' + escapeHtml(c) + '</b>' : ((exStCol[c] || exCellColor(c)) ? '<b style="color:' + (exStCol[c] || exCellColor(c)) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>` + (fold ? exPhotoCells(sec.ph[i] || [], r.length, fold, key) : ''); }).join('')}</tbody></table>`;
   }).join('');
   return `<div style="font-family:Arial,sans-serif;"><table width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 4px;border-collapse:collapse;"><tr><td valign="top"><h2 style="margin:0 0 4px;font:700 18px Arial,sans-serif;color:#111827;">${escapeHtml(exTitle())}</h2>
 <div style="font:12px Arial,sans-serif;color:#6b7280;">${escapeHtml(exDateStr())} · ${exCountLabel()}</div></td><td valign="top" align="right">${sum}</td></tr></table>${secHtml}</div>`;
@@ -3190,6 +3192,8 @@ async function renderExportPreview() {
   if (rows.length && document.getElementById('ex-col-photos').checked && lastListExport.some(it => (it.photos || []).length)) { const tok = (window._exTok = (window._exTok || 0) + 1); await exPreloadPhotos(); if (tok === window._exTok) pv.innerHTML = exHtmlTable(true); }
 }
 document.getElementById('ex-preview').addEventListener('click', e => {
+  const lk = e.target.closest('a[href*="#ph="]');
+  if (lk) { e.preventDefault(); const m = /#ph=([^&]+)/.exec(lk.getAttribute('href')); if (m) openPhotoViewer(decodeURIComponent(m[1]).split(',').filter(Boolean), 0); return; }
   const tg = e.target.closest('.ex-tg'), im = e.target.closest('img[data-exph]');
   if (im) { openPhotoViewer(im.dataset.exph.split(','), +im.dataset.i || 0); return; }
   if (!tg) return;
