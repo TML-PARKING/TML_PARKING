@@ -2867,7 +2867,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-42";
+const APP_VERSION = "2026-11-26-ocr-43";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2959,7 +2959,7 @@ function exRows() {
   // Sections séparées : remorques puis camions
   const sections = [['trailer', 'Remorques', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9'], ['van', 'Fourgons', 'N° fourgon', '#be185d'], ['tractor', 'Tracteurs', 'N° tracteur', '#b45309']].map(([kind, title, h0, color]) => {
     const ORD = { 'Remorque': 0, 'Châssis': 1, 'Camion': 2, 'Fourgon': 3, 'Tracteur': 4 };
-    const its = lastListExport.filter(it => exGroup(it) === kind).sort((a, b) => ((ORD[itemVtype(a)] ?? 9) - (ORD[itemVtype(b)] ?? 9)) || String(a.trailer || '').localeCompare(String(b.trailer || ''), 'fr', { numeric: true }));
+    const its = lastListExport.filter(it => exGroup(it) === kind).map((it, k) => [it, k]).sort((a, b) => ((ORD[itemVtype(a[0])] ?? 9) - (ORD[itemVtype(b[0])] ?? 9)) || a[1] - b[1]).map(x => x[0]); // regroupé par type, l'ordre de la liste (tri choisi) est conservé dans chaque type
     const st = {}; its.forEach(it => { st[it.status] = (st[it.status] || 0) + 1; });
     const hd = [h0].concat(head.slice(1)), rws = its.map(mkRow), pi = head.indexOf('Plaque');
     const ci = head.indexOf('Container');
