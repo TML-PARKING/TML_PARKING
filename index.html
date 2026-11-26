@@ -1000,6 +1000,7 @@
 
     <div style="background:var(--surface-3); border-radius:12px; padding:14px; margin-bottom:14px;">
       <div class="detail-row"><span class="detail-label">Client</span><span id="detail-client" class="detail-value">—</span></div>
+      <div class="detail-row" id="detail-type-row" style="display:none;"><span class="detail-label">Type</span><span id="detail-type" class="detail-value">—</span></div>
       <div class="detail-row" id="detail-plate-row" style="display:none;"><span class="detail-label">Plaque</span><span id="detail-plate" class="detail-value">—</span></div>
       <div class="detail-row"><span class="detail-label">Emplacement</span><span id="detail-location" class="detail-value">—</span></div>
       <div class="detail-row"><span class="detail-label">Déposée depuis</span><span id="detail-days" class="detail-value">—</span></div>
@@ -1153,6 +1154,7 @@
       <button type="button" class="btn btn-ghost" id="ex-manage" style="margin-top:6px; padding:6px 12px; font-size:12px;">⚙️ Gérer les adresses et groupes</button>
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:14px; margin:4px 0 10px; font-size:12.5px;">
+      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-type" checked>Type / modèle</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-plate" checked>Plaque</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-loc" checked>Emplacement</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="ex-col-status" checked>Statut</label>
@@ -1379,6 +1381,14 @@
       <label>N° Remorque</label>
       <input type="text" id="db-f-trailer" placeholder="Ex: TR-4521" autocomplete="off">
       <div id="db-trailer-warning" style="margin-top:6px; font-size:12px; color:#fb923c; display:none;">⚠ Cette remorque existe déjà dans la base</div>
+    </div>
+    <div class="field">
+      <label>Type</label>
+      <select id="db-f-vtype" style="width:100%;"><option value="">—</option><option>Remorque</option><option>Châssis</option><option>Camion</option><option>Fourgon</option><option>Tracteur</option></select>
+    </div>
+    <div class="field" id="db-f-model-wrap">
+      <label>Modèle</label>
+      <input type="text" id="db-f-model" placeholder="Ex: Mega, Standard, Box taillift…" autocomplete="off">
     </div>
     <div class="field">
       <label>N° Plaque</label>
@@ -2847,7 +2857,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-25-ocr-30";
+const APP_VERSION = "2026-11-26-ocr-33";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2894,6 +2904,7 @@ document.querySelectorAll('#db-kind-tabs .kind-tab').forEach(b => b.onclick = ()
   document.getElementById('db-panel-search').placeholder = dbKind === 'vehicle' ? 'Rechercher n° camion...' : 'Rechercher n° remorque...';
   renderDbPanel();
 });
+const exGroup = it => isTractor(it.trailer) ? 'tractor' : (kindOf(it) === 'vehicle' ? 'vehicle' : 'trailer');
 // Cellule « CT » : OK / Bientôt / Expiré + date d'échéance
 function exCtCell(it) {
   const e = it.trailer ? trailerDB[it.trailer] : null, st = e ? getCtStatus(e.ctExpiryDate) : null;
@@ -2907,9 +2918,10 @@ function exCommentsCell(it) {
   return (it.comments || []).filter(c => c && c.text && !c.auto).map(c => c.text.replace(/\s+/g, ' ').trim()).join(' · ');
 }
 function exRows() {
-  const cols = { plate: document.getElementById('ex-col-plate').checked, loc: document.getElementById('ex-col-loc').checked, status: document.getElementById('ex-col-status').checked, days: document.getElementById('ex-col-days').checked, notes: document.getElementById('ex-col-notes').checked, ct: document.getElementById('ex-col-ct').checked, comments: document.getElementById('ex-col-comments').checked };
+  const cols = { type: document.getElementById('ex-col-type').checked, plate: document.getElementById('ex-col-plate').checked, loc: document.getElementById('ex-col-loc').checked, status: document.getElementById('ex-col-status').checked, days: document.getElementById('ex-col-days').checked, notes: document.getElementById('ex-col-notes').checked, ct: document.getElementById('ex-col-ct').checked, comments: document.getElementById('ex-col-comments').checked };
   const hasV = lastListExport.some(it => kindOf(it) === 'vehicle'), hasT = lastListExport.some(it => kindOf(it) === 'trailer');
   const head = [hasV && hasT ? 'N° remorque / camion' : hasV ? 'N° camion' : 'N° remorque'];
+  if (cols.type) head.push('Type');
   if (cols.plate) head.push('Plaque');
   head.push('Client');
   if (cols.loc) head.push('Emplacement'); if (cols.status) head.push('Statut'); if (cols.ct) head.push('CT'); if (cols.days) head.push('Déposée le', 'Jours sur site'); if (cols.notes) head.push('Notes'); if (cols.comments) head.push('Commentaires');
@@ -2917,17 +2929,18 @@ function exRows() {
   const mkRow = it => {
     const loc = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     const r = [it.trailer || '(sans n°)'];
+    if (cols.type) r.push(fleetInfo(it.trailer ? trailerDB[it.trailer] : null));
     if (cols.plate) r.push((it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].plate) || '');
     r.push(it.client || '');
-    if (cols.loc) r.push(loc); if (cols.status) r.push(stLabel(it.status)); if (cols.ct) r.push(exCtCell(it)); if (cols.days) r.push(it.time ? new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '', daysSince(it.time) + ' j'); if (cols.notes) r.push(it.notes || ''); if (cols.comments) r.push(exCommentsCell(it));
+    if (cols.loc) r.push(loc); if (cols.status) r.push(isTractor(it.trailer) ? '' : stLabel(it.status)); if (cols.ct) r.push(exCtCell(it)); if (cols.days) r.push(it.time ? new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '', daysSince(it.time) + ' j'); if (cols.notes) r.push(it.notes || ''); if (cols.comments) r.push(exCommentsCell(it));
     return r;
   };
   const rows = lastListExport.map(mkRow);
   // Sections séparées : remorques puis camions
-  const sections = [['trailer', 'Remorques', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9']].map(([kind, title, h0, color]) => {
-    const its = lastListExport.filter(it => (kindOf(it) === 'vehicle' ? 'vehicle' : 'trailer') === kind);
+  const sections = [['trailer', 'Remorques', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9'], ['tractor', 'Tracteurs', 'N° tracteur', '#b45309']].map(([kind, title, h0, color]) => {
+    const its = lastListExport.filter(it => exGroup(it) === kind);
     const st = {}; its.forEach(it => { st[it.status] = (st[it.status] || 0) + 1; });
-    return { kind, title, color, head: [h0].concat(head.slice(1)), rows: its.map(mkRow), items: EX_ST.filter(([k]) => st[k]).map(([k, l, c]) => ({ l, n: st[k], c })) };
+    return { kind, title, color, head: [h0].concat(head.slice(1)), rows: its.map(mkRow), items: kind === 'tractor' ? [] : EX_ST.filter(([k]) => st[k]).map(([k, l, c]) => ({ l, n: st[k], c })) };
   }).filter(sec => sec.rows.length);
   return { head, rows, sections };
 }
@@ -2936,16 +2949,16 @@ function exDateStr() { return new Date().toLocaleDateString('fr-BE', { weekday: 
 // Récapitulatif (haut droite de l'export) : remorques / camions par statut + CT par état
 const EX_ST = [['pleine', 'À vider', '#dc2626'], ['fleet', 'Fleet', '#6b7280'], ['charge', 'Chargé', '#2563eb'], ['achar', 'En cours', '#ca8a04'], ['vide', 'Vide', '#16a34a']];
 function exSummary() {
-  const mk = () => ({ n: 0, st: {} }), tr = mk(), tk = mk(), ct = { ok: 0, soon: 0, nok: 0, none: 0 };
+  const mk = () => ({ n: 0, st: {} }), tr = mk(), tk = mk(), tt = mk(), ct = { ok: 0, soon: 0, nok: 0, none: 0 };
   lastListExport.forEach(it => {
-    const g = kindOf(it) === 'vehicle' ? tk : tr; g.n++; g.st[it.status] = (g.st[it.status] || 0) + 1;
+    const gk = exGroup(it), g = gk === 'tractor' ? tt : gk === 'vehicle' ? tk : tr; g.n++; if (gk !== 'tractor') g.st[it.status] = (g.st[it.status] || 0) + 1;
     const e = it.trailer ? trailerDB[it.trailer] : null, c = e ? getCtStatus(e.ctExpiryDate) : null;
-    ct[c ? c.level : 'none']++;
+    if (c) ct[c.level]++; else if (gk !== 'tractor') ct.none++;
   });
   const grp = (label, g) => g.n ? { label, n: g.n, items: EX_ST.filter(([k]) => g.st[k]).map(([k, l, c]) => ({ l, n: g.st[k], c })) } : null;
   const ctItems = [{ l: 'OK', n: ct.ok, c: '#16a34a' }, { l: 'Bientôt', n: ct.soon, c: '#ea580c' }, { l: 'Expiré', n: ct.nok, c: '#dc2626' }];
   if (ct.none) ctItems.push({ l: 'Sans CT', n: ct.none, c: '#6b7280' });
-  return [grp('Remorques', tr), grp('Camions', tk), { label: 'Contrôle technique', n: null, items: ctItems }].filter(Boolean);
+  return [grp('Remorques', tr), grp('Camions', tk), grp('Tracteurs', tt), { label: 'Contrôle technique', n: null, items: ctItems }].filter(Boolean);
 }
 function exSummaryLines() { return exSummary().map(g => [{ t: g.label + (g.n != null ? ' ' + g.n : '') + ' : ' }].concat(g.items.map((x, i) => ({ t: (i ? ' · ' : '') + x.l + ' ' + x.n })))); }
 function exHtmlTable() {
@@ -2955,7 +2968,7 @@ function exHtmlTable() {
   const secHtml = sections.map(sec => {
     const th = `style="background:${sec.color};color:#ffffff;text-align:left;padding:8px 12px;border:${bd};font:600 13px Arial,sans-serif;"`;
     const td = i => `style="padding:7px 12px;border:${bd};font:13px Arial,sans-serif;color:#111827;${i % 2 ? 'background:#f1f5f9;' : ''}"`;
-    return `<table cellspacing="0" cellpadding="0" width="100%" style="border-collapse:collapse;margin:16px 0 0;"><tr><td style="background:${sec.color};color:#ffffff;padding:9px 12px;font:700 15px Arial,sans-serif;border-radius:8px 8px 0 0;">${sec.kind === 'vehicle' ? '🚚' : '🚛'} ${escapeHtml(sec.title.toUpperCase())} · ${sec.rows.length}<span style="float:right;font:600 12px Arial,sans-serif;">${sec.items.map(x => escapeHtml(x.l) + ' ' + x.n).join(' · ')}</span></td></tr></table>
+    return `<table cellspacing="0" cellpadding="0" width="100%" style="border-collapse:collapse;margin:16px 0 0;"><tr><td style="background:${sec.color};color:#ffffff;padding:9px 12px;font:700 15px Arial,sans-serif;border-radius:8px 8px 0 0;">${sec.kind === 'vehicle' ? '🚚' : sec.kind === 'tractor' ? '🚜' : '🚛'} ${escapeHtml(sec.title.toUpperCase())} · ${sec.rows.length}<span style="float:right;font:600 12px Arial,sans-serif;">${sec.items.map(x => escapeHtml(x.l) + ' ' + x.n).join(' · ')}</span></td></tr></table>
 <table cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:${bd};"><thead><tr>${sec.head.map(h => `<th ${th}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
 <tbody>${sec.rows.map((r, i) => `<tr>${r.map((c, j) => `<td ${td(i)}>${j === 0 ? '<b>' + escapeHtml(c) + '</b>' : (exCellColor(c) ? '<b style="color:' + exCellColor(c) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   }).join('');
@@ -2963,8 +2976,8 @@ function exHtmlTable() {
 <div style="font:12px Arial,sans-serif;color:#6b7280;">${escapeHtml(exDateStr())} · ${exCountLabel()}</div></td><td valign="top" align="right">${sum}</td></tr></table>${secHtml}</div>`;
 }
 function exCountLabel() {
-  const t = lastListExport.filter(it => kindOf(it) !== 'vehicle').length, v = lastListExport.length - t;
-  return [t ? t + ' remorque' + (t > 1 ? 's' : '') : '', v ? v + ' camion' + (v > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') || '0 remorque';
+  const n = { trailer: 0, vehicle: 0, tractor: 0 }; lastListExport.forEach(it => { n[exGroup(it)]++; });
+  return [n.trailer ? n.trailer + ' remorque' + (n.trailer > 1 ? 's' : '') : '', n.vehicle ? n.vehicle + ' camion' + (n.vehicle > 1 ? 's' : '') : '', n.tractor ? n.tractor + ' tracteur' + (n.tractor > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') || '0 remorque';
 }
 // Tableau en IMAGE (PNG) : joli et identique partout, idéal pour le téléphone.
 function exTableCanvas() {
@@ -3001,7 +3014,11 @@ function exTableCanvas() {
   // pictogrammes
   const icon = (kind, x, y, col) => { // pictogramme 34x22 : remorque (caisse seule) / camion (cabine + caisse)
     g.save(); g.translate(x, y); g.fillStyle = col;
-    if (kind === 'vehicle') {
+    if (kind === 'tractor') {
+      g.beginPath(); g.moveTo(2, 4); g.lineTo(18, 4); g.lineTo(24, 10); g.lineTo(24, 15); g.lineTo(2, 15); g.closePath(); g.fill();                // cabine
+      g.fillRect(24, 11, 9, 4);                                                                                            // capot / sellette
+      g.fillStyle = col === '#fff' ? '#b45309' : '#fff'; g.beginPath(); g.moveTo(5, 6); g.lineTo(16.5, 6); g.lineTo(20, 10); g.lineTo(5, 10); g.closePath(); g.fill(); // vitre
+    } else if (kind === 'vehicle') {
       rr(g, 0, 1, 19, 14, 2); g.fill();                                   // caisse
       g.beginPath(); g.moveTo(21, 5); g.lineTo(27, 5); g.lineTo(33, 10); g.lineTo(33, 15); g.lineTo(21, 15); g.closePath(); g.fill(); // cabine
       g.fillStyle = col === '#fff' ? '#6d28d9' : '#fff'; g.beginPath(); g.moveTo(23, 7); g.lineTo(26.5, 7); g.lineTo(30, 10.5); g.lineTo(23, 10.5); g.closePath(); g.fill(); // vitre
@@ -3011,7 +3028,7 @@ function exTableCanvas() {
       g.fillStyle = col === '#fff' ? '#0f766e' : '#fff'; for (let i = 0; i < 4; i++) g.fillRect(4 + i * 7, 4, 4, 8); // nervures
     }
     const wheel = (cx) => { g.fillStyle = '#fff'; g.beginPath(); g.arc(cx, 17.5, 4, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(cx, 17.5, 2.2, 0, 7); g.fill(); };
-    if (kind === 'vehicle') { wheel(8); wheel(15); wheel(28); } else { wheel(8); wheel(16); }
+    if (kind === 'vehicle') { wheel(8); wheel(15); wheel(28); } else if (kind === 'tractor') { wheel(8); wheel(17); wheel(29); } else { wheel(8); wheel(16); }
     g.restore();
   };
   const stCol = { 'À vider': '#dc2626', 'Vide': '#16a34a', 'Chargé': '#2563eb', 'En cours de chargement': '#ca8a04', 'Bloqué': '#6b7280' };
@@ -3126,7 +3143,7 @@ function openExportModal() {
 function closeExportModal() { exportModal.classList.remove('open'); overlay.classList.remove('show'); }
 document.getElementById('btn-lp-export').onclick = openExportModal;
 document.getElementById('btn-export-close').onclick = closeExportModal;
-['ex-title', 'ex-col-plate', 'ex-col-loc', 'ex-col-status', 'ex-col-ct', 'ex-col-days', 'ex-col-notes', 'ex-col-comments'].forEach(id => document.getElementById(id).addEventListener('input', renderExportPreview));
+['ex-title', 'ex-col-type', 'ex-col-plate', 'ex-col-loc', 'ex-col-status', 'ex-col-ct', 'ex-col-days', 'ex-col-notes', 'ex-col-comments'].forEach(id => document.getElementById(id).addEventListener('input', renderExportPreview));
 // Fichier .eml en brouillon (X-Unsent) : s'ouvre dans Outlook installé sur le PC par simple double-clic,
 // avec le tableau mis en forme directement dans le message — sans dépendre du lien mailto.
 document.getElementById('ex-mail-eml').onclick = () => {
@@ -3904,13 +3921,13 @@ function renderTrailerSuggestions() {
     else if (pl && nq.length >= 3 && pl.includes(nq)) score = pl.endsWith(nq) ? 1.5 : 3;
     if (score < 0) return;
     if (kindOf(e) !== formKind) score += 10; // l'autre type en dernier
-    hits.push({ num, plate: e && e.plate || '', score });
+    hits.push({ num, plate: e && e.plate || '', info: fleetInfo(e), score });
   });
   hits.sort((a, b) => a.score - b.score || a.num.localeCompare(b.num, undefined, { numeric: true }));
   const top = hits.slice(0, 6);
   if (!top.length) { box.style.display = 'none'; return; }
   const hl = t => { const i = t.toUpperCase().indexOf(q); return i < 0 ? escapeHtml(t) : escapeHtml(t.slice(0, i)) + '<mark>' + escapeHtml(t.slice(i, i + q.length)) + '</mark>' + escapeHtml(t.slice(i + q.length)); };
-  box.innerHTML = top.map(h => `<button type="button" data-num="${escapeHtml(h.num)}"><span class="sg-num">${hl(h.num)}</span><span class="sg-plate">${h.plate ? '🔖 ' + hl(h.plate) : ''}</span></button>`).join('');
+  box.innerHTML = top.map(h => `<button type="button" data-num="${escapeHtml(h.num)}"><span class="sg-num">${hl(h.num)}</span><span class="sg-plate">${h.info ? escapeHtml(h.info) + (h.plate ? ' · ' : '') : ''}${h.plate ? '🔖 ' + hl(h.plate) : ''}</span></button>`).join('');
   box.style.display = 'block';
   box.querySelectorAll('button').forEach(b => b.onmousedown = b.ontouchstart = ev => { ev.preventDefault(); const i = document.getElementById('f-trailer'); i.value = b.dataset.num; box.style.display = 'none'; i.dispatchEvent(new Event('input', { bubbles: true })); });
 }
@@ -3951,6 +3968,62 @@ document.getElementById('f-trailer').addEventListener('blur', () => {
 
 // Calcule le statut du contrôle technique à partir de la date de validité :
 // vert = OK (plus de 2 mois restants), orange = OK mais échéance proche (<=2 mois), rouge = dépassé
+// ---------- FLOTTE : type de véhicule + modèle (importés depuis la liste TML) ----------
+const VTYPES = ['Remorque', 'Châssis', 'Camion', 'Fourgon', 'Tracteur'];
+const vtypeKind = t => (t === 'Camion' || t === 'Fourgon' || t === 'Tracteur') ? 'vehicle' : 'trailer';
+function isTractor(num) { const e = num ? trailerDB[num] : null; return !!(e && e.vtype === 'Tracteur'); }
+function fleetInfo(entry) { // « Remorque · Mega » ; pour un tracteur uniquement « Tracteur » (le modèle serait redondant)
+  if (!entry || !entry.vtype) return '';
+  return entry.vtype === 'Tracteur' || !entry.model ? entry.vtype : entry.vtype + ' · ' + entry.model;
+}
+function normVtype(t) {
+  const l = String(t || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return ({ remorque: 'Remorque', chassis: 'Châssis', camion: 'Camion', fourgon: 'Fourgon', tracteur: 'Tracteur' })[l] || '';
+}
+async function importFleetRows(rows, c) {
+  const who = (currentUser && currentUser.name) || 'Inconnu', now = new Date().toISOString();
+  const idxKey = {}, idxPlate = {};
+  Object.keys(trailerDB).forEach(k => { idxKey[normPlate(k)] = k; const pl = trailerDB[k].plate; if (pl) { const np = normPlate(pl); idxPlate[np] = idxPlate[np] === undefined ? k : null; } });
+  const cnt = {}; // orthographe la plus fréquente de chaque modèle (MEGA / Mega → Mega)
+  rows.slice(1).forEach(r => { const m = c.hModel >= 0 ? String(r[c.hModel] || '').trim() : ''; if (m) { const l = m.toLowerCase(); cnt[l] = cnt[l] || {}; cnt[l][m] = (cnt[l][m] || 0) + 1; } });
+  const canon = {}; Object.entries(cnt).forEach(([l, o]) => { canon[l] = Object.entries(o).sort((a, b) => b[1] - a[1])[0][0]; });
+  // Un tracteur et une remorque peuvent porter le même n° (ex. AN015) : le tracteur prend alors la clé « AN015 (TRACTEUR) »
+  const nonTr = new Set(); rows.slice(1).forEach(r => { if (r && r[c.hNom] && normVtype(r[c.hType]) && normVtype(r[c.hType]) !== 'Tracteur') nonTr.add(String(r[c.hNom]).trim().toUpperCase()); });
+  const next = { ...trailerDB }, perType = {}; let linked = 0, added = 0, skipped = 0, changed = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i]; if (!r || !r[c.hNom]) continue;
+    const nom = String(r[c.hNom]).trim().toUpperCase(), vt = normVtype(r[c.hType]);
+    if (!nom || !vt) { skipped++; continue; }
+    const rawModel = c.hModel >= 0 ? String(r[c.hModel] || '').trim() : '';
+    const model = vt === 'Tracteur' ? '' : (rawModel ? (canon[rawModel.toLowerCase()] || rawModel) : '');
+    const plate = c.hPlate >= 0 ? String(r[c.hPlate] || '').trim().toUpperCase() : '';
+    const bk = (vt === 'Tracteur' && nonTr.has(nom)) ? nom + ' (TRACTEUR)' : nom;
+    let key = idxKey[normPlate(bk)];
+    if (!key && bk === nom) { const k2 = idxPlate[normPlate(nom)] || (plate && idxPlate[normPlate(plate)]); if (k2 && !(vt !== 'Tracteur' && next[k2].vtype === 'Tracteur' && k2 !== nom)) key = k2; }
+    if (!key && bk !== nom && plate && idxPlate[normPlate(plate)]) key = idxPlate[normPlate(plate)];
+    const ex = key ? next[key] : null;
+    perType[vt] = (perType[vt] || 0) + 1;
+    if (ex) {
+      linked++;
+      const np = ex.plate || plate;
+      if (ex.vtype !== vt || (ex.model || '') !== model || (ex.plate || '') !== np) { changed++; next[key] = { ...ex, vtype: vt, model, plate: np }; }
+    } else {
+      added++; idxKey[normPlate(bk)] = bk;
+      next[bk] = { ctExpiryDate: '', plate, notes: '', vtype: vt, model, kind: vtypeKind(vt) === 'vehicle' ? 'vehicle' : undefined, createdBy: who, createdAt: now, modifiedBy: who, modifiedAt: now, history: [{ action: 'import flotte (création, sans CT)', by: who, date: now }] };
+    }
+  }
+  trailerDB = next;
+  renderDbPanel();
+  toast(`${linked} liés à la base (${changed} mis à jour) · ${added} ajoutés sans CT${skipped ? ' · ' + skipped + ' ignorés' : ''}`, 9000);
+  try { await saveTrailerDB(); } catch (e) { toast('Erreur de synchronisation'); }
+}
+// Un tracteur s'encode seul : pas de client, de statut ni de notes
+function applyTractorMode() {
+  const t = isTractor(document.getElementById('f-trailer').value.trim());
+  const wr = [document.getElementById('f-client'), document.querySelector('.status-options'), document.getElementById('f-notes')].map(el => el && el.closest('.field'));
+  wr.forEach(w => { if (w) w.style.display = t ? 'none' : ''; });
+  const w = document.getElementById('f-age-warning'); if (w) w.style.display = t ? 'none' : '';
+}
 function getCtStatus(expiryDate) {
   if (!expiryDate) return null;
   const now = new Date();
@@ -3971,22 +4044,22 @@ function getCtStatus(expiryDate) {
 function updateCtIndicator() {
   const trailerNum = document.getElementById('f-trailer').value.trim();
   const indicator = document.getElementById('ct-indicator');
+  applyTractorMode();
   if (!trailerNum || !trailerDB[trailerNum]) {
     indicator.style.display = 'none';
     return;
   }
-  const status = getCtStatus(trailerDB[trailerNum].ctExpiryDate);
+  const e = trailerDB[trailerNum], status = getCtStatus(e.ctExpiryDate), info = fleetInfo(e), plate = e.plate;
+  const extra = (info ? '🏷 ' + info : '') + (info && plate ? ' · ' : '') + (plate ? '🔖 Plaque ' + plate : '');
   if (!status) {
-    const pl = trailerDB[trailerNum].plate;
-    if (pl) { indicator.style.display = 'block'; indicator.style.background = 'var(--surface-1)'; indicator.style.color = 'var(--ink)'; indicator.textContent = '🔖 Plaque ' + pl; }
+    if (extra) { indicator.style.display = 'block'; indicator.style.background = 'var(--surface-1)'; indicator.style.color = 'var(--ink)'; indicator.textContent = extra; }
     else indicator.style.display = 'none';
     return;
   }
   indicator.style.display = 'block';
   indicator.style.background = status.bg;
   indicator.style.color = status.color;
-  const plate = trailerDB[trailerNum].plate;
-  indicator.textContent = status.label + (plate ? ` · 🔖 Plaque ${plate}` : '');
+  indicator.textContent = status.label + (extra ? ' · ' + extra : '');
 }
 
 document.getElementById('btn-sheet-close').onclick = closeSheet;
@@ -4076,10 +4149,11 @@ document.getElementById('btn-save').onclick = async () => {
     locateOnSite(trailer);
     return;
   }
-  const client = document.getElementById('f-client').value.trim().toUpperCase();
-  const notes = document.getElementById('f-notes').value.trim().toUpperCase();
+  const tractor = isTractor(trailer);
+  const client = tractor ? '' : document.getElementById('f-client').value.trim().toUpperCase();
+  const notes = tractor ? '' : document.getElementById('f-notes').value.trim().toUpperCase();
   const activeChip = document.querySelector('.status-chip.active');
-  const status = activeChip ? activeChip.dataset.status : 'pleine';
+  const status = tractor ? 'vide' : (activeChip ? activeChip.dataset.status : 'pleine');
 
   let existingTime = null;
   let existingEncodedBy = null;
@@ -4087,7 +4161,7 @@ document.getElementById('btn-save').onclick = async () => {
   else if (currentTarget.type === 'free') { existingTime = freeTrailers[currentTarget.id]?.time; existingEncodedBy = freeTrailers[currentTarget.id]?.encodedBy; }
   else if (currentTarget.type === 'dock') { existingTime = dockOccupancy[currentTarget.id]?.time; existingEncodedBy = dockOccupancy[currentTarget.id]?.encodedBy; }
   const data = {
-    trailer, client, status, notes, kind: formKind === 'vehicle' ? 'vehicle' : undefined, photos: formPhotos.length ? formPhotos.slice() : undefined,
+    trailer, client, status, notes, kind: (formKind === 'vehicle' || tractor) ? 'vehicle' : undefined, photos: formPhotos.length ? formPhotos.slice() : undefined,
     time: existingTime || new Date().toISOString(),
     encodedBy: existingEncodedBy || (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : undefined)
   };
@@ -4571,7 +4645,7 @@ function renderListPanel() {
           <div class="lp-badge ${badgeClass}">${badgeText}</div>
         </div>
       </div>
-      <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}${(trailerDB[it.trailer] && trailerDB[it.trailer].plate) ? ((compactLabel || it.client) ? ' · ' : '') + '🔖 ' + escapeHtml(trailerDB[it.trailer].plate) : ''}</div>
+      <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}${(trailerDB[it.trailer] && trailerDB[it.trailer].plate) ? ((compactLabel || it.client) ? ' · ' : '') + '🔖 ' + escapeHtml(trailerDB[it.trailer].plate) : ''}${fleetInfo(trailerDB[it.trailer]) ? ' · 🏷 ' + escapeHtml(fleetInfo(trailerDB[it.trailer])) : ''}</div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-meta">🔄 <span style="${isOverThreshold ? 'color:#f87171; font-weight:700;' : ''}">${days}j</span>${it.time ? ' · déposée le ' + new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' }) : ''}${it.notes ? ' · 📝 ' + it.notes : ''}</div>
         <div style="display:flex; gap:4px; flex-shrink:0;">
@@ -4791,6 +4865,7 @@ function openDetailView(item) {
 
   document.getElementById('detail-client').textContent = item.client || '—';
   document.getElementById('detail-location').textContent = item.label || '—';
+  { const te = item.trailer ? trailerDB[item.trailer] : null, tr = document.getElementById('detail-type-row'), inf = fleetInfo(te); tr.style.display = inf ? '' : 'none'; document.getElementById('detail-type').textContent = inf; }
   { const pe = item.trailer ? trailerDB[item.trailer] : null, pr = document.getElementById('detail-plate-row');
     pr.style.display = pe && pe.plate ? '' : 'none'; document.getElementById('detail-plate').textContent = pe && pe.plate ? pe.plate : '—'; }
   document.getElementById('detail-days').textContent = `${days} jour${days > 1 ? 's' : ''}${item.time ? ' (depuis le ' + formatDateTime(item.time) + ')' : ''}`;
@@ -4818,7 +4893,7 @@ function openDetailView(item) {
 
   const ctBox = document.getElementById('detail-ct-box');
   const ctEntry = item.trailer ? trailerDB[item.trailer] : null;
-  if (ctEntry) {
+  if (ctEntry && getCtStatus(ctEntry.ctExpiryDate)) {
     const ctStatus = getCtStatus(ctEntry.ctExpiryDate);
     ctBox.style.display = 'block';
     ctBox.style.background = ctStatus.bg;
@@ -5349,7 +5424,7 @@ function renderDbPanel() {
     const status = getCtStatus(entry.ctExpiryDate);
     const statusLabel = status ? (status.level === 'nok' ? 'NON OK' : (status.level === 'soon' ? 'BIENTÔT' : 'OK')) : '';
     const authorFields = hasPermission('viewAuthors') ? [entry.createdBy, entry.modifiedBy] : [];
-    const haystack = [num, entry.plate, entry.notes, entry.ctExpiryDate, statusLabel, ...authorFields]
+    const haystack = [num, entry.plate, entry.notes, entry.ctExpiryDate, statusLabel, entry.vtype, entry.model, ...authorFields]
       .filter(Boolean).join(' ').toUpperCase();
     return haystack.includes(q);
   });
@@ -5403,7 +5478,8 @@ function renderDbPanel() {
         <div class="lp-num">${num}</div>
         <div class="lp-badge ${badgeClass}">${badgeText}</div>
       </div>
-      <div class="lp-meta">${entry.plate ? '🔖 ' + entry.plate + ' · ' : ''}${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de date'}</div>
+      ${fleetInfo(entry) ? `<div class="lp-meta">🏷 ${escapeHtml(fleetInfo(entry))}</div>` : ''}
+      <div class="lp-meta">${entry.plate ? '🔖 ' + entry.plate + ' · ' : ''}${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de CT'}</div>
       ${entry.notes ? `<div class="lp-meta">📝 ${entry.notes}</div>` : ''}
       ${entry.modifiedAt ? `<div class="lp-meta">🕓 Mis à jour le ${formatDateTime(entry.modifiedAt)}</div>` : ''}
     `;
@@ -5499,6 +5575,8 @@ document.getElementById('db-import-file-input').addEventListener('change', async
     let colTrailer = findCol('remorque', 'camion', 'véhicule', 'vehicule', 'tracteur', 'traction', 'numero', 'numéro');
     if (colTrailer === -1) colTrailer = headerRow.findIndex(h => (h.includes('n°') || h.startsWith('n ') || h === 'n' || h.includes('num')) && !h.includes('plaque'));
     if (colTrailer === -1) colTrailer = headerRow.findIndex((h, i) => i === 0 && !h.includes('plaque') && !h.includes('date') && !h.includes('échéance') && !h.includes('echeance'));
+    const hNom = headerRow.indexOf('nom'), hType = headerRow.indexOf('type'), hModel = headerRow.findIndex(h => h === 'modèle' || h === 'modele' || h === 'model'), hPl = headerRow.findIndex(h => h.includes('plaque'));
+    if (hNom !== -1 && hType !== -1) { await importFleetRows(rows, { hNom, hType, hModel, hPlate: hPl }); e.target.value = ''; return; }
     const colPlate = findCol('plaque');
     const colDate = findCol('échéance', 'echeance', 'date');
 
@@ -5558,6 +5636,9 @@ function openDbSheet(trailerNum) {
   document.getElementById('db-f-trailer').disabled = !!trailerNum;
   document.getElementById('db-f-date').value = entry ? (entry.ctExpiryDate || '') : '';
   document.getElementById('db-f-plate').value = entry ? (entry.plate || '') : '';
+  document.getElementById('db-f-vtype').value = entry ? (entry.vtype || '') : '';
+  document.getElementById('db-f-model').value = entry ? (entry.model || '') : '';
+  document.getElementById('db-f-model-wrap').style.display = (entry && entry.vtype === 'Tracteur') ? 'none' : '';
   document.getElementById('db-f-plate').disabled = !!(entry && entry.plate);
   document.getElementById('db-f-notes').value = entry ? (entry.notes || '') : '';
   document.getElementById('db-btn-delete').style.display = (trailerNum && hasPermission('trailerdbDelete')) ? 'block' : 'none';
@@ -5584,6 +5665,7 @@ document.getElementById('db-f-trailer').addEventListener('input', (e) => {
 });
 
 document.getElementById('db-f-date').addEventListener('input', updateDbCtPreview);
+document.getElementById('db-f-vtype').addEventListener('change', e => { document.getElementById('db-f-model-wrap').style.display = e.target.value === 'Tracteur' ? 'none' : ''; });
 
 function updateDbCtPreview() {
   const date = document.getElementById('db-f-date').value;
@@ -5613,7 +5695,6 @@ document.getElementById('db-btn-save').onclick = async () => {
   const trailerNum = document.getElementById('db-f-trailer').value.trim();
   if (!trailerNum) { toast("Indique un n° de remorque"); return; }
   const ctExpiryDate = document.getElementById('db-f-date').value;
-  if (!ctExpiryDate) { toast("Indique une date de validité"); return; }
   const notes = document.getElementById('db-f-notes').value.trim();
   const plate = document.getElementById('db-f-plate').value.trim();
   const existing = trailerDB[trailerNum];
@@ -5622,8 +5703,10 @@ document.getElementById('db-btn-save').onclick = async () => {
   const changeLog = (existing && existing.history) ? existing.history.slice() : [];
   changeLog.push({ action: existing ? 'modified' : 'created', by: who, date: now });
 
+  const vtype = document.getElementById('db-f-vtype').value, model = vtype === 'Tracteur' ? '' : document.getElementById('db-f-model').value.trim();
+  const kindFinal = vtype ? vtypeKind(vtype) : (existing ? kindOf(existing) : dbKind);
   trailerDB[trailerNum] = {
-    ctExpiryDate, plate, notes, kind: (existing ? kindOf(existing) : dbKind) === 'vehicle' ? 'vehicle' : undefined,
+    ctExpiryDate, plate, notes, vtype: vtype || undefined, model: model || undefined, kind: kindFinal === 'vehicle' ? 'vehicle' : undefined,
     createdBy: existing ? existing.createdBy : who,
     createdAt: existing ? existing.createdAt : now,
     modifiedBy: who,
