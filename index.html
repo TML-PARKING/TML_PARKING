@@ -1398,7 +1398,7 @@
     </div>
     <div class="field">
       <label>Type</label>
-      <select id="db-f-vtype" style="width:100%;"><option value="">—</option><option>Remorque</option><option>Châssis</option><option>Camion</option><option>Fourgon</option><option>Tracteur</option></select>
+      <select id="db-f-vtype" style="width:100%;"><option value="">—</option><option>Remorque</option><option value="Châssis">Châssis/container</option><option>Camion</option><option>Fourgon</option><option>Tracteur</option></select>
     </div>
     <div class="field" id="db-f-container-wrap" style="display:none;">
       <label>N° container (fixé au châssis)</label>
@@ -2875,7 +2875,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-35";
+const APP_VERSION = "2026-11-26-ocr-36";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2895,7 +2895,7 @@ function setFormKind(k) {
 document.querySelectorAll('#f-kind-tabs .kind-tab').forEach(b => b.onclick = () => setFormKind(b.dataset.k));
 const itemVtype = it => { const e = it && it.trailer ? trailerDB[it.trailer] : null; return (e && e.vtype) || (kindOf(it) === 'vehicle' ? 'Camion' : 'Remorque'); };
 const typeOk = it => !lpType || itemVtype(it) === lpType;
-function syncTypeSel() { ['lp-type-sel', 'hd-type-sel'].forEach(id => { const el = document.getElementById(id); if (!el) return; if (!el.options.length) el.innerHTML = '<option value="">Tous les types</option>' + VTYPES.map(t => '<option>' + t + '</option>').join(''); el.value = lpType; el.classList.toggle('active', !!lpType); }); }
+function syncTypeSel() { ['lp-type-sel', 'hd-type-sel'].forEach(id => { const el = document.getElementById(id); if (!el) return; if (!el.options.length) el.innerHTML = '<option value="">Tous les types</option>' + VTYPES.map(t => '<option value="' + t + '">' + vlabel(t) + '</option>').join(''); el.value = lpType; el.classList.toggle('active', !!lpType); }); }
 function setLpType(t) { lpType = t || ''; syncTypeSel(); try { renderListPanel(); } catch (e) {} applyMapFilters(); updateHeaderExtras(); }
 document.addEventListener('DOMContentLoaded', syncTypeSel); setTimeout(syncTypeSel, 0);
 ['lp-type-sel', 'hd-type-sel'].forEach(id => { const el = document.getElementById(id); if (el) { el.onchange = () => setLpType(el.value); el.onclick = e => e.stopPropagation(); } });
@@ -2964,8 +2964,9 @@ function exRows() {
   };
   const rows = lastListExport.map(mkRow);
   // Sections séparées : remorques puis camions
-  const sections = [['trailer', 'Remorques', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9'], ['tractor', 'Tracteurs', 'N° tracteur', '#b45309']].map(([kind, title, h0, color]) => {
-    const its = lastListExport.filter(it => exGroup(it) === kind);
+  const sections = [['trailer', 'Remorques et châssis', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9'], ['tractor', 'Tracteurs', 'N° tracteur', '#b45309']].map(([kind, title, h0, color]) => {
+    const ORD = { 'Remorque': 0, 'Châssis': 1, 'Camion': 2, 'Fourgon': 3, 'Tracteur': 4 };
+    const its = lastListExport.filter(it => exGroup(it) === kind).sort((a, b) => ((ORD[itemVtype(a)] ?? 9) - (ORD[itemVtype(b)] ?? 9)) || String(a.trailer || '').localeCompare(String(b.trailer || ''), 'fr', { numeric: true }));
     const st = {}; its.forEach(it => { st[it.status] = (st[it.status] || 0) + 1; });
     const hd = [h0].concat(head.slice(1)), rws = its.map(mkRow), pi = head.indexOf('Plaque');
     if (kind !== 'trailer' && cols.plate && pi > 0) { // camions / tracteurs : la plaque passe en 1re colonne, le n° en second
@@ -4011,13 +4012,14 @@ function isChassis(num) { const e = num ? trailerDB[num] : null; return !!(e && 
 const contOf = it => (it && it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].container) || (it && it.container) || '';
 function setChassisContainer(num, val) { const e = num ? trailerDB[num] : null; if (!e || e.vtype !== 'Châssis') return false; val = val || ''; if ((e.container || '') === val) return false; const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu'); const now = new Date().toISOString(); e.container = val || undefined; e.modifiedBy = who; e.modifiedAt = now; e.history = (e.history || []).concat([{ action: 'container : ' + (val || '—'), by: who, date: now }]); saveTrailerDB().catch(() => toast('Erreur de synchronisation')); return true; }
 const normContainer = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const vlabel = t => t === 'Châssis' ? 'Châssis/container' : (t || '');
 function fleetInfo(entry) { // « Remorque · Mega » ; pour un tracteur uniquement « Tracteur » (le modèle serait redondant)
   if (!entry || !entry.vtype) return '';
-  return entry.vtype === 'Tracteur' || !entry.model ? entry.vtype : entry.vtype + ' · ' + entry.model;
+  return entry.vtype === 'Tracteur' || !entry.model ? vlabel(entry.vtype) : vlabel(entry.vtype) + ' · ' + entry.model;
 }
 function normVtype(t) {
   const l = String(t || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  return ({ remorque: 'Remorque', chassis: 'Châssis', camion: 'Camion', fourgon: 'Fourgon', tracteur: 'Tracteur' })[l] || '';
+  return ({ remorque: 'Remorque', chassis: 'Châssis', 'chassis/container': 'Châssis', 'chassis container': 'Châssis', container: 'Châssis', camion: 'Camion', fourgon: 'Fourgon', tracteur: 'Tracteur' })[l] || '';
 }
 async function importFleetRows(rows, c) {
   const who = (currentUser && currentUser.name) || 'Inconnu', now = new Date().toISOString();
@@ -5555,7 +5557,7 @@ document.getElementById('btn-db-bulk').onclick = () => {
   m.innerHTML = `<div style="width:100%;max-width:480px;background:var(--surface-1);border-radius:20px 20px 0 0;padding:18px 16px 24px;display:flex;flex-direction:column;gap:12px;">
     <div style="text-align:center;font-weight:700;">Modifier ${list.length} ligne${list.length > 1 ? 's' : ''}</div>
     <div style="font-size:12px;color:var(--ink-dim);text-align:center;">S'applique à toutes les lignes actuellement affichées dans la liste.</div>
-    <div class="field"><label>Type</label><select id="bulk-vtype" style="width:100%;"><option value="">— inchangé —</option><option>Remorque</option><option>Châssis</option><option>Camion</option><option>Fourgon</option><option>Tracteur</option></select></div>
+    <div class="field"><label>Type</label><select id="bulk-vtype" style="width:100%;"><option value="">— inchangé —</option><option>Remorque</option><option value="Châssis">Châssis/container</option><option>Camion</option><option>Fourgon</option><option>Tracteur</option></select></div>
     <div class="field"><label>Modèle</label><input type="text" id="bulk-model" placeholder="Vide = inchangé" autocomplete="off"></div>
     <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="bulk-clear"> Effacer le modèle</label>
     <button class="btn btn-success" id="bulk-apply" style="padding:14px;font-size:15px;">✅ Appliquer</button>
