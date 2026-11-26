@@ -911,6 +911,10 @@
       <label>Contenu / notes</label>
       <input type="text" id="f-notes" list="content-presets-list" placeholder="Ex: TR Orbette, Retour Trémery..." autocomplete="off">
     </div>
+    <div class="field" id="f-container-wrap" style="display:none;">
+      <label>N° container (lié au châssis)</label>
+      <input type="text" id="f-container" placeholder="Ex: MSCU1234567" autocomplete="off" autocapitalize="characters">
+    </div>
     <div class="field">
       <label>Photos</label>
       <div class="ph-grid" id="f-photos"></div>
@@ -1001,6 +1005,7 @@
     <div style="background:var(--surface-3); border-radius:12px; padding:14px; margin-bottom:14px;">
       <div class="detail-row"><span class="detail-label">Client</span><span id="detail-client" class="detail-value">—</span></div>
       <div class="detail-row" id="detail-type-row" style="display:none;"><span class="detail-label">Type</span><span id="detail-type" class="detail-value">—</span></div>
+      <div class="detail-row" id="detail-container-row" style="display:none;"><span class="detail-label">Container</span><span id="detail-container" class="detail-value">—</span></div>
       <div class="detail-row" id="detail-plate-row" style="display:none;"><span class="detail-label">Plaque</span><span id="detail-plate" class="detail-value">—</span></div>
       <div class="detail-row"><span class="detail-label">Emplacement</span><span id="detail-location" class="detail-value">—</span></div>
       <div class="detail-row"><span class="detail-label">Déposée depuis</span><span id="detail-days" class="detail-value">—</span></div>
@@ -1059,6 +1064,10 @@
     <div class="field">
       <label>Client</label>
       <input type="text" id="edit-status-client" list="client-presets-list" placeholder="Client...">
+    </div>
+ <div class="field" id="edit-container-wrap" style="display:none;">
+      <label>N° container (lié au châssis)</label>
+      <input type="text" id="edit-status-container" placeholder="Ex: MSCU1234567" autocomplete="off" autocapitalize="characters">
     </div>
     <div class="field">
       <label>Contenu / notes</label>
@@ -1360,6 +1369,7 @@
   </div>
   <div style="padding:0 14px 10px;">
     <button class="btn btn-success" id="btn-db-new" style="width:100%; padding:10px;">➕ Ajouter une remorque</button>
+    <button class="btn btn-warn" id="btn-db-bulk" style="width:100%; padding:10px; margin-top:8px; display:none;">✏️ Modifier type / modèle de toute la liste</button>
     <button class="btn btn-warn" id="btn-db-import" style="width:100%; padding:10px; margin-top:8px; display:none;">📥 Importer un fichier Excel</button>
     <button class="btn btn-ghost" id="btn-db-export" style="width:100%; padding:10px; margin-top:8px;">📤 Exporter en Excel (liste affichée)</button>
     <input type="file" id="db-import-file-input" accept=".xlsx,.xls" style="display:none;">
@@ -2727,7 +2737,7 @@ function applyMapFilters() {
 }
 var mapSearchQ = '';
 function mapSearchMatch(d, q) {
-  if ([d.trailer, d.client, d.notes].some(v => v && String(v).toLowerCase().includes(q))) return true;
+  if ([d.trailer, d.container, d.client, d.notes].some(v => v && String(v).toLowerCase().includes(q))) return true;
   const e = d.trailer ? trailerDB[d.trailer] : null, nq = normPlate(q);
   if (nq.length >= 2 && d.trailer && normPlate(d.trailer).includes(nq)) return true;
   return !!(e && e.plate && nq.length >= 3 && normPlate(e.plate).includes(nq));
@@ -2857,7 +2867,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-33";
+const APP_VERSION = "2026-11-26-ocr-34";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2922,7 +2932,9 @@ function exRows() {
   const hasV = lastListExport.some(it => kindOf(it) === 'vehicle'), hasT = lastListExport.some(it => kindOf(it) === 'trailer');
   const head = [hasV && hasT ? 'N° remorque / camion' : hasV ? 'N° camion' : 'N° remorque'];
   if (cols.type) head.push('Type');
+  cols.container = lastListExport.some(it => it.container);
   if (cols.plate) head.push('Plaque');
+  if (cols.container) head.push('Container');
   head.push('Client');
   if (cols.loc) head.push('Emplacement'); if (cols.status) head.push('Statut'); if (cols.ct) head.push('CT'); if (cols.days) head.push('Déposée le', 'Jours sur site'); if (cols.notes) head.push('Notes'); if (cols.comments) head.push('Commentaires');
   const stLabel = st => st === 'fleet' ? 'Bloqué' : st === 'vide' ? 'Vide' : st === 'charge' ? 'Chargé' : st === 'achar' ? 'En cours de chargement' : 'À vider';
@@ -2931,6 +2943,7 @@ function exRows() {
     const r = [it.trailer || '(sans n°)'];
     if (cols.type) r.push(fleetInfo(it.trailer ? trailerDB[it.trailer] : null));
     if (cols.plate) r.push((it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].plate) || '');
+    if (cols.container) r.push(it.container || '');
     r.push(it.client || '');
     if (cols.loc) r.push(loc); if (cols.status) r.push(isTractor(it.trailer) ? '' : stLabel(it.status)); if (cols.ct) r.push(exCtCell(it)); if (cols.days) r.push(it.time ? new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '', daysSince(it.time) + ' j'); if (cols.notes) r.push(it.notes || ''); if (cols.comments) r.push(exCommentsCell(it));
     return r;
@@ -2940,7 +2953,12 @@ function exRows() {
   const sections = [['trailer', 'Remorques', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9'], ['tractor', 'Tracteurs', 'N° tracteur', '#b45309']].map(([kind, title, h0, color]) => {
     const its = lastListExport.filter(it => exGroup(it) === kind);
     const st = {}; its.forEach(it => { st[it.status] = (st[it.status] || 0) + 1; });
-    return { kind, title, color, head: [h0].concat(head.slice(1)), rows: its.map(mkRow), items: kind === 'tractor' ? [] : EX_ST.filter(([k]) => st[k]).map(([k, l, c]) => ({ l, n: st[k], c })) };
+    const hd = [h0].concat(head.slice(1)), rws = its.map(mkRow), pi = head.indexOf('Plaque');
+    if (kind !== 'trailer' && cols.plate && pi > 0) { // camions / tracteurs : la plaque passe en 1re colonne, le n° en second
+      hd[0] = 'Plaque'; hd[pi] = h0;
+      rws.forEach(r => { if (r[pi]) { const t = r[0]; r[0] = r[pi]; r[pi] = t; } });
+    }
+    return { kind, title, color, head: hd, rows: rws, items: kind === 'tractor' ? [] : EX_ST.filter(([k]) => st[k]).map(([k, l, c]) => ({ l, n: st[k], c })) };
   }).filter(sec => sec.rows.length);
   return { head, rows, sections };
 }
@@ -3765,6 +3783,7 @@ function fillForm(data) {
   document.getElementById('f-trailer').value = data?.trailer || '';
   document.getElementById('f-client').value = data?.client || '';
   document.getElementById('f-notes').value = data?.notes || '';
+  document.getElementById('f-container').value = data?.container || '';
   refreshContentPresetsDatalist(data?.client || '');
   if (typeof checkTrailerAlreadyOnSiteLive === 'function') checkTrailerAlreadyOnSiteLive();
   document.querySelectorAll('.status-chip').forEach(c => c.classList.remove('active'));
@@ -3921,13 +3940,13 @@ function renderTrailerSuggestions() {
     else if (pl && nq.length >= 3 && pl.includes(nq)) score = pl.endsWith(nq) ? 1.5 : 3;
     if (score < 0) return;
     if (kindOf(e) !== formKind) score += 10; // l'autre type en dernier
-    hits.push({ num, plate: e && e.plate || '', info: fleetInfo(e), score });
+    hits.push({ num, plate: e && e.plate || '', info: fleetInfo(e), veh: kindOf(e) === 'vehicle', score });
   });
   hits.sort((a, b) => a.score - b.score || a.num.localeCompare(b.num, undefined, { numeric: true }));
   const top = hits.slice(0, 6);
   if (!top.length) { box.style.display = 'none'; return; }
   const hl = t => { const i = t.toUpperCase().indexOf(q); return i < 0 ? escapeHtml(t) : escapeHtml(t.slice(0, i)) + '<mark>' + escapeHtml(t.slice(i, i + q.length)) + '</mark>' + escapeHtml(t.slice(i + q.length)); };
-  box.innerHTML = top.map(h => `<button type="button" data-num="${escapeHtml(h.num)}"><span class="sg-num">${hl(h.num)}</span><span class="sg-plate">${h.info ? escapeHtml(h.info) + (h.plate ? ' · ' : '') : ''}${h.plate ? '🔖 ' + hl(h.plate) : ''}</span></button>`).join('');
+  box.innerHTML = top.map(h => `<button type="button" data-num="${escapeHtml(h.num)}">${h.veh && h.plate ? `<span class="sg-num">${hl(h.plate)}</span><span class="sg-plate">${h.info ? escapeHtml(h.info) + ' · ' : ''}N° ${hl(h.num)}</span>` : `<span class="sg-num">${hl(h.num)}</span><span class="sg-plate">${h.info ? escapeHtml(h.info) + (h.plate ? ' · ' : '') : ''}${h.plate ? '🔖 ' + hl(h.plate) : ''}</span>`}</button>`).join('');
   box.style.display = 'block';
   box.querySelectorAll('button').forEach(b => b.onmousedown = b.ontouchstart = ev => { ev.preventDefault(); const i = document.getElementById('f-trailer'); i.value = b.dataset.num; box.style.display = 'none'; i.dispatchEvent(new Event('input', { bubbles: true })); });
 }
@@ -3972,6 +3991,10 @@ document.getElementById('f-trailer').addEventListener('blur', () => {
 const VTYPES = ['Remorque', 'Châssis', 'Camion', 'Fourgon', 'Tracteur'];
 const vtypeKind = t => (t === 'Camion' || t === 'Fourgon' || t === 'Tracteur') ? 'vehicle' : 'trailer';
 function isTractor(num) { const e = num ? trailerDB[num] : null; return !!(e && e.vtype === 'Tracteur'); }
+// Camions / fourgons / tracteurs : la PLAQUE est l'identifiant principal (le n° passe en second)
+function mainId(num, kind) { const e = num ? trailerDB[num] : null; const veh = e ? kindOf(e) === 'vehicle' : kind === 'vehicle'; return (veh && e && e.plate) ? e.plate : (num || ''); }
+function isChassis(num) { const e = num ? trailerDB[num] : null; return !!(e && e.vtype === 'Châssis'); }
+const normContainer = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 function fleetInfo(entry) { // « Remorque · Mega » ; pour un tracteur uniquement « Tracteur » (le modèle serait redondant)
   if (!entry || !entry.vtype) return '';
   return entry.vtype === 'Tracteur' || !entry.model ? entry.vtype : entry.vtype + ' · ' + entry.model;
@@ -4023,6 +4046,7 @@ function applyTractorMode() {
   const wr = [document.getElementById('f-client'), document.querySelector('.status-options'), document.getElementById('f-notes')].map(el => el && el.closest('.field'));
   wr.forEach(w => { if (w) w.style.display = t ? 'none' : ''; });
   const w = document.getElementById('f-age-warning'); if (w) w.style.display = t ? 'none' : '';
+  const cw = document.getElementById('f-container-wrap'); if (cw) cw.style.display = isChassis(document.getElementById('f-trailer').value.trim()) ? '' : 'none';
 }
 function getCtStatus(expiryDate) {
   if (!expiryDate) return null;
@@ -4161,7 +4185,7 @@ document.getElementById('btn-save').onclick = async () => {
   else if (currentTarget.type === 'free') { existingTime = freeTrailers[currentTarget.id]?.time; existingEncodedBy = freeTrailers[currentTarget.id]?.encodedBy; }
   else if (currentTarget.type === 'dock') { existingTime = dockOccupancy[currentTarget.id]?.time; existingEncodedBy = dockOccupancy[currentTarget.id]?.encodedBy; }
   const data = {
-    trailer, client, status, notes, kind: (formKind === 'vehicle' || tractor) ? 'vehicle' : undefined, photos: formPhotos.length ? formPhotos.slice() : undefined,
+    trailer, client, status, notes, kind: (formKind === 'vehicle' || tractor) ? 'vehicle' : undefined, container: isChassis(trailer) ? (normContainer(document.getElementById('f-container').value) || undefined) : undefined, photos: formPhotos.length ? formPhotos.slice() : undefined,
     time: existingTime || new Date().toISOString(),
     encodedBy: existingEncodedBy || (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : undefined)
   };
@@ -4388,6 +4412,7 @@ async function performRemove(target) {
       kind: removedData.kind === 'vehicle' ? 'vehicle' : undefined,
       comments: removedData.comments || [],
       photos: removedData.photos,
+      container: removedData.container,
       label,
       dropTime: removedData.time,
       removeTime: new Date().toISOString(),
@@ -4579,7 +4604,7 @@ function renderListPanel() {
   filtered = q ? filtered.filter(it => {
     const ctEntry = it.trailer ? trailerDB[it.trailer] : null;
     const commentsText = (it.comments || []).map(c => c.text).join(' ');
-    const haystack = [it.trailer, it.client, it.label, it.notes, commentsText, ctEntry && ctEntry.plate]
+    const haystack = [it.trailer, it.container, it.client, it.label, it.notes, commentsText, ctEntry && ctEntry.plate]
       .filter(Boolean).join(' ').toLowerCase();
     if (haystack.includes(q)) return true;
     // recherche de plaque tolérante : "qamx 398", "QAMX-398" et "qamx398" sont équivalents
@@ -4639,13 +4664,13 @@ function renderListPanel() {
     const compactLabel = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-num"><svg class="i" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px;opacity:.75"><use href="#${kindOf(it) === 'vehicle' ? 'i-truck' : 'i-trailer'}"/></svg>${it.trailer || '(sans n°)'}</div>
+        <div class="lp-num"><svg class="i" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px;opacity:.75"><use href="#${kindOf(it) === 'vehicle' ? 'i-truck' : 'i-trailer'}"/></svg>${escapeHtml(mainId(it.trailer, kindOf(it)) || '(sans n°)')}</div>
         <div style="display:flex; gap:6px; align-items:center;">
           ${ctBadgeHtml}
           <div class="lp-badge ${badgeClass}">${badgeText}</div>
         </div>
       </div>
-      <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}${(trailerDB[it.trailer] && trailerDB[it.trailer].plate) ? ((compactLabel || it.client) ? ' · ' : '') + '🔖 ' + escapeHtml(trailerDB[it.trailer].plate) : ''}${fleetInfo(trailerDB[it.trailer]) ? ' · 🏷 ' + escapeHtml(fleetInfo(trailerDB[it.trailer])) : ''}</div>
+      <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}${(mainId(it.trailer, kindOf(it)) !== it.trailer && it.trailer) ? ((compactLabel || it.client) ? ' · ' : '') + 'N° ' + escapeHtml(it.trailer) : ((trailerDB[it.trailer] && trailerDB[it.trailer].plate) ? ((compactLabel || it.client) ? ' · ' : '') + '🔖 ' + escapeHtml(trailerDB[it.trailer].plate) : '')}${it.container ? ' · 📦 ' + escapeHtml(it.container) : ''}${fleetInfo(trailerDB[it.trailer]) ? ' · 🏷 ' + escapeHtml(fleetInfo(trailerDB[it.trailer])) : ''}</div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-meta">🔄 <span style="${isOverThreshold ? 'color:#f87171; font-weight:700;' : ''}">${days}j</span>${it.time ? ' · déposée le ' + new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' }) : ''}${it.notes ? ' · 📝 ' + it.notes : ''}</div>
         <div style="display:flex; gap:4px; flex-shrink:0;">
@@ -4762,7 +4787,7 @@ function renderHistoryPanel() {
   let filtered = q ? history.filter(h => {
     const commentsText = (h.comments || []).map(c => c.text).join(' ');
     const authorFields = hasPermission('viewAuthors') ? [h.encodedBy, h.removedBy] : [];
-    const haystack = [h.trailer, h.client, h.label, h.notes, commentsText, ...authorFields]
+    const haystack = [h.trailer, h.container, h.client, h.label, h.notes, commentsText, ...authorFields]
       .filter(Boolean).join(' ').toLowerCase();
     return haystack.includes(q);
   }) : history;
@@ -4809,7 +4834,7 @@ function renderHistoryPanel() {
 
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-num">${h.trailer || '(sans n°)'}</div>
+        <div class="lp-num">${escapeHtml(mainId(h.trailer, kindOf(h)) || '(sans n°)')}</div>
         <div class="lp-badge ${h.status || 'pleine'}">${h.status === 'fleet' ? 'Fleet' : (h.status === 'vide' ? 'Vide' : (h.status === 'pleine' ? 'À vider' : (h.status === 'charge' ? 'Chargé' : (h.status === 'achar' ? 'En cours de chargement' : (h.status || '')))))}</div>
       </div>
       <div class="lp-meta">${h.label}${h.client ? ' · ' + h.client : ''}</div>
@@ -4817,6 +4842,7 @@ function renderHistoryPanel() {
       <div class="lp-meta">📤 Retiré : ${formatDateTime(h.removeTime)}${(h.removedBy && hasPermission('viewAuthors')) ? ' par ' + h.removedBy : ''}</div>
       ${durationText ? `<div class="lp-meta">⏱️ Durée sur site : ${durationText}</div>` : ''}
       ${h.notes ? `<div class="lp-meta">📝 ${h.notes}</div>` : ''}
+      ${h.container ? `<div class="lp-meta">📦 ${escapeHtml(h.container)}</div>` : ''}
       ${(h.comments && h.comments.length) ? h.comments.map(c => `<div class="lp-meta">${c.auto ? '' : '💬 '}${c.text} <span style="opacity:.75;">— 🕒 ${formatDateTime(c.date)}${hasPermission('viewAuthors') && c.author ? ' · ' + c.author : ''}</span></div>`).join('') : ''}
       ${(h.photos && h.photos.length) ? '<div class="ph-grid" data-hist-photos style="margin-top:6px;"></div>' : ''}
     `;
@@ -4849,7 +4875,7 @@ function openDetailView(item) {
   if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
   detailTarget = item;
   const days = daysSince(item.time);
-  document.getElementById('detail-title').textContent = item.trailer || '(sans n°)';
+  document.getElementById('detail-title').textContent = mainId(item.trailer, kindOf(item)) || '(sans n°)';
   renderDetailComments(item);
   renderDetailPhotos(item);
 
@@ -4867,7 +4893,11 @@ function openDetailView(item) {
   document.getElementById('detail-location').textContent = item.label || '—';
   { const te = item.trailer ? trailerDB[item.trailer] : null, tr = document.getElementById('detail-type-row'), inf = fleetInfo(te); tr.style.display = inf ? '' : 'none'; document.getElementById('detail-type').textContent = inf; }
   { const pe = item.trailer ? trailerDB[item.trailer] : null, pr = document.getElementById('detail-plate-row');
-    pr.style.display = pe && pe.plate ? '' : 'none'; document.getElementById('detail-plate').textContent = pe && pe.plate ? pe.plate : '—'; }
+    const vehMain = pe && pe.plate && kindOf(pe) === 'vehicle';
+    pr.style.display = (pe && pe.plate) || vehMain ? '' : 'none';
+    pr.firstElementChild.textContent = vehMain ? 'N°' : 'Plaque';
+    document.getElementById('detail-plate').textContent = vehMain ? item.trailer : (pe && pe.plate ? pe.plate : '—'); }
+  { const cr = document.getElementById('detail-container-row'); cr.style.display = item.container ? '' : 'none'; document.getElementById('detail-container').textContent = item.container || '—'; }
   document.getElementById('detail-days').textContent = `${days} jour${days > 1 ? 's' : ''}${item.time ? ' (depuis le ' + formatDateTime(item.time) + ')' : ''}`;
   const notesRow = document.getElementById('detail-notes-row');
   if (item.notes) {
@@ -4946,6 +4976,7 @@ function rerenderMapLayersFor(type) {
 // ---------- ÉDITION STATUT / NOTE (remorque déjà encodée) ----------
 const editStatusModal = document.getElementById('edit-status-modal');
 let editStatusTarget = null;
+function record0Container() { const r = editStatusTarget ? getRecordByTarget(editStatusTarget) : null; return (r && r.container) || ''; }
 
 function openEditStatusModal(item) {
   if (!item._target) return;
@@ -4955,6 +4986,8 @@ function openEditStatusModal(item) {
   });
   document.getElementById('edit-status-client').value = item.client || '';
   document.getElementById('edit-status-notes').value = item.notes || '';
+  document.getElementById('edit-status-container').value = item.container || '';
+  document.getElementById('edit-container-wrap').style.display = isChassis(item.trailer) ? '' : 'none';
   refreshContentPresetsDatalist(item.client || '');
   editStatusModal.classList.add('open');
   overlay.classList.add('show');
@@ -4977,6 +5010,7 @@ document.getElementById('btn-edit-status-save').onclick = async () => {
   const status = activeChip ? activeChip.dataset.status : 'pleine';
   const client = document.getElementById('edit-status-client').value.trim().toUpperCase();
   const notes = document.getElementById('edit-status-notes').value.trim().toUpperCase();
+  const containerNew = document.getElementById('edit-container-wrap').style.display === 'none' ? (record0Container()) : normContainer(document.getElementById('edit-status-container').value);
 
   const record = getRecordByTarget(editStatusTarget);
   if (!record) { toast("Introuvable"); closeEditStatusModal(); return; }
@@ -4986,6 +5020,7 @@ document.getElementById('btn-edit-status-save').onclick = async () => {
   if ((record.status || '') !== status) changes.push(`statut : ${statusName(record.status)} → ${statusName(status)}`);
   if ((record.client || '') !== client) changes.push(`client : ${record.client || '—'} → ${client || '—'}`);
   if ((record.notes || '') !== notes) changes.push(`note : ${record.notes || '—'} → ${notes || '—'}`);
+  if ((record.container || '') !== containerNew) changes.push(`container : ${record.container || '—'} → ${containerNew || '—'}`);
   if (changes.length) {
     const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu');
     record.comments = record.comments || [];
@@ -4994,6 +5029,7 @@ document.getElementById('btn-edit-status-save').onclick = async () => {
   record.status = status;
   record.client = client;
   record.notes = notes;
+  record.container = containerNew || undefined;
 
   rerenderMapLayersFor(editStatusTarget.type);
   if (listPanel.classList.contains('open')) renderListPanel();
@@ -5417,6 +5453,7 @@ document.getElementById('btn-db-sort-date').onclick = () => {
 };
 function renderDbPanel() {
   document.getElementById('btn-db-import').style.display = hasPermission('trailerdbImport') ? 'block' : 'none';
+  document.getElementById('btn-db-bulk').style.display = hasPermission('trailerdbImport') ? 'block' : 'none';
   const q = document.getElementById('db-panel-search').value.trim().toUpperCase();
   const container = document.getElementById('db-panel-items');
   let entries = Object.entries(trailerDB).filter(([num, entry]) => kindOf(entry) === dbKind).filter(([num, entry]) => {
@@ -5475,10 +5512,10 @@ function renderDbPanel() {
     div.style.gap = '3px';
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-num">${num}</div>
+        <div class="lp-num">${escapeHtml(mainId(num, kindOf(entry)))}</div>
         <div class="lp-badge ${badgeClass}">${badgeText}</div>
       </div>
-      ${fleetInfo(entry) ? `<div class="lp-meta">🏷 ${escapeHtml(fleetInfo(entry))}</div>` : ''}
+      ${fleetInfo(entry) ? `<div class="lp-meta">🏷 ${escapeHtml(fleetInfo(entry))}${mainId(num, kindOf(entry)) !== num ? ' · N° ' + escapeHtml(num) : ''}</div>` : (mainId(num, kindOf(entry)) !== num ? `<div class="lp-meta">N° ${escapeHtml(num)}</div>` : '')}
       <div class="lp-meta">${entry.plate ? '🔖 ' + entry.plate + ' · ' : ''}${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de CT'}</div>
       ${entry.notes ? `<div class="lp-meta">📝 ${entry.notes}</div>` : ''}
       ${entry.modifiedAt ? `<div class="lp-meta">🕓 Mis à jour le ${formatDateTime(entry.modifiedAt)}</div>` : ''}
@@ -5489,6 +5526,39 @@ function renderDbPanel() {
 }
 
 document.getElementById('btn-db-new').onclick = () => openDbSheet(null);
+// Modification en masse du type / modèle sur toutes les lignes affichées (filtres et recherche compris)
+document.getElementById('btn-db-bulk').onclick = () => {
+  if (!hasPermission('trailerdbImport')) { toast('Accès non autorisé'); return; }
+  const list = lastFilteredDbEntries.slice(); if (!list.length) { toast('Aucune ligne dans la liste'); return; }
+  let m = document.getElementById('db-bulk-modal');
+  if (m) m.remove();
+  m = document.createElement('div'); m.id = 'db-bulk-modal';
+  m.style.cssText = 'position:fixed;inset:0;z-index:5200;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;';
+  m.innerHTML = `<div style="width:100%;max-width:480px;background:var(--surface-1);border-radius:20px 20px 0 0;padding:18px 16px 24px;display:flex;flex-direction:column;gap:12px;">
+    <div style="text-align:center;font-weight:700;">Modifier ${list.length} ligne${list.length > 1 ? 's' : ''}</div>
+    <div style="font-size:12px;color:var(--ink-dim);text-align:center;">S'applique à toutes les lignes actuellement affichées dans la liste.</div>
+    <div class="field"><label>Type</label><select id="bulk-vtype" style="width:100%;"><option value="">— inchangé —</option><option>Remorque</option><option>Châssis</option><option>Camion</option><option>Fourgon</option><option>Tracteur</option></select></div>
+    <div class="field"><label>Modèle</label><input type="text" id="bulk-model" placeholder="Vide = inchangé" autocomplete="off"></div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="bulk-clear"> Effacer le modèle</label>
+    <button class="btn btn-success" id="bulk-apply" style="padding:14px;font-size:15px;">✅ Appliquer</button>
+    <button class="btn btn-ghost" id="bulk-cancel" style="padding:12px;">Annuler</button></div>`;
+  document.body.appendChild(m);
+  m.onclick = e => { if (e.target === m) m.remove(); };
+  document.getElementById('bulk-cancel').onclick = () => m.remove();
+  document.getElementById('bulk-apply').onclick = () => {
+    const vt = document.getElementById('bulk-vtype').value, model = document.getElementById('bulk-model').value.trim(), clear = document.getElementById('bulk-clear').checked;
+    if (!vt && !model && !clear) { toast('Rien à modifier'); return; }
+    if (!confirm(`Appliquer à ${list.length} ligne(s) ?` + (vt ? `\nType : ${vt}` : '') + (model ? `\nModèle : ${model}` : '') + (clear ? '\nModèle effacé' : ''))) return;
+    const who = (currentUser && currentUser.name) || 'Inconnu', now = new Date().toISOString();
+    list.forEach(([num, e]) => {
+      const nv = vt || e.vtype, nm = (nv === 'Tracteur' || clear) ? undefined : (model || e.model);
+      const hist = (e.history || []).concat({ action: 'modification en masse (type/modèle)', by: who, date: now });
+      trailerDB[num] = { ...e, vtype: nv || undefined, model: nm, kind: nv ? (vtypeKind(nv) === 'vehicle' ? 'vehicle' : undefined) : e.kind, modifiedBy: who, modifiedAt: now, history: hist };
+    });
+    m.remove(); renderDbPanel(); toast(`${list.length} ligne(s) modifiée(s)`);
+    saveTrailerDB().catch(() => toast('Erreur de synchronisation'));
+  };
+};
 document.getElementById('btn-db-import').onclick = () => document.getElementById('db-import-file-input').click();
 
 document.getElementById('btn-db-export').onclick = () => {
