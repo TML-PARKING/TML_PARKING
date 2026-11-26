@@ -495,7 +495,6 @@
   .kind-tab { flex: 1; border: none; cursor: pointer; border-radius: 999px; padding: 7px 8px; font: 700 12px var(--font-display); background: var(--surface-3); color: var(--ink); }
   .kind-tab.active { background: var(--amber); color: var(--amber-ink); }
   .is-vehicle { position: relative; }
-  .is-vehicle::after { content: ''; position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='12' fill='%23111827'/><g transform='translate(3.2 3.6) scale(.7)' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M1.5 6h12v10h-12z'/><path d='M13.5 9.2h4.2l3.3 3.6V16h-7.5z'/><circle cx='6' cy='17.6' r='2'/><circle cx='17' cy='17.6' r='2'/></g></svg>") center/contain no-repeat; border: 1.5px solid rgba(255,255,255,.85); border-radius: 50%; }
   .rc-chip { border: none; cursor: pointer; border-radius: 999px; padding: 6px 12px; font: 600 12px var(--font-display); background: var(--surface-3); color: var(--ink); }
   .rc-chip.active { background: var(--amber); color: var(--amber-ink); }
   .rc-chip.group { box-shadow: inset 0 0 0 1.5px var(--amber); }
@@ -820,6 +819,7 @@
   <div><span style="background:#0891b2"></span>Chargé</div>
   <div><span style="background:#eab308"></span>En cours de chargement</div>
   <div><span style="background:#7c3aed"></span>Fleet (bloqué)</div>
+  <div><span style="background:#92400e"></span>Tracteur</div>
 </div>
 
 <div id="overlay"></div>
@@ -1682,6 +1682,7 @@ function daysSince(isoTime) {
 // Détermine la couleur d'une remorque selon son statut uniquement (fixe, ne change jamais avec les jours)
 function getVisualState(data) {
   if (!data) return { color: '#6b7280', label: '' }; // libre = gris
+  if (data.trailer && isTractor(data.trailer)) return { color: '#92400e', label: 'Tracteur' }; // tracteur = brun
   if (data.status === 'fleet') return { color: '#7c3aed', label: 'Bloqué' };
   if (data.status === 'vide') return { color: '#16a34a', label: '' };
   if (data.status === 'charge') return { color: '#0891b2', label: '' };
@@ -2866,7 +2867,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-38";
+const APP_VERSION = "2026-11-26-ocr-41";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2919,7 +2920,7 @@ document.querySelectorAll('#db-kind-tabs .kind-tab').forEach(b => b.onclick = ()
   document.getElementById('db-panel-search').placeholder = dbKind === 'vehicle' ? 'Rechercher n° camion...' : 'Rechercher n° remorque...';
   renderDbPanel();
 });
-const exGroup = it => isTractor(it.trailer) ? 'tractor' : (kindOf(it) === 'vehicle' ? 'vehicle' : 'trailer');
+const exGroup = it => isTractor(it.trailer) ? 'tractor' : (kindOf(it) === 'vehicle' ? (itemVtype(it) === 'Fourgon' ? 'van' : 'vehicle') : 'trailer');
 // Cellule « CT » : OK / Bientôt / Expiré + date d'échéance
 function exCtCell(it) {
   const e = it.trailer ? trailerDB[it.trailer] : null, st = e ? getCtStatus(e.ctExpiryDate) : null;
@@ -2927,6 +2928,7 @@ function exCtCell(it) {
   const d = new Date(e.ctExpiryDate), ds = isNaN(d.getTime()) ? e.ctExpiryDate : d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   return (st.level === 'nok' ? 'Expiré' : st.level === 'soon' ? 'Bientôt' : 'OK') + ' · ' + ds;
 }
+const exStCol = { 'À vider': '#dc2626', 'Vide': '#16a34a', 'Chargé': '#2563eb', 'En cours de chargement': '#ca8a04', 'Bloqué': '#6b7280' };
 const exCellColor = c => /^OK ·/.test(c) ? '#16a34a' : /^Bientôt ·/.test(c) ? '#ea580c' : /^Expiré ·/.test(c) ? '#dc2626' : null;
 // Cellule « Commentaires » : commentaires saisis à la main (les mouvements automatiques sont ignorés)
 function exCommentsCell(it) {
@@ -2955,11 +2957,13 @@ function exRows() {
   };
   const rows = lastListExport.map(mkRow);
   // Sections séparées : remorques puis camions
-  const sections = [['trailer', 'Remorques', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9'], ['tractor', 'Tracteurs', 'N° tracteur', '#b45309']].map(([kind, title, h0, color]) => {
+  const sections = [['trailer', 'Remorques', 'N° remorque', '#0f766e'], ['vehicle', 'Camions', 'N° camion', '#6d28d9'], ['van', 'Fourgons', 'N° fourgon', '#be185d'], ['tractor', 'Tracteurs', 'N° tracteur', '#b45309']].map(([kind, title, h0, color]) => {
     const ORD = { 'Remorque': 0, 'Châssis': 1, 'Camion': 2, 'Fourgon': 3, 'Tracteur': 4 };
     const its = lastListExport.filter(it => exGroup(it) === kind).sort((a, b) => ((ORD[itemVtype(a)] ?? 9) - (ORD[itemVtype(b)] ?? 9)) || String(a.trailer || '').localeCompare(String(b.trailer || ''), 'fr', { numeric: true }));
     const st = {}; its.forEach(it => { st[it.status] = (st[it.status] || 0) + 1; });
     const hd = [h0].concat(head.slice(1)), rws = its.map(mkRow), pi = head.indexOf('Plaque');
+    const ci = head.indexOf('Container');
+    if (kind === 'trailer' && ci > 0) { let sw = false; rws.forEach((r, k) => { const e = its[k].trailer ? trailerDB[its[k].trailer] : null; if (e && e.vtype === 'Châssis' && r[ci]) { const t = r[0]; r[0] = r[ci]; r[ci] = t; sw = true; } }); if (sw) { hd[0] = 'N° remorque / container'; hd[ci] = 'N° châssis'; } }
     if (kind !== 'trailer' && cols.plate && pi > 0) { // camions / tracteurs : la plaque passe en 1re colonne, le n° en second
       hd[0] = 'Plaque'; hd[pi] = h0;
       rws.forEach(r => { if (r[pi]) { const t = r[0]; r[0] = r[pi]; r[pi] = t; } });
@@ -2973,16 +2977,16 @@ function exDateStr() { return new Date().toLocaleDateString('fr-BE', { weekday: 
 // Récapitulatif (haut droite de l'export) : remorques / camions par statut + CT par état
 const EX_ST = [['pleine', 'À vider', '#dc2626'], ['fleet', 'Fleet', '#6b7280'], ['charge', 'Chargé', '#2563eb'], ['achar', 'En cours', '#ca8a04'], ['vide', 'Vide', '#16a34a']];
 function exSummary() {
-  const mk = () => ({ n: 0, st: {} }), tr = mk(), tk = mk(), tt = mk(), ct = { ok: 0, soon: 0, nok: 0, none: 0 };
+  const mk = () => ({ n: 0, st: {} }), tr = mk(), tk = mk(), tv = mk(), tt = mk(), ct = { ok: 0, soon: 0, nok: 0, none: 0 };
   lastListExport.forEach(it => {
-    const gk = exGroup(it), g = gk === 'tractor' ? tt : gk === 'vehicle' ? tk : tr; g.n++; if (gk !== 'tractor') g.st[it.status] = (g.st[it.status] || 0) + 1;
+    const gk = exGroup(it), g = gk === 'tractor' ? tt : gk === 'van' ? tv : gk === 'vehicle' ? tk : tr; g.n++; if (gk !== 'tractor') g.st[it.status] = (g.st[it.status] || 0) + 1;
     const e = it.trailer ? trailerDB[it.trailer] : null, c = e ? getCtStatus(e.ctExpiryDate) : null;
     if (c) ct[c.level]++; else if (gk !== 'tractor') ct.none++;
   });
   const grp = (label, g) => g.n ? { label, n: g.n, items: EX_ST.filter(([k]) => g.st[k]).map(([k, l, c]) => ({ l, n: g.st[k], c })) } : null;
   const ctItems = [{ l: 'OK', n: ct.ok, c: '#16a34a' }, { l: 'Bientôt', n: ct.soon, c: '#ea580c' }, { l: 'Expiré', n: ct.nok, c: '#dc2626' }];
   if (ct.none) ctItems.push({ l: 'Sans CT', n: ct.none, c: '#6b7280' });
-  return [grp('Remorques', tr), grp('Camions', tk), grp('Tracteurs', tt), { label: 'Contrôle technique', n: null, items: ctItems }].filter(Boolean);
+  return [grp('Remorques', tr), grp('Camions', tk), grp('Fourgons', tv), grp('Tracteurs', tt), { label: 'Contrôle technique', n: null, items: ctItems }].filter(Boolean);
 }
 function exSummaryLines() { return exSummary().map(g => [{ t: g.label + (g.n != null ? ' ' + g.n : '') + ' : ' }].concat(g.items.map((x, i) => ({ t: (i ? ' · ' : '') + x.l + ' ' + x.n })))); }
 function exHtmlTable() {
@@ -2994,14 +2998,14 @@ function exHtmlTable() {
     const td = i => `style="padding:7px 12px;border:${bd};font:13px Arial,sans-serif;color:#111827;${i % 2 ? 'background:#f1f5f9;' : ''}"`;
     return `<table cellspacing="0" cellpadding="0" width="100%" style="border-collapse:collapse;margin:16px 0 0;"><tr><td style="background:${sec.color};color:#ffffff;padding:9px 12px;font:700 15px Arial,sans-serif;border-radius:8px 8px 0 0;">${sec.kind === 'vehicle' ? '🚚' : sec.kind === 'tractor' ? '🚜' : '🚛'} ${escapeHtml(sec.title.toUpperCase())} · ${sec.rows.length}<span style="float:right;font:600 12px Arial,sans-serif;">${sec.items.map(x => escapeHtml(x.l) + ' ' + x.n).join(' · ')}</span></td></tr></table>
 <table cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:${bd};"><thead><tr>${sec.head.map(h => `<th ${th}>${escapeHtml(h)}</th>`).join('')}</tr></thead>
-<tbody>${sec.rows.map((r, i) => `<tr>${r.map((c, j) => `<td ${td(i)}>${j === 0 ? '<b>' + escapeHtml(c) + '</b>' : (exCellColor(c) ? '<b style="color:' + exCellColor(c) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+<tbody>${sec.rows.map((r, i) => `<tr>${r.map((c, j) => `<td ${td(i)}>${j === 0 ? '<b>' + escapeHtml(c) + '</b>' : ((exStCol[c] || exCellColor(c)) ? '<b style="color:' + (exStCol[c] || exCellColor(c)) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   }).join('');
   return `<div style="font-family:Arial,sans-serif;"><table width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 4px;border-collapse:collapse;"><tr><td valign="top"><h2 style="margin:0 0 4px;font:700 18px Arial,sans-serif;color:#111827;">${escapeHtml(exTitle())}</h2>
 <div style="font:12px Arial,sans-serif;color:#6b7280;">${escapeHtml(exDateStr())} · ${exCountLabel()}</div></td><td valign="top" align="right">${sum}</td></tr></table>${secHtml}</div>`;
 }
 function exCountLabel() {
-  const n = { trailer: 0, vehicle: 0, tractor: 0 }; lastListExport.forEach(it => { n[exGroup(it)]++; });
-  return [n.trailer ? n.trailer + ' remorque' + (n.trailer > 1 ? 's' : '') : '', n.vehicle ? n.vehicle + ' camion' + (n.vehicle > 1 ? 's' : '') : '', n.tractor ? n.tractor + ' tracteur' + (n.tractor > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') || '0 remorque';
+  const n = { trailer: 0, vehicle: 0, van: 0, tractor: 0 }; lastListExport.forEach(it => { n[exGroup(it)]++; });
+  return [n.trailer ? n.trailer + ' remorque' + (n.trailer > 1 ? 's' : '') : '', n.vehicle ? n.vehicle + ' camion' + (n.vehicle > 1 ? 's' : '') : '', n.van ? n.van + ' fourgon' + (n.van > 1 ? 's' : '') : '', n.tractor ? n.tractor + ' tracteur' + (n.tractor > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') || '0 remorque';
 }
 // Tableau en IMAGE (PNG) : joli et identique partout, idéal pour le téléphone.
 function exTableCanvas() {
@@ -3011,6 +3015,7 @@ function exTableCanvas() {
   // colonnes communes à toutes les sections (alignement parfait)
   const widths = head.map((h, j) => { let w = 0; sections.forEach(sec => { m.font = fb; w = Math.max(w, m.measureText(sec.head[j]).width); sec.rows.forEach(r => { m.font = j === 0 ? fb : f; w = Math.max(w, m.measureText(String(r[j] || '')).width); }); }); return Math.min(Math.ceil(w), maxW) + 24; });
   let tableW = widths.reduce((a, b) => a + b, 0);
+  { m.font = 'bold 17px Arial, sans-serif'; let need = 0; sections.forEach(sec => { const tw = m.measureText(sec.title.toUpperCase()).width; m.font = 'bold 12px Arial, sans-serif'; const pw = sec.items.reduce((a, it) => a + Math.ceil(m.measureText(it.l + ' ' + it.n).width) + 24, 0); m.font = 'bold 17px Arial, sans-serif'; need = Math.max(need, 60 + tw + 10 + 34 + 24 + pw + 12); }); if (need > tableW) { widths[widths.length - 1] += Math.ceil(need - tableW); tableW = widths.reduce((a, b) => a + b, 0); } }
   const wrap = (txt, w, font) => { m.font = font; const out = []; let cur = ''; String(txt || '').split(/\s+/).forEach(word => { const t = cur ? cur + ' ' + word : word; if (m.measureText(t).width <= w - 24 || !cur) cur = t; else { out.push(cur); cur = word; } }); out.push(cur); return out; };
   sections.forEach(sec => { sec.cells = sec.rows.map(r => r.map((c, j) => wrap(c, widths[j], j === 0 ? fb : f))); sec.rhs = sec.cells.map(cs => Math.max(34, Math.max(...cs.map(l => l.length)) * lh + 16)); });
   const groups = exSummary(), cardW = 270, cgap = 10, pillH = 22;
@@ -3036,6 +3041,7 @@ function exTableCanvas() {
     cd.pills.forEach(pl => { const px = x0 + 12 + pl.x, py = y0 + 36 + pl.row * (pillH + 6); rr(g, px, py, pl.w, pillH, 11); g.fillStyle = pl.it.c; g.fill(); g.fillStyle = '#fff'; g.font = 'bold 12px Arial, sans-serif'; g.fillText(pl.t, px + 9, py + pillH / 2 + 1); });
   });
   // pictogrammes
+  let sec_cur = null;
   const icon = (kind, x, y, col) => { // pictogramme 34x22 : remorque (caisse seule) / camion (cabine + caisse)
     g.save(); g.translate(x, y); g.fillStyle = col;
     if (kind === 'tractor') {
@@ -3045,7 +3051,7 @@ function exTableCanvas() {
     } else if (kind === 'vehicle') {
       rr(g, 0, 1, 19, 14, 2); g.fill();                                   // caisse
       g.beginPath(); g.moveTo(21, 5); g.lineTo(27, 5); g.lineTo(33, 10); g.lineTo(33, 15); g.lineTo(21, 15); g.closePath(); g.fill(); // cabine
-      g.fillStyle = col === '#fff' ? '#6d28d9' : '#fff'; g.beginPath(); g.moveTo(23, 7); g.lineTo(26.5, 7); g.lineTo(30, 10.5); g.lineTo(23, 10.5); g.closePath(); g.fill(); // vitre
+      g.fillStyle = col === '#fff' ? (sec_cur && sec_cur.color || '#6d28d9') : '#fff'; g.beginPath(); g.moveTo(23, 7); g.lineTo(26.5, 7); g.lineTo(30, 10.5); g.lineTo(23, 10.5); g.closePath(); g.fill(); // vitre
     } else {
       rr(g, 0, 1, 30, 14, 2); g.fill();                                   // caisse
       g.fillRect(30, 12, 4, 3); g.fillRect(26, 15, 2, 3);                  // sellette + béquille
@@ -3061,10 +3067,10 @@ function exTableCanvas() {
   sections.forEach((sec, si) => {
     if (si) y += gapS;
     breaks.push(y - Math.floor(si ? gapS / 2 : 0));
-    const x0 = pad, X1 = pad + tableW;
+    const x0 = pad, X1 = pad + tableW; sec_cur = sec;
     // bandeau de section
     rr(g, x0, y, tableW, banH + 8, 10); g.fillStyle = sec.color; g.fill();
-    icon(sec.kind, x0 + 14, y + 10, '#fff');
+    icon(sec.kind === 'van' ? 'vehicle' : sec.kind, x0 + 14, y + 10, '#fff');
     g.fillStyle = '#fff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = 'bold 17px Arial, sans-serif'; g.fillText(sec.title.toUpperCase(), x0 + 60, y + banH / 2);
     m.font = 'bold 17px Arial, sans-serif'; const tw = m.measureText(sec.title.toUpperCase()).width;
     rr(g, x0 + 60 + tw + 10, y + banH / 2 - 11, 34, 22, 11); g.fillStyle = '#fff'; g.fill();
@@ -3998,7 +4004,7 @@ const VTYPES = ['Remorque', 'Châssis', 'Camion', 'Fourgon', 'Tracteur'];
 const vtypeKind = t => (t === 'Camion' || t === 'Fourgon' || t === 'Tracteur') ? 'vehicle' : 'trailer';
 function isTractor(num) { const e = num ? trailerDB[num] : null; return !!(e && e.vtype === 'Tracteur'); }
 // Camions / fourgons / tracteurs : la PLAQUE est l'identifiant principal (le n° passe en second)
-function mainId(num, kind) { const e = num ? trailerDB[num] : null; const veh = e ? kindOf(e) === 'vehicle' : kind === 'vehicle'; return (veh && e && e.plate) ? e.plate : (num || ''); }
+function mainId(num, kind) { const e = num ? trailerDB[num] : null; if (e && e.vtype === 'Châssis' && e.container) return e.container; const veh = e ? kindOf(e) === 'vehicle' : kind === 'vehicle'; return (veh && e && e.plate) ? e.plate : (num || ''); }
 function isChassis(num) { const e = num ? trailerDB[num] : null; return !!(e && e.vtype === 'Châssis'); }
 const contOf = it => (it && it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].container) || (it && it.container) || '';
 function setChassisContainer(num, val) { const e = num ? trailerDB[num] : null; if (!e || e.vtype !== 'Châssis') return false; val = val || ''; if ((e.container || '') === val) return false; const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu'); const now = new Date().toISOString(); e.container = val || undefined; e.modifiedBy = who; e.modifiedAt = now; e.history = (e.history || []).concat([{ action: 'container : ' + (val || '—'), by: who, date: now }]); saveTrailerDB().catch(() => toast('Erreur de synchronisation')); return true; }
@@ -4681,7 +4687,7 @@ function renderListPanel() {
           <div class="lp-badge ${badgeClass}">${badgeText}</div>
         </div>
       </div>
-      <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}${(mainId(it.trailer, kindOf(it)) !== it.trailer && it.trailer) ? ((compactLabel || it.client) ? ' · ' : '') + 'N° ' + escapeHtml(it.trailer) : ((trailerDB[it.trailer] && trailerDB[it.trailer].plate) ? ((compactLabel || it.client) ? ' · ' : '') + '🔖 ' + escapeHtml(trailerDB[it.trailer].plate) : '')}${contOf(it) ? ' · 📦 ' + escapeHtml(contOf(it)) : ''}${fleetInfo(trailerDB[it.trailer]) ? ' · 🏷 ' + escapeHtml(fleetInfo(trailerDB[it.trailer])) : ''}</div>
+      <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}${(mainId(it.trailer, kindOf(it)) !== it.trailer && it.trailer) ? ((compactLabel || it.client) ? ' · ' : '') + 'N° ' + escapeHtml(it.trailer) : ((trailerDB[it.trailer] && trailerDB[it.trailer].plate) ? ((compactLabel || it.client) ? ' · ' : '') + '🔖 ' + escapeHtml(trailerDB[it.trailer].plate) : '')}${(contOf(it) && mainId(it.trailer, kindOf(it)) !== contOf(it)) ? ' · 📦 ' + escapeHtml(contOf(it)) : ''}${fleetInfo(trailerDB[it.trailer]) ? ' · 🏷 ' + escapeHtml(fleetInfo(trailerDB[it.trailer])) : ''}</div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-meta">🔄 <span style="${isOverThreshold ? 'color:#f87171; font-weight:700;' : ''}">${days}j</span>${it.time ? ' · déposée le ' + new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' }) : ''}${it.notes ? ' · 📝 ' + it.notes : ''}</div>
         <div style="display:flex; gap:4px; flex-shrink:0;">
@@ -4908,7 +4914,7 @@ function openDetailView(item) {
     pr.style.display = (pe && pe.plate) || vehMain ? '' : 'none';
     pr.firstElementChild.textContent = vehMain ? 'N°' : 'Plaque';
     document.getElementById('detail-plate').textContent = vehMain ? item.trailer : (pe && pe.plate ? pe.plate : '—'); }
-  { const cr = document.getElementById('detail-container-row'); cr.style.display = contOf(item) ? '' : 'none'; document.getElementById('detail-container').textContent = contOf(item) || '—'; }
+  { const cr = document.getElementById('detail-container-row'); const cm = isChassis(item.trailer) && contOf(item); cr.style.display = contOf(item) ? '' : 'none'; cr.firstElementChild.textContent = cm ? 'N° châssis' : 'Container'; document.getElementById('detail-container').textContent = cm ? item.trailer : (contOf(item) || '—'); }
   document.getElementById('detail-days').textContent = `${days} jour${days > 1 ? 's' : ''}${item.time ? ' (depuis le ' + formatDateTime(item.time) + ')' : ''}`;
   const notesRow = document.getElementById('detail-notes-row');
   if (item.notes) {
@@ -5526,7 +5532,7 @@ function renderDbPanel() {
         <div class="lp-num">${escapeHtml(mainId(num, kindOf(entry)))}</div>
         <div class="lp-badge ${badgeClass}">${badgeText}</div>
       </div>
-      ${fleetInfo(entry) ? `<div class="lp-meta">🏷 ${escapeHtml(fleetInfo(entry))}${entry.container ? ' · 📦 ' + escapeHtml(entry.container) : ''}${mainId(num, kindOf(entry)) !== num ? ' · N° ' + escapeHtml(num) : ''}</div>` : (mainId(num, kindOf(entry)) !== num ? `<div class="lp-meta">N° ${escapeHtml(num)}</div>` : '')}
+      ${fleetInfo(entry) ? `<div class="lp-meta">🏷 ${escapeHtml(fleetInfo(entry))}${mainId(num, kindOf(entry)) !== num ? ' · N° ' + escapeHtml(num) : ''}</div>` : (mainId(num, kindOf(entry)) !== num ? `<div class="lp-meta">N° ${escapeHtml(num)}</div>` : '')}
       <div class="lp-meta">${entry.plate ? '🔖 ' + entry.plate + ' · ' : ''}${entry.ctExpiryDate ? 'Valide jusqu\'au ' + entry.ctExpiryDate : 'Pas de CT'}</div>
       ${entry.notes ? `<div class="lp-meta">📝 ${entry.notes}</div>` : ''}
       ${entry.modifiedAt ? `<div class="lp-meta">🕓 Mis à jour le ${formatDateTime(entry.modifiedAt)}</div>` : ''}
