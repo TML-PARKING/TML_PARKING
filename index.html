@@ -902,6 +902,10 @@
       <div id="scan-plate-status" style="display:none; margin-top:8px; font-size:12.5px; padding:9px 11px; border-radius:12px; background:var(--surface-1);"></div>
       <div id="ct-indicator" style="margin-top:6px; font-size:13px; font-weight:600; display:none; padding:8px 10px; border-radius:8px;"></div>
     </div>
+    <div class="field" id="f-container-wrap" style="display:none;">
+      <label>N° container (sur ce dépôt)</label>
+      <input type="text" id="f-container" placeholder="Ex: MSCU1234567" autocomplete="off" autocapitalize="characters">
+    </div>
     <div class="field">
       <label>Client</label>
       <input type="text" id="f-client" list="client-presets-list" placeholder="Ex: Chaussea, Nike, H&M..." autocomplete="off">
@@ -919,10 +923,6 @@
     <div class="field">
       <label>Contenu / notes</label>
       <input type="text" id="f-notes" list="content-presets-list" placeholder="Ex: TR Orbette, Retour Trémery..." autocomplete="off">
-    </div>
-    <div class="field" id="f-container-wrap" style="display:none;">
-      <label>N° container (sur ce dépôt)</label>
-      <input type="text" id="f-container" placeholder="Ex: MSCU1234567" autocomplete="off" autocapitalize="characters">
     </div>
     <div class="field">
       <label>Photos</label>
@@ -2889,7 +2889,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-27-ocr-54";
+const APP_VERSION = "2026-11-27-ocr-55";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
