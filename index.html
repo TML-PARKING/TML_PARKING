@@ -2889,7 +2889,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-27-ocr-56";
+const APP_VERSION = "2026-11-27-ocr-57";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -4094,6 +4094,26 @@ function isChassis(num) { const e = num ? trailerDB[num] : null; return !!(e && 
 // Le container est propre à chaque dépôt (il change d'un trajet à l'autre). Ancienne valeur fixée sur la fiche du châssis : simple repli tant qu'elle n'est pas remplacée.
 const contOf = it => (it && it.container) || (it && it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].vtype === 'Châssis' && trailerDB[it.trailer].container) || '';
 function dropLegacyContainer(num) { const e = num ? trailerDB[num] : null; if (!e || !e.container) return; e.container = undefined; saveTrailerDB().catch(() => { }); }
+// Liste déroulante des modèles déjà utilisés (les plus fréquents d'abord, filtrés sur le type choisi s'il y en a)
+function knownModels(vtype) {
+  const count = (filter) => { const m = {}; Object.values(trailerDB).forEach(e => { const mo = String(e && e.model || '').trim(); if (!mo || (filter && e.vtype !== vtype)) return; const k = mo.toLowerCase(); m[k] = m[k] || { n: 0, c: {} }; m[k].n++; m[k].c[mo] = (m[k].c[mo] || 0) + 1; }); return Object.values(m).map(o => ({ n: o.n, label: Object.entries(o.c).sort((a, b) => b[1] - a[1])[0][0] })).sort((a, b) => b.n - a.n || a.label.localeCompare(b.label)); };
+  const byType = vtype ? count(true) : []; return (byType.length ? byType : count(false)).map(o => o.label);
+}
+function attachModelPicker(inputId, vtypeId) {
+  const inp = document.getElementById(inputId); if (!inp || inp._mp) return; inp._mp = 1;
+  const box = document.createElement('div'); box.style.cssText = 'display:none;margin-top:6px;border-radius:14px;overflow-y:auto;background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--panel-hair);max-height:220px;';
+  inp.insertAdjacentElement('afterend', box);
+  const show = () => {
+    const q = inp.value.trim().toLowerCase(), vt = vtypeId ? (document.getElementById(vtypeId) || {}).value : '';
+    const m = knownModels(vt).filter(x => !q || x.toLowerCase().includes(q)).filter(x => x.toLowerCase() !== q).slice(0, 40);
+    if (!m.length) { box.style.display = 'none'; return; }
+    box.innerHTML = m.map(x => '<div data-m="' + escapeHtml(x) + '" style="padding:11px 14px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--panel-hair);">' + escapeHtml(x) + '</div>').join('');
+    box.style.display = '';
+  };
+  inp.addEventListener('input', show); inp.addEventListener('focus', show); inp.addEventListener('click', show); inp.addEventListener('blur', () => setTimeout(() => { box.style.display = 'none'; }, 180));
+  box.addEventListener('mousedown', e => { const d = e.target.closest('[data-m]'); if (!d) return; e.preventDefault(); inp.value = d.dataset.m; box.style.display = 'none'; });
+}
+attachModelPicker('db-f-model', 'db-f-vtype');
 const fmtContainer = n => /^[A-Z]{4}\d{7}$/.test(n) ? n.slice(0, 4) + ' ' + n.slice(4, 10) + ' ' + n.slice(10) : n;
 // Suggestions sous un champ container : on tape un bout du numéro (ex. 4551 ou 455100) et la liste connue répond
 function attachContainerSuggest(inputId) {
@@ -5689,6 +5709,7 @@ document.getElementById('btn-db-bulk').onclick = () => {
   document.body.appendChild(m);
   m.onclick = e => { if (e.target === m) m.remove(); };
   document.getElementById('bulk-cancel').onclick = () => m.remove();
+  attachModelPicker('bulk-model', 'bulk-vtype');
   document.getElementById('bulk-apply').onclick = () => {
     const vt = document.getElementById('bulk-vtype').value, model = document.getElementById('bulk-model').value.trim(), clear = document.getElementById('bulk-clear').checked;
     if (!vt && !model && !clear) { toast('Rien à modifier'); return; }
