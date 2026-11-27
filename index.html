@@ -921,7 +921,7 @@
       <input type="text" id="f-notes" list="content-presets-list" placeholder="Ex: TR Orbette, Retour Trémery..." autocomplete="off">
     </div>
     <div class="field" id="f-container-wrap" style="display:none;">
-      <label>N° container (fixé au châssis)</label>
+      <label>N° container (sur ce dépôt)</label>
       <input type="text" id="f-container" placeholder="Ex: MSCU1234567" autocomplete="off" autocapitalize="characters">
     </div>
     <div class="field">
@@ -1075,7 +1075,7 @@
       <input type="text" id="edit-status-client" list="client-presets-list" placeholder="Client...">
     </div>
  <div class="field" id="edit-container-wrap" style="display:none;">
-      <label>N° container (fixé au châssis)</label>
+      <label>N° container (sur ce dépôt)</label>
       <input type="text" id="edit-status-container" placeholder="Ex: MSCU1234567" autocomplete="off" autocapitalize="characters">
     </div>
     <div class="field">
@@ -1407,7 +1407,7 @@
       <select id="db-f-vtype" style="width:100%;"><option value="">—</option><option>Remorque</option><option value="Châssis">Châssis/container</option><option>Camion</option><option>Fourgon</option><option>Tracteur</option></select>
     </div>
     <div class="field" id="db-f-container-wrap" style="display:none;">
-      <label>N° container (fixé au châssis)</label>
+      <label>N° container (sur ce dépôt)</label>
       <input type="text" id="db-f-container" placeholder="Ex: MSCU1234567" autocomplete="off" autocapitalize="characters">
     </div>
     <div class="field" id="db-f-model-wrap">
@@ -1584,6 +1584,7 @@ const STORAGE_KEY_DOCKS_CONFIG = "yard:docks-config";
 const STORAGE_KEY_DOCK_OCCUPANCY = "yard:dock-occupancy";
 let dbActiveFilters = new Set(); // vide = "Tous"
 let mailDirectory = { contacts: [], groups: [] }; // carnet d'adresses mail (contacts + groupes)
+let containerList = []; // numéros de containers connus (compacts, ex. TMLA4551000) : sert aux suggestions à l'encodage
 function migrateFilters(cfg) {
   // ajoute une seule fois le filtre « En cours de chargement » aux filtres déjà enregistrés
   if (cfg && Array.isArray(cfg.list) && !cfg._acharAdded) {
@@ -1735,6 +1736,7 @@ async function loadAll(preFetched) {
   teamUsers = d.teamUsers || {};
   clientPresets = Array.isArray(d.clientPresets) ? d.clientPresets : [];
   filtersConfig = (d.filtersConfig && typeof d.filtersConfig === 'object') ? migrateFilters(JSON.parse(JSON.stringify(d.filtersConfig).replace(/À charger/g, 'En cours de chargement'))) : null;
+  if (Array.isArray(d.containerList)) containerList = d.containerList;
   if (d.mailDirectory && Array.isArray(d.mailDirectory.contacts)) mailDirectory = { contacts: d.mailDirectory.contacts, groups: Array.isArray(d.mailDirectory.groups) ? d.mailDirectory.groups : [] };
   try { renderFilterBars(); } catch (e) {}
   contentPresetsByClient = d.contentPresets || {};
@@ -1766,6 +1768,10 @@ async function saveDockCount() {
 async function saveFreeTrailers() {
   try { await backendSave('saveFreeTrailers', STORAGE_KEY_FREE_TRAILERS, freeTrailers); }
   catch(e) { toast("Erreur sauvegarde"); }
+}
+async function saveContainerList() {
+  try { await backendSave('saveContainerList', 'yard:container-list', containerList); }
+  catch (e) { toast('Erreur sauvegarde de la liste des containers'); }
 }
 async function saveMailDirectory() {
   try { await backendSave('saveMailDirectory', 'yard:mail-directory', mailDirectory); }
@@ -2055,6 +2061,7 @@ function applyFreshState(d) {
     if (Array.isArray(d.clientPresets)) clientPresets = d.clientPresets;
     if (d.contentPresets && typeof d.contentPresets === 'object') contentPresetsByClient = d.contentPresets;
     if (d.filtersConfig && typeof d.filtersConfig === 'object') { filtersConfig = migrateFilters(JSON.parse(JSON.stringify(d.filtersConfig).replace(/À charger/g, 'En cours de chargement'))); renderFilterBars(); }
+    if (Array.isArray(d.containerList)) containerList = d.containerList;
     if (d.mailDirectory && Array.isArray(d.mailDirectory.contacts) && typeof mdModalOpen !== 'undefined' && !mdModalOpen) mailDirectory = { contacts: d.mailDirectory.contacts, groups: Array.isArray(d.mailDirectory.groups) ? d.mailDirectory.groups : [] };
   } catch (e) { console.warn('refresh listes', e); }
   const newOcc = d.occupancy || {};
@@ -2882,7 +2889,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-26-ocr-52";
+const APP_VERSION = "2026-11-27-ocr-54";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -4076,10 +4083,28 @@ const VTYPES = ['Remorque', 'Châssis', 'Camion', 'Fourgon', 'Tracteur'];
 const vtypeKind = t => (t === 'Camion' || t === 'Fourgon' || t === 'Tracteur') ? 'vehicle' : 'trailer';
 function isTractor(num) { const e = num ? trailerDB[num] : null; return !!(e && e.vtype === 'Tracteur'); }
 // Camions / fourgons / tracteurs : la PLAQUE est l'identifiant principal (le n° passe en second)
-function mainId(num, kind) { const e = num ? trailerDB[num] : null; if (e && e.vtype === 'Châssis' && e.container) return e.container; const veh = e ? kindOf(e) === 'vehicle' : kind === 'vehicle'; return (veh && e && e.plate) ? e.plate : (num || ''); }
+function mainId(num, kind, it) { const e = num ? trailerDB[num] : null; if (e && e.vtype === 'Châssis' && it && contOf(it)) return contOf(it); const veh = e ? kindOf(e) === 'vehicle' : kind === 'vehicle'; return (veh && e && e.plate) ? e.plate : (num || ''); }
 function isChassis(num) { const e = num ? trailerDB[num] : null; return !!(e && e.vtype === 'Châssis'); }
-const contOf = it => (it && it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].container) || (it && it.container) || '';
-function setChassisContainer(num, val) { const e = num ? trailerDB[num] : null; if (!e || e.vtype !== 'Châssis') return false; val = val || ''; if ((e.container || '') === val) return false; const who = (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : 'Inconnu'); const now = new Date().toISOString(); e.container = val || undefined; e.modifiedBy = who; e.modifiedAt = now; e.history = (e.history || []).concat([{ action: 'container : ' + (val || '—'), by: who, date: now }]); saveTrailerDB().catch(() => toast('Erreur de synchronisation')); return true; }
+// Le container est propre à chaque dépôt (il change d'un trajet à l'autre). Ancienne valeur fixée sur la fiche du châssis : simple repli tant qu'elle n'est pas remplacée.
+const contOf = it => (it && it.container) || (it && it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].vtype === 'Châssis' && trailerDB[it.trailer].container) || '';
+function dropLegacyContainer(num) { const e = num ? trailerDB[num] : null; if (!e || !e.container) return; e.container = undefined; saveTrailerDB().catch(() => { }); }
+const fmtContainer = n => /^[A-Z]{4}\d{7}$/.test(n) ? n.slice(0, 4) + ' ' + n.slice(4, 10) + ' ' + n.slice(10) : n;
+// Suggestions sous un champ container : on tape un bout du numéro (ex. 4551 ou 455100) et la liste connue répond
+function attachContainerSuggest(inputId) {
+  const inp = document.getElementById(inputId); if (!inp || inp._cs) return; inp._cs = 1;
+  const box = document.createElement('div'); box.style.cssText = 'display:none;margin-top:6px;border-radius:14px;overflow:hidden;background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--panel-hair);max-height:230px;overflow-y:auto;';
+  inp.insertAdjacentElement('afterend', box);
+  const show = () => {
+    const q = normContainer(inp.value); if (q.length < 2 || !containerList.length) { box.style.display = 'none'; return; }
+    const m = containerList.filter(n => n.includes(q) && n !== q).sort((a, b) => (b.startsWith(q) - a.startsWith(q)) || a.localeCompare(b)).slice(0, 8);
+    if (!m.length) { box.style.display = 'none'; return; }
+    box.innerHTML = m.map(n => '<div data-n="' + n + '" style="padding:11px 14px;font-weight:700;cursor:pointer;border-bottom:1px solid var(--panel-hair);">📦 ' + escapeHtml(fmtContainer(n)).replace(new RegExp('(' + q.split('').join(' ?') + ')'), '<span style="color:var(--accent,#f59e0b)">$1</span>') + '</div>').join('');
+    box.style.display = '';
+  };
+  inp.addEventListener('input', show); inp.addEventListener('focus', show); inp.addEventListener('blur', () => setTimeout(() => { box.style.display = 'none'; }, 180));
+  box.addEventListener('mousedown', e => { const d = e.target.closest('[data-n]'); if (!d) return; e.preventDefault(); inp.value = d.dataset.n; box.style.display = 'none'; inp.dispatchEvent(new Event('change')); });
+}
+['f-container', 'edit-status-container'].forEach(attachContainerSuggest);
 const normContainer = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const vlabel = t => t === 'Châssis' ? 'Châssis/container' : (t || '');
 function fleetInfo(entry) { // « Remorque · Mega » ; pour un tracteur uniquement « Tracteur » (le modèle serait redondant)
@@ -4090,6 +4115,15 @@ function normVtype(t) {
   const l = String(t || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return ({ remorque: 'Remorque', chassis: 'Châssis', 'chassis/container': 'Châssis', 'chassis container': 'Châssis', container: 'Châssis', camion: 'Camion', fourgon: 'Fourgon', tracteur: 'Tracteur' })[l] || '';
 }
+// Types néerlandais du fichier « Remorques » → type + modèle de l'app (mêmes libellés que la base existante)
+const NL_TYPES = {
+  'MEGA': ['Remorque', 'Mega'], 'STANDAARD': ['Remorque', 'Standard'], 'PLATEAU': ['Remorque', 'Plateau'],
+  'MEGA + SCHUIFDAK': ['Remorque', 'Mega + sliding roof'], 'DRYBOXLINER': ['Remorque', 'Drybox liner'], 'DRYBOXLINER + LAADBRUG': ['Remorque', 'Drybox liner + loading bridge'],
+  'CITY TRAILER': ['Remorque', 'City trailer'], 'MEGA COIL TRAILER': ['Remorque', 'Mega coil'], 'DUBBELDEKTRAILER': ['Remorque', 'Double deck'],
+  'STANDAARD VORKLIFT': ['Remorque', 'Standard forklift'], 'STANDARD COILER': ['Remorque', 'Standard Coil'], 'STANDAARD + KLEP': ['Remorque', 'Standard taillift'], 'REEFER': ['Remorque', 'Reefer'],
+  'CONTAINER CHASSIS': ['Châssis', 'Container chassis'], 'CHASSIS 45': ['Châssis', 'Chassis 45ft'], '20FT CHASSIS': ['Châssis', 'Chassis 20ft'],
+  '40 TON TRACTOR UNIT': ['Tracteur', ''], '40 TON + BULKCOMPRESSOR': ['Tracteur', '']
+};
 async function importFleetRows(rows, c) {
   const who = (currentUser && currentUser.name) || 'Inconnu', now = new Date().toISOString();
   const idxKey = {}, idxPlate = {};
@@ -4099,7 +4133,7 @@ async function importFleetRows(rows, c) {
   const canon = {}; Object.entries(cnt).forEach(([l, o]) => { canon[l] = Object.entries(o).sort((a, b) => b[1] - a[1])[0][0]; });
   // Un tracteur et une remorque peuvent porter le même n° (ex. AN015) : le tracteur prend alors la clé « AN015 (TRACTEUR) »
   const nonTr = new Set(); rows.slice(1).forEach(r => { if (r && r[c.hNom] && normVtype(r[c.hType]) && normVtype(r[c.hType]) !== 'Tracteur') nonTr.add(String(r[c.hNom]).trim().toUpperCase()); });
-  const next = { ...trailerDB }, perType = {}; let linked = 0, added = 0, skipped = 0, changed = 0;
+  const next = { ...trailerDB }, perType = {}; let linked = 0, added = 0, skipped = 0, changed = 0, conflicts = 0, byPlate = 0;
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i]; if (!r || !r[c.hNom]) continue;
     const nom = String(r[c.hNom]).trim().toUpperCase(), vt = normVtype(r[c.hType]);
@@ -4113,7 +4147,12 @@ async function importFleetRows(rows, c) {
     if (!key && bk !== nom && plate && idxPlate[normPlate(plate)]) key = idxPlate[normPlate(plate)];
     const ex = key ? next[key] : null;
     perType[vt] = (perType[vt] || 0) + 1;
-    if (ex) {
+    if (ex && c.fillOnly) {
+      linked++; if (!idxKey[normPlate(bk)]) byPlate++;
+      const nv = ex.vtype || vt, nm = ex.model || ((ex.vtype && ex.vtype !== vt) ? '' : model), np2 = ex.plate || plate;
+      if (ex.vtype && ex.vtype !== vt) conflicts++;
+      if (nv !== ex.vtype || nm !== (ex.model || '') || np2 !== (ex.plate || '')) { changed++; next[key] = { ...ex, vtype: nv, model: nm, plate: np2, kind: ex.vtype ? ex.kind : (vtypeKind(nv) === 'vehicle' ? 'vehicle' : ex.kind) }; }
+    } else if (ex) {
       linked++;
       const np = ex.plate || plate;
       if (ex.vtype !== vt || (ex.model || '') !== model || (ex.plate || '') !== np) { changed++; next[key] = { ...ex, vtype: vt, model, plate: np }; }
@@ -4121,6 +4160,12 @@ async function importFleetRows(rows, c) {
       added++; idxKey[normPlate(bk)] = bk;
       next[bk] = { ctExpiryDate: '', plate, notes: '', vtype: vt, model, kind: vtypeKind(vt) === 'vehicle' ? 'vehicle' : undefined, createdBy: who, createdAt: now, modifiedBy: who, modifiedAt: now, history: [{ action: 'import flotte (création, sans CT)', by: who, date: now }] };
     }
+  }
+  if (c.fillOnly) {
+    const pc = {}; rows.slice(1).forEach(r => { const pl = c.hPlate >= 0 ? String(r[c.hPlate] || '').trim().toUpperCase() : ''; if (pl) pc[pl] = (pc[pl] || 0) + 1; });
+    const dupPl = Object.values(pc).filter(n => n > 1).length;
+    const msg = `Compléter la base ?\n\n• ${added} nouveaux véhicules ajoutés (sans CT)\n• ${linked} déjà en base (${byPlate} retrouvés par la plaque), dont ${changed} complétés (type / modèle / plaque manquants)\n• ${conflicts} avec un type différent : le type déjà en base est conservé\n• ${dupPl} plaque(s) partagée(s) par plusieurs numéros dans le fichier\n• ${skipped} ignoré(s)`;
+    if (!confirm(msg)) { toast('Import annulé'); return; }
   }
   trailerDB = next;
   renderDbPanel();
@@ -4133,7 +4178,7 @@ function applyTractorMode() {
   const wr = [document.getElementById('f-client'), document.querySelector('.status-options'), document.getElementById('f-notes')].map(el => el && el.closest('.field'));
   wr.forEach(w => { if (w) w.style.display = t ? 'none' : ''; });
   const w = document.getElementById('f-age-warning'); if (w) w.style.display = t ? 'none' : '';
-  { const cw = document.getElementById('f-container-wrap'), tn = document.getElementById('f-trailer').value.trim(), ch = isChassis(tn); if (cw) cw.style.display = ch ? '' : 'none'; if (ch && window._chN !== tn) { document.getElementById('f-container').value = (trailerDB[tn] && trailerDB[tn].container) || ''; } window._chN = ch ? tn : null; }
+  { const cw = document.getElementById('f-container-wrap'), tn = document.getElementById('f-trailer').value.trim(), ch = isChassis(tn); if (cw) cw.style.display = ch ? '' : 'none'; if (ch && window._chN && window._chN !== tn) { document.getElementById('f-container').value = ''; } window._chN = ch ? tn : null; }
 }
 function getCtStatus(expiryDate) {
   if (!expiryDate) return null;
@@ -4276,7 +4321,8 @@ document.getElementById('btn-save').onclick = async () => {
     time: existingTime || new Date().toISOString(),
     encodedBy: existingEncodedBy || (currentUser && currentUser.name) || (driverMode ? 'Chauffeur (accès temporaire)' : undefined)
   };
-  if (isChassis(trailer)) setChassisContainer(trailer, normContainer(document.getElementById('f-container').value));
+  data.container = isChassis(trailer) ? (normContainer(document.getElementById('f-container').value) || undefined) : undefined;
+  if (isChassis(trailer)) dropLegacyContainer(trailer);
 
   if (currentTarget.type === 'spot') {
     occupancy[currentTarget.id] = { ...occupancy[currentTarget.id], ...data };
@@ -4500,7 +4546,7 @@ async function performRemove(target) {
       kind: removedData.kind === 'vehicle' ? 'vehicle' : undefined,
       comments: removedData.comments || [],
       photos: removedData.photos,
-      container: removedData.container,
+      container: contOf(removedData) || undefined,
       label,
       dropTime: removedData.time,
       removeTime: new Date().toISOString(),
@@ -4756,13 +4802,13 @@ function renderListPanel() {
     const compactLabel = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-num"><svg class="i" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px;opacity:.75"><use href="#${kindOf(it) === 'vehicle' ? 'i-truck' : 'i-trailer'}"/></svg>${escapeHtml(mainId(it.trailer, kindOf(it)) || '(sans n°)')}</div>
+        <div class="lp-num"><svg class="i" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px;opacity:.75"><use href="#${kindOf(it) === 'vehicle' ? 'i-truck' : 'i-trailer'}"/></svg>${escapeHtml(mainId(it.trailer, kindOf(it), it) || '(sans n°)')}</div>
         <div style="display:flex; gap:6px; align-items:center;">
           ${ctBadgeHtml}
           <div class="lp-badge ${badgeClass}">${badgeText}</div>
         </div>
       </div>
-      <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}${(mainId(it.trailer, kindOf(it)) !== it.trailer && it.trailer) ? ((compactLabel || it.client) ? ' · ' : '') + 'N° ' + escapeHtml(it.trailer) : ((trailerDB[it.trailer] && trailerDB[it.trailer].plate) ? ((compactLabel || it.client) ? ' · ' : '') + '🔖 ' + escapeHtml(trailerDB[it.trailer].plate) : '')}${(contOf(it) && mainId(it.trailer, kindOf(it)) !== contOf(it)) ? ' · 📦 ' + escapeHtml(contOf(it)) : ''}${fleetInfo(trailerDB[it.trailer]) ? ' · 🏷 ' + escapeHtml(fleetInfo(trailerDB[it.trailer])) : ''}</div>
+      <div class="lp-meta">${compactLabel}${compactLabel && it.client ? ' · ' : ''}${it.client || ''}${(mainId(it.trailer, kindOf(it), it) !== it.trailer && it.trailer) ? ((compactLabel || it.client) ? ' · ' : '') + 'N° ' + escapeHtml(it.trailer) : ((trailerDB[it.trailer] && trailerDB[it.trailer].plate) ? ((compactLabel || it.client) ? ' · ' : '') + '🔖 ' + escapeHtml(trailerDB[it.trailer].plate) : '')}${(contOf(it) && mainId(it.trailer, kindOf(it), it) !== contOf(it)) ? ' · 📦 ' + escapeHtml(contOf(it)) : ''}${fleetInfo(trailerDB[it.trailer]) ? ' · 🏷 ' + escapeHtml(fleetInfo(trailerDB[it.trailer])) : ''}</div>
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div class="lp-meta">🔄 <span style="${isOverThreshold ? 'color:#f87171; font-weight:700;' : ''}">${days}j</span>${it.time ? ' · déposée le ' + new Date(it.time).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' }) : ''}${it.notes ? ' · 📝 ' + it.notes : ''}</div>
         <div style="display:flex; gap:4px; flex-shrink:0;">
@@ -4926,7 +4972,7 @@ function renderHistoryPanel() {
 
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div class="lp-num">${escapeHtml(mainId(h.trailer, kindOf(h)) || '(sans n°)')}</div>
+        <div class="lp-num">${escapeHtml(mainId(h.trailer, kindOf(h), h) || '(sans n°)')}</div>
         <div class="lp-badge ${h.status || 'pleine'}">${h.status === 'fleet' ? 'Fleet' : (h.status === 'vide' ? 'Vide' : (h.status === 'pleine' ? 'À vider' : (h.status === 'charge' ? 'Chargé' : (h.status === 'achar' ? 'En cours de chargement' : (h.status || '')))))}</div>
       </div>
       <div class="lp-meta">${h.label}${h.client ? ' · ' + h.client : ''}</div>
@@ -4967,7 +5013,7 @@ function openDetailView(item) {
   if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
   detailTarget = item;
   const days = daysSince(item.time);
-  document.getElementById('detail-title').textContent = mainId(item.trailer, kindOf(item)) || '(sans n°)';
+  document.getElementById('detail-title').textContent = mainId(item.trailer, kindOf(item), item) || '(sans n°)';
   renderDetailComments(item);
   renderDetailPhotos(item);
 
@@ -5121,7 +5167,7 @@ document.getElementById('btn-edit-status-save').onclick = async () => {
   record.status = status;
   record.client = client;
   record.notes = notes;
-  record.container = undefined; if (isChassis(record.trailer)) setChassisContainer(record.trailer, containerNew);
+  record.container = containerNew || undefined; if (isChassis(record.trailer)) dropLegacyContainer(record.trailer);
 
   rerenderMapLayersFor(editStatusTarget.type);
   if (listPanel.classList.contains('open')) renderListPanel();
@@ -5717,7 +5763,7 @@ document.getElementById('db-import-file-input').addEventListener('change', async
   if (!file) return;
   if (!hasPermission('trailerdbImport')) { toast("Accès non autorisé"); return; }
 
-  const confirmMsg = "Ce fichier va mettre à jour la base : les remorques du fichier seront ajoutées/actualisées, celles déjà en base mais absentes du fichier resteront inchangées. Continuer ?";
+  const confirmMsg = "Ce fichier va compléter la base (ajouts / mises à jour) : rien de ce qui est déjà en base n'est supprimé. Continuer ?";
   if (!confirm(confirmMsg)) { e.target.value = ''; return; }
 
   try {
@@ -5738,7 +5784,32 @@ document.getElementById('db-import-file-input').addEventListener('change', async
     if (colTrailer === -1) colTrailer = headerRow.findIndex(h => (h.includes('n°') || h.startsWith('n ') || h === 'n' || h.includes('num')) && !h.includes('plaque'));
     if (colTrailer === -1) colTrailer = headerRow.findIndex((h, i) => i === 0 && !h.includes('plaque') && !h.includes('date') && !h.includes('échéance') && !h.includes('echeance'));
     const hNom = headerRow.indexOf('nom'), hType = headerRow.indexOf('type'), hModel = headerRow.findIndex(h => h === 'modèle' || h === 'modele' || h === 'model'), hPl = headerRow.findIndex(h => h.includes('plaque'));
-    if (hNom !== -1 && hType !== -1) { await importFleetRows(rows, { hNom, hType, hModel, hPlate: hPl }); e.target.value = ''; return; }
+    const isContainerFile = headerRow.indexOf('nom') !== -1 && headerRow.some(h => /^(propre|produit|actif)$|d[ée]pose|reprise/.test(h));
+    if (hNom !== -1 && hType !== -1 && !isContainerFile) { await importFleetRows(rows, { hNom, hType, hModel, hPlate: hPl }); e.target.value = ''; return; }
+    if (isContainerFile) {
+      // Fichier « Conteneurs » (Code / Nom / … ) : liste des numéros de containers pour les suggestions à l'encodage
+      const hN = headerRow.indexOf('nom'), have = new Set(containerList), add = [], seen = new Set(); let bad = 0, known = 0;
+      rows.slice(1).forEach(r => { if (!r || !r[hN]) return; const n = normContainer(r[hN]); if (!/^[A-Z]{4}\d{6,7}$/.test(n)) { bad++; return; } if (have.has(n)) { known++; return; } if (seen.has(n)) return; seen.add(n); add.push(n); });
+      e.target.value = '';
+      if (!add.length) { toast(`Aucun nouveau container (${known} déjà connus${bad ? ', ' + bad + ' ignorés' : ''})`, 7000); return; }
+      containerList = [...containerList, ...add].sort(); await saveContainerList();
+      toast(`📦 ${add.length} containers ajoutés (${containerList.length} au total${known ? ' · ' + known + ' déjà connus' : ''}${bad ? ' · ' + bad + ' ignorés' : ''})`, 8000);
+      return;
+    }
+    if (hType !== -1 && colTrailer !== -1 && !headerRow.some(h => /ch[ée]ance|date/.test(h))) {
+      // Fichier « n°remorque / n° plaque / Type » (types en néerlandais) : on traduit puis on complète la base sans écraser l'existant
+      const unk = {};
+      const hP = headerRow.findIndex(h => h.includes('plaque'));
+      const rows2 = [['Nom', 'Type', 'Modèle', 'Plaque']];
+      rows.slice(1).forEach(r => {
+        if (!r || !r[colTrailer]) return;
+        const raw = String(r[hType] || '').trim(), m = NL_TYPES[raw.toUpperCase().replace(/\s+/g, ' ')];
+        if (!m && raw) unk[raw] = (unk[raw] || 0) + 1;
+        rows2.push([String(r[colTrailer]).trim(), m ? m[0] : 'Remorque', m ? m[1] : raw, hP >= 0 ? r[hP] : '']);
+      });
+      if (Object.keys(unk).length) toast('Types inconnus (classés en Remorque) : ' + Object.keys(unk).join(', '), 9000);
+      await importFleetRows(rows2, { hNom: 0, hType: 1, hModel: 2, hPlate: 3, fillOnly: true }); e.target.value = ''; return;
+    }
     const colPlate = findCol('plaque');
     const colDate = findCol('échéance', 'echeance', 'date');
 
@@ -5801,7 +5872,7 @@ function openDbSheet(trailerNum) {
   document.getElementById('db-f-vtype').value = entry ? (entry.vtype || '') : '';
   document.getElementById('db-f-model').value = entry ? (entry.model || '') : '';
   document.getElementById('db-f-model-wrap').style.display = (entry && entry.vtype === 'Tracteur') ? 'none' : '';
-  document.getElementById('db-f-container').value = entry ? (entry.container || '') : ''; document.getElementById('db-f-container-wrap').style.display = (entry && entry.vtype === 'Châssis') ? '' : 'none';
+  
   document.getElementById('db-f-plate').disabled = !!(entry && entry.plate);
   document.getElementById('db-f-notes').value = entry ? (entry.notes || '') : '';
   document.getElementById('db-btn-delete').style.display = (trailerNum && hasPermission('trailerdbDelete')) ? 'block' : 'none';
@@ -5828,7 +5899,7 @@ document.getElementById('db-f-trailer').addEventListener('input', (e) => {
 });
 
 document.getElementById('db-f-date').addEventListener('input', updateDbCtPreview);
-document.getElementById('db-f-vtype').addEventListener('change', e => { document.getElementById('db-f-container-wrap').style.display = e.target.value === 'Châssis' ? '' : 'none'; document.getElementById('db-f-model-wrap').style.display = e.target.value === 'Tracteur' ? 'none' : ''; });
+document.getElementById('db-f-vtype').addEventListener('change', e => { document.getElementById('db-f-model-wrap').style.display = e.target.value === 'Tracteur' ? 'none' : ''; });
 
 function updateDbCtPreview() {
   const date = document.getElementById('db-f-date').value;
@@ -5869,7 +5940,7 @@ document.getElementById('db-btn-save').onclick = async () => {
   const vtype = document.getElementById('db-f-vtype').value, model = vtype === 'Tracteur' ? '' : document.getElementById('db-f-model').value.trim();
   const kindFinal = vtype ? vtypeKind(vtype) : (existing ? kindOf(existing) : dbKind);
   trailerDB[trailerNum] = {
-    ctExpiryDate, plate, notes, vtype: vtype || undefined, model: model || undefined, container: vtype === 'Châssis' ? (normContainer(document.getElementById('db-f-container').value) || undefined) : undefined, kind: kindFinal === 'vehicle' ? 'vehicle' : undefined,
+    ctExpiryDate, plate, notes, vtype: vtype || undefined, model: model || undefined, container: existing && existing.container || undefined, kind: kindFinal === 'vehicle' ? 'vehicle' : undefined,
     createdBy: existing ? existing.createdBy : who,
     createdAt: existing ? existing.createdAt : now,
     modifiedBy: who,
