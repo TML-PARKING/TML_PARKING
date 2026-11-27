@@ -2889,7 +2889,7 @@ document.getElementById('btn-filters-config-close').onclick = () => { filtersCon
 // ---------- EXPORT / ENVOI PAR MAIL DE LA LISTE ----------
 const exportModal = document.getElementById('export-modal');
 // Version de l'app + mise à jour automatique (évite de garder une ancienne copie en cache).
-const APP_VERSION = "2026-11-27-ocr-55";
+const APP_VERSION = "2026-11-27-ocr-56";
 (function () {
   try {
     fetch(location.pathname + '?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
@@ -2972,7 +2972,7 @@ function exRows() {
   const mkRow = it => {
     const loc = it._target.type === 'spot' ? 'Parking P' + it._target.id : (it._target.type === 'dock' ? 'Quai Q' + it._target.id : 'Zone libre');
     const r = [it.trailer || '(sans n°)'];
-    if (cols.type) r.push(fleetInfo(it.trailer ? trailerDB[it.trailer] : null));
+    if (cols.type) r.push(exTypeCell(it));
     if (cols.plate) r.push((it.trailer && trailerDB[it.trailer] && trailerDB[it.trailer].plate) || '');
     if (cols.container) r.push(contOf(it));
     r.push(it.client || '');
@@ -3049,7 +3049,13 @@ function exHtmlTable(fold) {
 <tbody>${sec.rows.map((r, i) => { const phs = (sec.ph[i] || []).filter(id => exPhSrc(id)); const key = sec.kind + i; return `<tr>${r.map((c, j) => `<td ${td(i)}>${(j === r.length - 1 && /^📷/.test(c) && (sec.ph[i] || []).length) ? `<a href="${escapeHtml(exPhUrl(sec.ph[i], r[0]))}" target="_blank" rel="noopener" style="color:#2563eb;font-weight:bold;text-decoration:underline;">${escapeHtml(c)}</a>` : j === 0 ? (phs.length && fold ? `<span class="ex-tg" data-k="${key}" style="cursor:pointer;color:#0f766e;margin-right:6px;">▸ 📷${phs.length}</span>` : '') + '<b>' + escapeHtml(c) + '</b>' : ((exStCol[c] || exCellColor(c)) ? '<b style="color:' + (exStCol[c] || exCellColor(c)) + '">' + escapeHtml(c) + '</b>' : escapeHtml(c))}</td>`).join('')}</tr>` + (fold ? exPhotoCells(sec.ph[i] || [], r.length, fold, key) : ''); }).join('')}</tbody></table>`;
   }).join('');
   return `<div style="font-family:Arial,sans-serif;"><table width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 4px;border-collapse:collapse;"><tr><td valign="top"><h2 style="margin:0 0 4px;font:700 18px Arial,sans-serif;color:#111827;">${escapeHtml(exTitle())}</h2>
-<div style="font:12px Arial,sans-serif;color:#6b7280;">${escapeHtml(exDateStr())} · ${exCountLabel()}</div></td><td valign="top" align="right">${sum}</td></tr></table>${secHtml}</div>`;
+<div style="font:12px Arial,sans-serif;color:#6b7280;">${escapeHtml(exDateStr())}</div></td><td valign="top" align="right">${sum}</td></tr></table>${secHtml}</div>`;
+}
+// Colonne Type : le type est déjà donné par la section (Remorques / Camions…) → on n'affiche que le modèle ; seuls les types « à part » (ex. Châssis dans Remorques) gardent leur libellé
+function exTypeCell(it) {
+  const e = it.trailer ? trailerDB[it.trailer] : null; if (!e || !e.vtype) return fleetInfo(e);
+  const dflt = { trailer: 'Remorque', vehicle: 'Camion', van: 'Fourgon', tractor: 'Tracteur' }[exGroup(it)];
+  return e.vtype === dflt ? (e.vtype === 'Tracteur' ? '' : (e.model || '')) : fleetInfo(e);
 }
 function exCountLabel() {
   const n = { trailer: 0, vehicle: 0, van: 0, tractor: 0 }; lastListExport.forEach(it => { n[exGroup(it)]++; });
@@ -3074,7 +3080,7 @@ function exTableCanvas(scale) {
   const cards = groups.map(gr => { let cx = 0, row = 0; const pills = gr.items.map(it => { const t = it.l + ' ' + it.n, w = Math.ceil(m.measureText(t).width) + 18; if (cx + w > cardW - 24 && cx > 0) { row++; cx = 0; } const o = { it, t, w, x: cx, row }; cx += w + 6; return o; }); return { gr, pills, h: 38 + (row + 1) * (pillH + 6) + 8 }; });
   const cardsH = Math.max(0, ...cards.map(c => c.h)), cardsW = cards.length ? cards.length * cardW + (cards.length - 1) * cgap : 0;
   m.font = 'bold 19px Arial, sans-serif'; let titleW = m.measureText(exTitle()).width;
-  m.font = '12px Arial, sans-serif'; titleW = Math.max(titleW, m.measureText(exDateStr() + ' · ' + exCountLabel()).width);
+  m.font = '12px Arial, sans-serif'; titleW = Math.max(titleW, m.measureText(exDateStr()).width);
   const W = Math.max(tableW, 360, titleW + cardsW + 40) + pad * 2, topH = Math.max(64, cardsH + 14), banH = 44, hh = 32, gapS = 22;
   { const extra = W - pad * 2 - tableW; if (extra > 0) { const base = tableW; let used = 0; widths.forEach((w, j) => { const nw = j === widths.length - 1 ? base + extra - used : Math.round(w + extra * w / base); widths[j] = nw; used += nw; }); tableW = base + extra; } }
   const H = topH + sections.reduce((a, sec, i) => a + (i ? gapS : 0) + banH + hh + sec.rhs.reduce((x, y) => x + y, 0) + sec.sub.reduce((x, o) => x + (o ? o.h : 0), 0), 0) + pad * 2;
@@ -3082,7 +3088,7 @@ function exTableCanvas(scale) {
   const g = c.getContext('2d'); g.scale(S, S);
   g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
   g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillStyle = '#111827'; g.font = 'bold 19px Arial, sans-serif'; g.fillText(exTitle(), pad, pad + 14);
-  g.fillStyle = '#6b7280'; g.font = '12px Arial, sans-serif'; g.fillText(exDateStr() + ' · ' + exCountLabel(), pad, pad + 38);
+  g.fillStyle = '#6b7280'; g.font = '12px Arial, sans-serif'; g.fillText(exDateStr(), pad, pad + 38);
   cards.forEach((cd, i) => {
     const x0 = W - pad - cardsW + i * (cardW + cgap), y0 = pad;
     rr(g, x0, y0, cardW, cardsH, 12); g.fillStyle = '#f3f4f6'; g.fill(); g.strokeStyle = '#e5e7eb'; g.lineWidth = 1; g.stroke();
@@ -3216,7 +3222,7 @@ async function exTableBlob() { await exSignLinks(); return new Promise(res => ex
 
 function exText() {
   const { sections } = exRows();
-  let t = exTitle() + '\n' + exDateStr() + ' — ' + exCountLabel() + '\n\n';
+  let t = exTitle() + '\n' + exDateStr() + '\n\n';
   t += exSummaryLines().map(l => l.map(x => x.t).join('')).join('\n') + '\n';
   sections.forEach(sec => { t += '\n== ' + sec.title.toUpperCase() + ' (' + sec.rows.length + ') ==\n' + sec.rows.map(r => '• ' + r.filter(Boolean).join(' — ')).join('\n') + '\n'; });
   return t;
